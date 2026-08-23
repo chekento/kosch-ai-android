@@ -58,7 +58,7 @@ Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn 
 - [ ] lokale Zusammenfassung und strukturierte Befehle mit Schema-Validator
 - [ ] lokaler Embedding-Index für Apps, Shortcuts und explizit gewählte Dateien
 - [ ] manuelle Ordner/Seiten, Drag/Drop, Dock-Reorder, Widget-Stacks und Export/Import
-- [ ] Notification Dots für Channels, Multi-User, Work/Private Profile und OEM-Restart härten
+- [ ] Notification Dots für Multi-User, Work/Private Profile und OEM-Restart härten
 - [ ] Macrobenchmark-/Baseline-Profile-Budgets für Start, Jank, RSS, Akku und Badge-Updates
 - [ ] lokales Audit mit Retention, Export und vollständigem Löschen
 - [ ] Expert-Review-Gaps aus `COMPETITOR_REVIEW_M2_1.md` schließen

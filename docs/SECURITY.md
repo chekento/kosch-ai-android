@@ -38,7 +38,7 @@ Das Storage Access Framework gibt nur die vom Nutzer gewählte URI frei. Der Zug
 
 ## Notification Dots
 
-Der opt-in Listener hält nur ein flüchtiges `packageName → count`-Abbild. Laufende Meldungen und Gruppenzusammenfassungen werden ausgeschlossen. Aktuell wird die `showBadge`-Policy fremder Notification Channels noch nicht vollständig ausgewertet; das ist ein dokumentierter M2.2-Punkt. Benachrichtigungsinhalte dürfen auch für spätere KI-Triage nicht implizit freigeschaltet werden.
+Der opt-in Listener hält nur ein flüchtiges `packageName → count`-Abbild. Laufende Meldungen und Gruppenzusammenfassungen werden ausgeschlossen; `NotificationListenerService.Ranking.canShowBadge()` respektiert die Badge-Entscheidung von Android und Kanal. Benachrichtigungsinhalte dürfen auch für spätere KI-Triage nicht implizit freigeschaltet werden.
 
 ## Externe KI-Übergaben
 

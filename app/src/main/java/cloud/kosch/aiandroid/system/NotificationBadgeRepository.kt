@@ -57,13 +57,23 @@ class KoSchNotificationListenerService : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) = refresh()
 
+    override fun onNotificationRankingUpdate(rankingMap: RankingMap?) = refresh()
+
     override fun onListenerDisconnected() {
         NotificationBadgeRepository.clear()
     }
 
     private fun refresh() {
         val notifications = runCatching { activeNotifications }.getOrNull() ?: return
-        NotificationBadgeRepository.publish(notifications, packageName)
+        val rankingMap = runCatching { currentRanking }.getOrNull()
+        val badgeable = notifications.filter { notification ->
+            if (rankingMap == null) return@filter true
+            val ranking = Ranking()
+            val found = runCatching { rankingMap.getRanking(notification.key, ranking) }
+                .getOrDefault(false)
+            !found || ranking.canShowBadge()
+        }.toTypedArray()
+        NotificationBadgeRepository.publish(badgeable, packageName)
     }
 }
 
