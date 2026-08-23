@@ -8,6 +8,7 @@ import android.media.AudioManager
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.BatteryManager
+import android.os.Build
 import cloud.kosch.aiandroid.model.ContextSnapshot
 import cloud.kosch.aiandroid.model.SceneId
 import java.time.LocalTime
@@ -65,8 +66,15 @@ class LocalContextEngine(private val context: Context) {
 
     private fun hasPersonalAudioOutput(): Boolean {
         val manager = context.getSystemService(AudioManager::class.java)
+        val supportedTypes = buildSet {
+            addAll(personalAudioTypes)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                add(AudioDeviceInfo.TYPE_BLE_HEADSET)
+                add(AudioDeviceInfo.TYPE_BLE_SPEAKER)
+            }
+        }
         return manager.getDevices(AudioManager.GET_DEVICES_OUTPUTS).any { device ->
-            device.type in personalAudioTypes
+            device.type in supportedTypes
         }
     }
 
@@ -79,8 +87,6 @@ class LocalContextEngine(private val context: Context) {
         val personalAudioTypes = setOf(
             AudioDeviceInfo.TYPE_BLUETOOTH_A2DP,
             AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
-            AudioDeviceInfo.TYPE_BLE_HEADSET,
-            AudioDeviceInfo.TYPE_BLE_SPEAKER,
             AudioDeviceInfo.TYPE_USB_HEADSET,
             AudioDeviceInfo.TYPE_WIRED_HEADPHONES,
             AudioDeviceInfo.TYPE_WIRED_HEADSET,

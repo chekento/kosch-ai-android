@@ -52,7 +52,7 @@ object SearchRanker {
     private fun String.normalized(): String = Normalizer
         .normalize(lowercase(Locale.GERMAN), Normalizer.Form.NFD)
         .replace("\\p{M}+".toRegex(), "")
-        .replace("[^a-z0-9 ]".toRegex(), " ")
+        .replace("[^a-z0-9 ]".toRegex(), "")
         .replace("\\s+".toRegex(), " ")
         .trim()
 }
@@ -107,4 +107,3 @@ object LocalAppClassifier {
     )
     private val gameTokens = setOf("game", "games", "gaming", "playgames")
 }
-
