@@ -29,16 +29,27 @@ Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn 
 - [x] ruhender Android-Keystore-Vault und Endpoint-Policy
 - [x] code-nativer Neural-Glass-Hintergrund
 - [ ] Widget-Resize, freie Platzierung, Restore-Mapping und Undo
-- [ ] Ordner, mehrere Workspace-Seiten, App-Dock und App-Pinning
-- [ ] Notification Dots/Badges
+- [x] lokale Smart-Ordner, zwei Home-Räume, adaptives App-Dock und Pinning
+- [x] opt-in Notification Dots ohne Inhaltskopie
 - [ ] vollständige Accessibility- und OEM-Gerätetests
 
-## Nächster Lauf – M2.1 Stabilisierung und echtes lokales Modell
+## M2.1 – Resilient Smart Home
 
-- [ ] Crash-safe Persistenzschema mit Versionen/Migrationen
+- [x] Persistenzschema mit Version und JSON-sicheren Collections
+- [x] Pending-Widget-ID über Activity-Recreation erhalten
+- [x] verspätete Shortcut-Ergebnisse bei Auswahlwechsel verwerfen
+- [x] persistierte Dokumentfreigabe ersetzen und lösen
+- [x] Suchnormalisierung für Trennzeichen/Leerzeichen härten
+- [x] lokale Smart-Ordner mit Preview/Apply/Discard
+- [x] szenenadaptives Dock mit Pin/Unpin
+- [x] Reduced-Motion-Fallback
+- [x] 7-Launcher-/60-Kategorien- und 25-Rollen-Review
+
+## Nächster Lauf – M2.2 Messbare Reife und lokales Modell
+
+- [ ] Migrationstests und vollständiger Prozess-Tod-/State-Restore
 - [ ] ViewModel/StateFlow statt Activity-gebundener Controller-Lebensdauer
 - [ ] instrumentierte Tests für HOME, SAF, Widget-Abbruch und Konfiguration
-- [ ] Baseline Profiles, Macrobenchmarks, Startzeit-, Jank-, Akku- und Thermal-Messung
 - [ ] TalkBack, Switch Access, Schrift 200 %, Reduced Motion und Kontrastprüfung
 - [ ] Foldable/Tablet-/Landscape-Layouts
 - [ ] `LocalModelBackend` in isolierter Service-/Prozessgrenze
@@ -46,7 +57,11 @@ Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn 
 - [ ] Modellimport per SAF, Lizenzanzeige, Hashprüfung, Load/Cancel/Unload
 - [ ] lokale Zusammenfassung und strukturierte Befehle mit Schema-Validator
 - [ ] lokaler Embedding-Index für Apps, Shortcuts und explizit gewählte Dateien
-- [ ] Expert-Review-Gaps aus `EXPERT_REVIEW_M2.md` schließen
+- [ ] manuelle Ordner/Seiten, Drag/Drop, Dock-Reorder, Widget-Stacks und Export/Import
+- [ ] Notification Dots für Channels, Multi-User, Work/Private Profile und OEM-Restart härten
+- [ ] Macrobenchmark-/Baseline-Profile-Budgets für Start, Jank, RSS, Akku und Badge-Updates
+- [ ] lokales Audit mit Retention, Export und vollständigem Löschen
+- [ ] Expert-Review-Gaps aus `COMPETITOR_REVIEW_M2_1.md` schließen
 
 ## M3 – Sichere Agenten und optionale APIs
 

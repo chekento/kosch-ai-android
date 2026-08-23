@@ -13,16 +13,16 @@ flowchart TD
     Preview --> Models["optionale lokale / externe Modelle"]
 ```
 
-M2 implementiert `Local Core` und die Android-Gateways. Generative Modelllaufzeiten sind registrierte, aber noch nicht in den HOME-Prozess geladene Erweiterungen.
+M2.1 implementiert `Local Core`, die Android-Gateways und einen persistierten Smart Space. Generative Modelllaufzeiten sind registrierte, aber noch nicht in den HOME-Prozess geladene Erweiterungen.
 
 ## Gegenwärtige Paketgrenzen
 
 | Paket | Verantwortung | Vertrauensniveau |
 |---|---|---|
 | `model` | unveränderliche Workspace-, Datei-, Shortcut- und Systemmodelle | rein |
-| `data` | App-/Shortcut-Katalog, Workspace- und Widget-ID-Persistenz | lokal |
-| `ai` | Befehlsplanung, Suche, Klassifikation, Runtime-/Providerprofile | lokal; keine Netzschicht |
-| `system` | HOME-Rolle, Kontext, Dialer/Settings/File-Gateways, Widget Host | Android-Grenze |
+| `data` | App-/Shortcut-Katalog, versionierter Workspace, Dock-/Ordner- und Widget-ID-Persistenz | lokal |
+| `ai` | Befehlsplanung, Suche, Smart-Dock-/Ordner-Klassifikation, Runtime-/Providerprofile | lokal; keine Netzschicht |
+| `system` | HOME-Rolle, Kontext, Dialer/Settings/File-Gateways, Grant-Owner, Badge Listener, Widget Host | Android-Grenze |
 | `security` | Endpoint-Policy und ruhender Keystore-Vault | Secret-Grenze |
 | `ui` | Compose-Shell, Onboarding, Sheets, Neural Glass, Bestätigungen | Darstellung |
 | `LauncherController` | explizite Orchestrierung und UI-Zustand | Application Layer |
@@ -50,7 +50,7 @@ stateDiagram-v2
     Preview --> [*]: Schließen
 ```
 
-Die Activity nutzt `ACTION_OPEN_DOCUMENT` über den Activity-Result-Vertrag und versucht, nur die READ-URI-Berechtigung zu persistieren. `LocalFileIntelligenceEngine` liest Metadaten sowie maximal 4.096 Zeichen aus erkannten Textformaten. Binärdateien werden nicht als Text geraten. M2 verändert, löscht oder benennt Dokumente nicht um.
+Die Activity nutzt `ACTION_OPEN_DOCUMENT` über den Activity-Result-Vertrag. `DocumentGrantManager` besitzt höchstens eine persistierte READ-URI-Freigabe: Eine neue Wahl ersetzt die alte, und die Oberfläche kann den Zugriff explizit lösen. `LocalFileIntelligenceEngine` liest Metadaten sowie maximal 4.096 Zeichen aus erkannten Textformaten. Binärdateien werden nicht als Text geraten. M2.1 verändert, löscht oder benennt Dokumente nicht um.
 
 ## Telefon und Systemeinstellungen
 
@@ -71,6 +71,18 @@ stateDiagram-v2
 ```
 
 `WidgetHostController` besitzt eine stabile Host-ID. Erst nach erfolgreicher Bindung wird die Widget-ID im Workspace Store persistiert. Abbruch und Löschen geben IDs frei. Beim Start werden nicht mehr gültige Records entfernt. M2 hostet Widgets in einem separaten Board; freie Position, Resize, Restore-Mapping und Undo für Widgets sind noch nicht fertig.
+
+Die während Androids Picker/Provider-Konfiguration offene Host-ID wird zusätzlich in `onSaveInstanceState` erhalten. Dadurch geht sie bei Activity-Recreation nicht sofort verloren; vollständige Prozess-Tod- und Provider-Restore-Tests bleiben ein M2.2-Gate.
+
+## Smart Space, Dock und Ordner
+
+`LocalSmartOrganizer` verarbeitet ausschließlich App-Key, Label, Paketname, lokale Recency, Pinning und aktive Szene. Das Dock setzt manuell gepinnte Apps zuerst, danach lokale Recency und szenenspezifische Kategorien. Ordner werden deterministisch vorgeschlagen und als JSON mit Schema-Version persistiert. Erneutes Organisieren nutzt **Vorschau → Anwenden/Verwerfen**; das erste leere Profil wird lokal mit editierbaren Starter-Sammlungen initialisiert.
+
+App-Shortcut-Abfragen tragen einen monotonen Request-Token. Wechselt die Auswahl oder schließt sich das Sheet, darf ein verspätetes Ergebnis den Zustand nicht mehr überschreiben.
+
+## Notification Dots
+
+`KoSchNotificationListenerService` ist opt-in und durch Androids `BIND_NOTIFICATION_LISTENER_SERVICE` geschützt. Der Launcher kopiert ausschließlich Paketname und Anzahl aktiver, nicht laufender, nicht gruppenzusammenfassender Notifications in einen prozesslokalen Zähler. Titel, Text, Extras, Personen und Aktionen werden nicht gespeichert. Ohne erteilten Zugriff ist die Map leer; alle anderen HOME-Funktionen bleiben aktiv.
 
 ## Workspace-Mutationen
 

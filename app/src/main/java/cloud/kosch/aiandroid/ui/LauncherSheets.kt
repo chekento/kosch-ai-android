@@ -165,7 +165,7 @@ fun OnboardingExperience(
                 title = "Sprich mit dem ganzen Startbildschirm.",
                 body = "Tippe oder sage zum Beispiel „Öffne Kamera“, „Wähle 030…“, „Datei analysieren“, „WLAN“ oder „Szene Work“.",
                 icon = Icons.Rounded.Check,
-                bullets = listOf("App-Shortcuts per langem Druck", "Widgets im eigenen Board", "Open-Source-KI als bewusste Option"),
+                bullets = listOf("Smart Dock und lokale Ordner", "App-Shortcuts und Widgets", "Open-Source-KI als bewusste Option"),
             ),
         )
     }
