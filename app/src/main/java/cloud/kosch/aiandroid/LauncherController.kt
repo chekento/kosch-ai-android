@@ -251,7 +251,7 @@ class LauncherController(context: Context) {
             )
         }
         val byKey = filtered.associateBy { it.key }
-        return SearchRanker.rank(
+        val ranked = SearchRanker.rank(
             query = query,
             documents = filtered.map { app ->
                 SearchDocument(
@@ -261,6 +261,11 @@ class LauncherController(context: Context) {
                 )
             },
         ).mapNotNull { byKey[it.id] }
+        return if (collection == SmartCollection.RECENT && query.isBlank()) {
+            ranked.sortedBy { recentPackages.indexOf(it.packageName).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE }
+        } else {
+            ranked
+        }
     }
 
     fun installedProviderApp(provider: AiProviderProfile): LaunchableApp? =
@@ -350,4 +355,3 @@ class LauncherController(context: Context) {
         canUndoLayout = true
     }
 }
-
