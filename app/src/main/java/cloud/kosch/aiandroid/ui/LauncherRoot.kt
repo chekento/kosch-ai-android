@@ -247,7 +247,7 @@ private fun LauncherHeader(
             }
             ModeToggle(
                 mode = controller.workspaceMode,
-                onModeSelected = controller::setWorkspaceMode,
+                onModeSelected = controller::selectWorkspaceMode,
             )
         }
 
@@ -697,7 +697,7 @@ private fun AppDrawerSheet(controller: LauncherController) {
                 items(SmartCollection.entries, key = { it.name }) { collection ->
                     FilterChip(
                         selected = controller.drawerCollection == collection,
-                        onClick = { controller.setDrawerCollection(collection) },
+                        onClick = { controller.selectDrawerCollection(collection) },
                         label = { Text(collection.title) },
                     )
                 }

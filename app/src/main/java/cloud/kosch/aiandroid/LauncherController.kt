@@ -95,7 +95,7 @@ class LauncherController(context: Context) {
         contextSnapshot = contextEngine.snapshot()
     }
 
-    fun setWorkspaceMode(mode: WorkspaceMode) {
+    fun selectWorkspaceMode(mode: WorkspaceMode) {
         workspaceMode = mode
         if (mode == WorkspaceMode.PLAY) previewPositions = null
     }
@@ -186,7 +186,7 @@ class LauncherController(context: Context) {
         drawerVisible = false
     }
 
-    fun setDrawerCollection(collection: SmartCollection) {
+    fun selectDrawerCollection(collection: SmartCollection) {
         drawerCollection = collection
     }
 
