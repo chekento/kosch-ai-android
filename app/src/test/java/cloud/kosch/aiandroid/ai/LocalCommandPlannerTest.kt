@@ -1,6 +1,7 @@
 package cloud.kosch.aiandroid.ai
 
 import cloud.kosch.aiandroid.model.SceneId
+import cloud.kosch.aiandroid.model.SystemPanel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -40,5 +41,25 @@ class LocalCommandPlannerTest {
         assertTrue(command is LauncherCommand.RoutePrompt)
         assertEquals("Fasse meinen Tag zusammen", (command as LauncherCommand.RoutePrompt).prompt)
     }
-}
 
+    @Test
+    fun `dial command sanitizes a number but still delegates the actual call`() {
+        assertEquals(
+            LauncherCommand.OpenPhone("+4930123456"),
+            planner.plan("Wähle +49 (30) 123-456"),
+        )
+    }
+
+    @Test
+    fun `file command stays inside explicit document picker route`() {
+        assertEquals(LauncherCommand.OpenFiles, planner.plan("Datei analysieren"))
+    }
+
+    @Test
+    fun `home selection command exposes the launcher escape hatch`() {
+        assertEquals(
+            LauncherCommand.OpenSystemPanel(SystemPanel.HOME_SELECTION),
+            planner.plan("Launcher Auswahl"),
+        )
+    }
+}
