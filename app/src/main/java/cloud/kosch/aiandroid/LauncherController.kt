@@ -15,9 +15,11 @@ import cloud.kosch.aiandroid.ai.LauncherCommand
 import cloud.kosch.aiandroid.ai.LocalAppClassifier
 import cloud.kosch.aiandroid.ai.LocalCommandPlanner
 import cloud.kosch.aiandroid.ai.LocalFileIntelligenceEngine
+import cloud.kosch.aiandroid.ai.LocalSmartOrganizer
 import cloud.kosch.aiandroid.ai.PhoneNumberParser
 import cloud.kosch.aiandroid.ai.SearchDocument
 import cloud.kosch.aiandroid.ai.SearchRanker
+import cloud.kosch.aiandroid.ai.SmartAppDescriptor
 import cloud.kosch.aiandroid.ai.SmartCollection
 import cloud.kosch.aiandroid.data.AppCatalog
 import cloud.kosch.aiandroid.data.WorkspaceStore
@@ -26,6 +28,8 @@ import cloud.kosch.aiandroid.model.DefaultWorkspace
 import cloud.kosch.aiandroid.model.LaunchableApp
 import cloud.kosch.aiandroid.model.LaunchableShortcut
 import cloud.kosch.aiandroid.model.FileInsight
+import cloud.kosch.aiandroid.model.HomePage
+import cloud.kosch.aiandroid.model.LauncherFolder
 import cloud.kosch.aiandroid.model.PositionedTile
 import cloud.kosch.aiandroid.model.SceneId
 import cloud.kosch.aiandroid.model.SystemPanel
@@ -33,6 +37,8 @@ import cloud.kosch.aiandroid.model.TilePosition
 import cloud.kosch.aiandroid.model.WorkspaceMode
 import cloud.kosch.aiandroid.system.HomeRoleController
 import cloud.kosch.aiandroid.system.LocalContextEngine
+import cloud.kosch.aiandroid.system.NotificationAccess
+import cloud.kosch.aiandroid.system.NotificationBadgeRepository
 import cloud.kosch.aiandroid.system.SystemActionGateway
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -53,6 +59,8 @@ class LauncherController(context: Context) {
     var appsLoading by mutableStateOf(true)
         private set
     var activeScene by mutableStateOf(store.loadScene())
+        private set
+    var homePage by mutableStateOf(store.loadHomePage())
         private set
     var workspaceMode by mutableStateOf(WorkspaceMode.PLAY)
         private set
@@ -104,20 +112,40 @@ class LauncherController(context: Context) {
         private set
     var recentPackages by mutableStateOf(store.recentPackages())
         private set
+    var pinnedAppKeys by mutableStateOf(store.pinnedAppKeys())
+        private set
+    var folders by mutableStateOf(store.folders())
+        private set
+    var folderPreview by mutableStateOf<List<LauncherFolder>?>(null)
+        private set
+    var folderSheetVisible by mutableStateOf(false)
+        private set
+    var selectedFolderId by mutableStateOf<String?>(null)
+        private set
+    var notificationCounts by mutableStateOf<Map<String, Int>>(emptyMap())
+        private set
+    var notificationAccessGranted by mutableStateOf(NotificationAccess.isGranted(appContext))
+        private set
 
     private var undoPositions: Map<SceneId, Map<String, TilePosition>>? = null
+    private var shortcutRequestToken = 0L
     private var started = false
+    private val badgeListener = NotificationBadgeRepository.Listener { counts ->
+        mainHandler.post { notificationCounts = counts }
+    }
 
     fun start() {
         if (started) return
         started = true
         appCatalog.startListening()
+        NotificationBadgeRepository.addListener(badgeListener)
         refreshApps()
         refreshSystemState()
     }
 
     fun close() {
         if (!started) return
+        NotificationBadgeRepository.removeListener(badgeListener)
         appCatalog.stopListening()
         executor.shutdownNow()
         started = false
@@ -126,6 +154,17 @@ class LauncherController(context: Context) {
     fun refreshSystemState() {
         isDefaultHome = HomeRoleController.isDefaultHome(appContext)
         contextSnapshot = contextEngine.snapshot()
+        notificationAccessGranted = NotificationAccess.isGranted(appContext)
+        notificationCounts = if (notificationAccessGranted) {
+            NotificationBadgeRepository.snapshot()
+        } else {
+            emptyMap()
+        }
+    }
+
+    fun switchHomePage(page: HomePage) {
+        homePage = page
+        store.saveHomePage(page)
     }
 
     fun selectWorkspaceMode(mode: WorkspaceMode) {
@@ -320,6 +359,17 @@ class LauncherController(context: Context) {
             .onFailure { notice = "Für diesen Dateityp ist keine App verfügbar" }
     }
 
+    fun forgetDocument(released: Boolean) {
+        fileInsight = null
+        fileLoading = false
+        fileSheetVisible = false
+        notice = if (released) {
+            "Gespeicherter Dateizugriff wurde gelöst"
+        } else {
+            "Es war kein gespeicherter Dateizugriff vorhanden"
+        }
+    }
+
     fun openWidgetBoard() {
         widgetBoardVisible = true
     }
@@ -342,7 +392,9 @@ class LauncherController(context: Context) {
     }
 
     fun showAppActions(app: LaunchableApp) {
+        val requestToken = ++shortcutRequestToken
         drawerVisible = false
+        folderSheetVisible = false
         selectedApp = app
         appActionsVisible = true
         shortcutsLoading = true
@@ -350,6 +402,9 @@ class LauncherController(context: Context) {
         executor.execute {
             val result = runCatching { appCatalog.loadShortcuts(app) }
             mainHandler.post {
+                if (requestToken != shortcutRequestToken || selectedApp?.key != app.key) {
+                    return@post
+                }
                 appShortcuts = result.getOrDefault(emptyList())
                 shortcutsLoading = false
             }
@@ -357,7 +412,111 @@ class LauncherController(context: Context) {
     }
 
     fun hideAppActions() {
+        shortcutRequestToken += 1
         appActionsVisible = false
+        shortcutsLoading = false
+    }
+
+    fun isPinned(app: LaunchableApp): Boolean = app.key in pinnedAppKeys
+
+    fun toggleSelectedAppPin() {
+        val app = selectedApp ?: return
+        pinnedAppKeys = if (app.key in pinnedAppKeys) {
+            pinnedAppKeys.filterNot { it == app.key }
+        } else {
+            (pinnedAppKeys + app.key).distinct().take(MAX_PINNED_APPS)
+        }
+        store.savePinnedAppKeys(pinnedAppKeys)
+        notice = if (app.key in pinnedAppKeys) {
+            "${app.label} ist fest im Smart Dock"
+        } else {
+            "${app.label} wurde aus dem Smart Dock gelöst"
+        }
+    }
+
+    fun smartDockApps(): List<LaunchableApp> {
+        val byKey = apps.associateBy(LaunchableApp::key)
+        return LocalSmartOrganizer.smartDockKeys(
+            apps = appDescriptors(),
+            pinnedKeys = pinnedAppKeys,
+            recentPackages = recentPackages,
+            scene = activeScene,
+            limit = DOCK_SIZE,
+        ).mapNotNull(byKey::get)
+    }
+
+    fun proposeSmartFolders() {
+        folderPreview = LocalSmartOrganizer.proposeFolders(appDescriptors())
+        notice = "Lokaler Ordnervorschlag – erst nach Bestätigung gespeichert"
+    }
+
+    fun applyFolderPreview() {
+        val proposal = folderPreview ?: return
+        folders = proposal
+        store.saveFolders(folders)
+        folderPreview = null
+        notice = "Smart-Ordner angewendet"
+    }
+
+    fun discardFolderPreview() {
+        folderPreview = null
+        notice = "Ordnervorschlag verworfen"
+    }
+
+    fun addSelectedAppToSmartFolder() {
+        val app = selectedApp ?: return
+        val descriptor = app.toSmartDescriptor()
+        val kind = LocalSmartOrganizer.bestFolderKind(descriptor)
+        val existing = folders.firstOrNull { it.kind == kind }
+        folders = if (existing == null) {
+            folders + LauncherFolder(
+                id = "local-${kind.name.lowercase()}",
+                title = kind.title,
+                kind = kind,
+                appKeys = listOf(app.key),
+            )
+        } else {
+            folders.map { folder ->
+                if (folder.id == existing.id) {
+                    folder.copy(appKeys = (folder.appKeys + app.key).distinct())
+                } else {
+                    folder
+                }
+            }
+        }
+        store.saveFolders(folders)
+        notice = "${app.label} liegt jetzt in ${kind.title}"
+    }
+
+    fun openFolder(folderId: String) {
+        if (folders.none { it.id == folderId }) return
+        selectedFolderId = folderId
+        folderSheetVisible = true
+    }
+
+    fun closeFolder() {
+        folderSheetVisible = false
+        selectedFolderId = null
+    }
+
+    fun selectedFolder(): LauncherFolder? =
+        selectedFolderId?.let { id -> folders.firstOrNull { it.id == id } }
+
+    fun folderApps(folder: LauncherFolder): List<LaunchableApp> {
+        val byKey = apps.associateBy(LaunchableApp::key)
+        return folder.appKeys.mapNotNull(byKey::get)
+    }
+
+    fun removeFolder(folderId: String) {
+        val removed = folders.firstOrNull { it.id == folderId } ?: return
+        folders = folders.filterNot { it.id == folderId }
+        store.saveFolders(folders)
+        if (selectedFolderId == folderId) closeFolder()
+        notice = "Ordner ${removed.title} entfernt; Apps bleiben installiert"
+    }
+
+    fun openNotificationAccess() {
+        openSystemPanel(SystemPanel.NOTIFICATION_ACCESS)
     }
 
     fun launch(shortcut: LaunchableShortcut) {
@@ -365,7 +524,7 @@ class LauncherController(context: Context) {
             .onSuccess {
                 store.recordRecent(shortcut.packageName)
                 recentPackages = store.recentPackages()
-                appActionsVisible = false
+                hideAppActions()
                 drawerVisible = false
             }
             .onFailure { notice = "${shortcut.label} konnte nicht gestartet werden" }
@@ -403,7 +562,7 @@ class LauncherController(context: Context) {
                 store.recordRecent(app.packageName)
                 recentPackages = store.recentPackages()
                 drawerVisible = false
-                appActionsVisible = false
+                hideAppActions()
             }
             .onFailure { notice = "${app.label} konnte nicht gestartet werden" }
     }
@@ -517,6 +676,10 @@ class LauncherController(context: Context) {
             mainHandler.post {
                 loaded.onSuccess { catalog ->
                     apps = catalog.filterNot { it.packageName == appContext.packageName }
+                    if (folders.isEmpty() && apps.isNotEmpty()) {
+                        folders = LocalSmartOrganizer.proposeFolders(appDescriptors())
+                        store.saveFolders(folders)
+                    }
                     appsLoading = false
                 }.onFailure {
                     appsLoading = false
@@ -529,5 +692,18 @@ class LauncherController(context: Context) {
     private fun rememberUndoPoint() {
         undoPositions = workspacePositions.mapValues { (_, positions) -> positions.toMap() }
         canUndoLayout = true
+    }
+
+    private fun appDescriptors(): List<SmartAppDescriptor> = apps.map { it.toSmartDescriptor() }
+
+    private fun LaunchableApp.toSmartDescriptor() = SmartAppDescriptor(
+        key = key,
+        label = label,
+        packageName = packageName,
+    )
+
+    private companion object {
+        const val MAX_PINNED_APPS = 8
+        const val DOCK_SIZE = 5
     }
 }

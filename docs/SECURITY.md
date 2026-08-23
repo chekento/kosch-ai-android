@@ -1,30 +1,32 @@
 # Sicherheit und Datenschutz
 
-## M2-Dateninventar
+## M2.1-Dateninventar
 
 KoSch verarbeitet lokal:
 
 - Uhrzeit, Akkustand/Ladestatus, validierte Netzverfügbarkeit und aktive persönliche Audioausgänge;
 - installierte startbare Launcher-Activities und von Apps veröffentlichte Shortcuts;
-- Szene, Kartenpositionen, Widget-Host-IDs und zuletzt über KoSch gestartete Paketnamen;
+- Szene, Home-Raum, Kartenpositionen, Dock-Pins, lokale Ordner, Widget-Host-IDs und zuletzt über KoSch gestartete Paketnamen;
 - nach ausdrücklicher Android-Auswahl: URI-Metadaten und bei erkannten Textformaten höchstens 4.096 Zeichen Textpräfix;
 - Text, den die Person in `⌘ Ask` eingibt oder aus der gestarteten Spracherkennungs-Activity übernimmt.
 
-Nicht gelesen werden Standort, Kontakte, Kalender, Anrufliste, SMS, Benachrichtigungsinhalte, Zwischenablage, Fotosammlung, permanenter Mikrofonstream oder Bildschirm. Aus einer gewählten Binärdatei werden keine vermeintlichen Textinhalte extrahiert.
+Nach separatem Android-Opt-in werden für Notification Dots ausschließlich Paketnamen und Anzahlen aktiver, nicht laufender Meldungen verarbeitet. Nicht kopiert oder gespeichert werden Notification-Titel, Text, Personen, Extras, Aktionen oder RemoteViews.
+
+Nicht gelesen werden Standort, Kontakte, Kalender, Anrufliste, SMS, Zwischenablage, Fotosammlung, permanenter Mikrofonstream oder Bildschirm. Aus einer gewählten Binärdatei werden keine vermeintlichen Textinhalte extrahiert.
 
 ## Berechtigungsbudget
 
-M2 deklariert nur `ACCESS_NETWORK_STATE`. Damit erkennt die Context Engine, ob ein validiertes Netz existiert. Es gibt bewusst kein:
+M2.1 deklariert als `uses-permission` nur `ACCESS_NETWORK_STATE`. Damit erkennt die Context Engine, ob ein validiertes Netz existiert. Es gibt bewusst kein:
 
 - `INTERNET`;
 - `CALL_PHONE` oder Kontakte-/Anruflistenrecht;
 - `READ_MEDIA_*` oder `MANAGE_EXTERNAL_STORAGE`;
 - `QUERY_ALL_PACKAGES`;
 - Accessibility Service;
-- Benachrichtigungszugriff;
+- standardmäßig erteilten Benachrichtigungszugriff;
 - Standort-/Kalender-/Mikrofonrecht.
 
-Spracherkennung, Dateiauswahl, Telefon, Widgets und Systemeinstellungen werden als sichtbare Android-Aktivitäten gestartet. Der jeweilige System-/Zielprozess besitzt seine eigenen Datenschutzregeln.
+Die App deklariert einen durch das System gebundenen Notification-Listener-Service, aber keine entsprechende Laufzeitberechtigung. Erst die Person kann ihn in Androids geschützter Einstellungsseite aktivieren; der Core funktioniert ohne ihn. Spracherkennung, Dateiauswahl, Telefon, Widgets und Systemeinstellungen werden als sichtbare Android-Aktivitäten gestartet. Der jeweilige System-/Zielprozess besitzt seine eigenen Datenschutzregeln.
 
 ## Telefon
 
@@ -32,7 +34,11 @@ KoSch verwendet `ACTION_DIAL`. Eine erkannte Nummer wird höchstens normalisiert
 
 ## Dateien
 
-Das Storage Access Framework gibt nur die vom Nutzer gewählte URI frei. Der Zugriff ist read-only. Die lokale Analyse ist begrenzt und fehlertolerant; M2 enthält keine Lösch-, Rename-, Move- oder Upload-Aktion. Ein vorgeschlagener Dateiname ist nur Text in einer Vorschau.
+Das Storage Access Framework gibt nur die vom Nutzer gewählte URI frei. Der Zugriff ist read-only. M2.1 verwaltet höchstens eine langfristige Freigabe, löst den vorherigen Zugriff nach erfolgreicher neuer Wahl und bietet „Dateizugriff vergessen“. Die lokale Analyse ist begrenzt und fehlertolerant; es gibt keine Lösch-, Rename-, Move- oder Upload-Aktion. Ein vorgeschlagener Dateiname ist nur Text in einer Vorschau.
+
+## Notification Dots
+
+Der opt-in Listener hält nur ein flüchtiges `packageName → count`-Abbild. Laufende Meldungen und Gruppenzusammenfassungen werden ausgeschlossen; `NotificationListenerService.Ranking.canShowBadge()` respektiert die Badge-Entscheidung von Android und Kanal. Benachrichtigungsinhalte dürfen auch für spätere KI-Triage nicht implizit freigeschaltet werden.
 
 ## Externe KI-Übergaben
 
@@ -67,7 +73,7 @@ M2 fordert keine Schlüssel an und liest den Vault nicht aus. Vor einem aktiven 
 
 LLM-Ausgaben sind Daten, keine Autorität. Sie dürfen keine Capability direkt erzeugen oder erweitern.
 
-## Bekannte M2-Risiken
+## Bekannte M2.1-Risiken
 
 - keine instrumentierten Geräte-/OEM-Tests;
 - Widget-Restore und Größenänderung noch unvollständig;
@@ -75,6 +81,8 @@ LLM-Ausgaben sind Daten, keine Autorität. Sie dürfen keine Capability direkt e
 - externe Share-Ziele können Text anders behandeln als erwartet;
 - Voice hängt vom installierten Android-Spracherkenner ab und ist nicht garantiert offline;
 - Vault-Sicherheitscode ist vorbereitet, aber noch nicht durch End-to-End-Key-Rotation oder Hardware-Attestation validiert;
-- keine Security-Audit- oder Penetration-Test-Freigabe.
+- keine Security-Audit- oder Penetration-Test-Freigabe;
+- Notification-Dot-Semantik ist noch nicht gegen Work/Private Profile und alle OEM-Service-Killer geprüft;
+- Smart Dock/Ordner nutzen transparente String-Heuristiken und lernen noch kein persönliches Modell.
 
 Der Launcher ist daher Alpha-Software und sollte zunächst auf Emulator/Zweitgerät getestet werden.

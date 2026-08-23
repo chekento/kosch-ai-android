@@ -14,32 +14,34 @@ KoSch trennt drei Ebenen sichtbar:
 
 | Priorität | Usecase | Nutzwert | Ausführung / Daten | Stand |
 |---:|---|---|---|---|
-| 1 | Universeller Intent-Eingang | „Öffne Kamera“, „WLAN“, „Wähle …“ statt Navigation | lokaler Planner → explizites Android-Gateway | M2 aktiv |
-| 2 | App-Suche und Smart Collections | schnelleres Finden ohne Cloudindex | Labels/Paketnamen lokal, fuzzy Ranking | M2 aktiv |
-| 3 | Kontextuelle Szenen | passender Workspace für Arbeit, Studio, Social, Abend | Uhr, Akku, Netz, Audio lokal | M2 aktiv |
-| 4 | Sichere Datei-Intelligenz | Metadaten, Kategorie, Textumfang, Namensvorschlag | nur gewählte SAF-URI; Textpräfix max. 4.096 Zeichen | M2 aktiv |
-| 5 | Layout-Assistent | weniger manuelles Sortieren | Vorschau → Anwenden/Verwerfen → Undo | M2 aktiv, regelbasiert |
-| 6 | Modell-/Provider-Routing | lokal, frei oder Cloud je Aufgabe wählen | Übergabe erst nach Tipp; keine verdeckte API | M2 aktiv |
-| 7 | App-Shortcut-Orchestrierung | tiefe App-Aktionen ohne UI-Automation | `LauncherApps.getShortcuts/startShortcut` | M2 aktiv |
-| 8 | Widget-Zentrale | Systeminformationen und App-Funktionen bündeln | Android `AppWidgetHost` | M2 aktiv |
-| 9 | Lokale Zusammenfassung | Notizen/gewählte Dokumente offline verdichten | optionales On-Device-LLM; Daten bleiben lokal | nächster Lauf |
-| 10 | Semantische Gerätesuche | Apps, eigene Dateien, Einstellungen, Shortcuts in einem Index | opt-in lokaler Embedding-Index, je Quelle löschbar | nächster Lauf |
-| 11 | Benachrichtigungs-Triage | weniger Unterbrechungen und gruppierte Wichtigkeit | opt-in Notification Listener; Inhalte standardmäßig nicht speichern | M3 |
-| 12 | Kalender-/Aufgabenplanung | realistische Tagespläne statt bloßer Antworten | einzelne opt-in Provider, Vorschau vor Schreibzugriff | M3 |
-| 13 | Kommunikationsentwürfe | Antworten formulieren, Ton/Barrierefreiheit anpassen | ausgewählter Text; immer Vorschau vor Share | M3 |
-| 14 | Gerätesupport | „Warum ist mein Akku leer?“ mit nachvollziehbaren Diagnosen | erlaubte lokale Telemetrie, keine Root-/Shell-Tricks | M3 |
-| 15 | Adaptive Bedienung | größere Ziele, ruhigere Oberfläche, kontextuelle Vereinfachung | lokale Präferenzregeln, Accessibility-Test | M3 |
-| 16 | Regelautomation | Szenen nach Zeit, Akku, Audio oder Netz | Capability-Tokens, Dry Run, Audit, Undo | M3 |
-| 17 | Persönlicher Memory-Vault | Vorlieben und Routinen ohne Cloudprofil | verschlüsselt, pro Quelle sichtbar/exportierbar/löschbar | M4 |
-| 18 | Lokale Sprache | offline STT/TTS und unterbrechbare Dialoge | austauschbare On-Device-Engines | M4 |
-| 19 | Theme-/Wallpaper-Designer | PMDD, Stimmung, Tagesphase oder Fokus in Visuals übersetzen | generiertes Asset nur nach Vorschau setzen | M4 |
-| 20 | Multi-App-Workflows | dokumentierte Deep Links/Intents sinnvoll verketten | keine Accessibility-Fernsteuerung; Bestätigung je Risikoklasse | M4 |
+| 1 | Universeller Intent-Eingang | „Öffne Kamera“, „WLAN“, „Wähle …“ statt Navigation | lokaler Planner → explizites Android-Gateway | M2.1 aktiv |
+| 2 | App-Suche und Smart Collections | schnelleres Finden ohne Cloudindex | Labels/Paketnamen lokal, fuzzy Ranking | M2.1 aktiv |
+| 3 | Kontextuelle Szenen | passender Workspace für Arbeit, Studio, Social, Abend | Uhr, Akku, Netz, Audio lokal | M2.1 aktiv |
+| 4 | Adaptives Dock und Smart-Ordner | wichtige Apps ohne manuelles Mikromanagement | Szene, Recency, Pinning, Label/Paketname; lokal und deterministisch | M2.1 aktiv |
+| 5 | Sichere Datei-Intelligenz | Metadaten, Kategorie, Textumfang, Namensvorschlag | genau eine gewählte read-only SAF-URI; Textpräfix max. 4.096 Zeichen | M2.1 aktiv |
+| 6 | Layout-Assistent | weniger manuelles Sortieren | Vorschau → Anwenden/Verwerfen → Undo | M2.1 aktiv, regelbasiert |
+| 7 | Modell-/Provider-Routing | lokal, frei oder Cloud je Aufgabe wählen | Übergabe erst nach Tipp; keine verdeckte API | M2.1 aktiv |
+| 8 | App-Shortcut-Orchestrierung | tiefe App-Aktionen ohne UI-Automation | `LauncherApps.getShortcuts/startShortcut`; verspätete Antworten verworfen | M2.1 aktiv |
+| 9 | Widget-Zentrale | Systeminformationen und App-Funktionen bündeln | Android `AppWidgetHost` | M2.1 aktiv |
+| 10 | Datensparsame Notification Dots | offene Meldungen sichtbar, ohne Nachrichtentext zu kopieren | opt-in Listener; nur Paket und Anzahl flüchtig | M2.1 aktiv |
+| 11 | Lokale Zusammenfassung | Notizen/gewählte Dokumente offline verdichten | optionales On-Device-LLM; Daten bleiben lokal | nächster Lauf |
+| 12 | Semantische Gerätesuche | Apps, eigene Dateien, Einstellungen, Shortcuts in einem Index | opt-in lokaler Embedding-Index, je Quelle löschbar | nächster Lauf |
+| 13 | Benachrichtigungs-Triage | weniger Unterbrechungen und gruppierte Wichtigkeit | separates opt-in für Inhalte; Vorschau, Retention und Löschen | M3 |
+| 14 | Kalender-/Aufgabenplanung | realistische Tagespläne statt bloßer Antworten | einzelne opt-in Provider, Vorschau vor Schreibzugriff | M3 |
+| 15 | Kommunikationsentwürfe | Antworten formulieren, Ton/Barrierefreiheit anpassen | ausgewählter Text; immer Vorschau vor Share | M3 |
+| 16 | Gerätesupport | „Warum ist mein Akku leer?“ mit nachvollziehbaren Diagnosen | erlaubte lokale Telemetrie, keine Root-/Shell-Tricks | M3 |
+| 17 | Adaptive Bedienung | größere Ziele, ruhigere Oberfläche, kontextuelle Vereinfachung | lokale Präferenzregeln, Accessibility-Test | M3 |
+| 18 | Regelautomation | Szenen nach Zeit, Akku, Audio oder Netz | Capability-Tokens, Dry Run, Audit, Undo | M3 |
+| 19 | Persönlicher Memory-Vault | Vorlieben und Routinen ohne Cloudprofil | verschlüsselt, pro Quelle sichtbar/exportierbar/löschbar | M4 |
+| 20 | Lokale Sprache | offline STT/TTS und unterbrechbare Dialoge | austauschbare On-Device-Engines | M4 |
+| 21 | Theme-/Wallpaper-Designer | PMDD, Stimmung, Tagesphase oder Fokus in Visuals übersetzen | generiertes Asset nur nach Vorschau setzen | M4 |
+| 22 | Multi-App-Workflows | dokumentierte Deep Links/Intents sinnvoll verketten | keine Accessibility-Fernsteuerung; Bestätigung je Risikoklasse | M4 |
 
 ## Freie und Open-Source-Optionen
 
-| Option | Rolle | Lizenz | M2-Verwendung |
+| Option | Rolle | Lizenz | M2.1-Verwendung |
 |---|---|---|---|
-| KoSch Local Core | Befehle, Suche, Kontext, Dateien, Layout | Apache-2.0 | eingebaut und aktiv |
+| KoSch Local Core | Befehle, Suche, Kontext, Dateien, Layout, Dock und Ordner | Apache-2.0 | eingebaut und aktiv |
 | [PocketPal AI](https://github.com/a-ghorbani/pocketpal-ai) | lokale GGUF-Inferenz über llama.cpp | MIT | installierte App erkennen/öffnen/teilen, sonst Projektseite |
 | [ChatterUI](https://github.com/Vali-98/ChatterUI) | lokaler GGUF-Frontend oder optionale Backends | AGPL-3.0 | Label-Erkennung und Projekt-Route |
 | [Maid](https://github.com/Mobile-Artificial-Intelligence/maid) | lokale llama.cpp-Inferenz und Modellverwaltung | MIT | Label-Erkennung und Projekt-Route |

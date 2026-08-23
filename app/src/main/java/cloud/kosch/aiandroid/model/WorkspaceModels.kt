@@ -16,6 +16,28 @@ enum class WorkspaceMode {
     EDIT,
 }
 
+enum class HomePage(val title: String) {
+    WORKSPACE("Workspace"),
+    SMART_SPACE("Smart Space"),
+}
+
+enum class FolderKind(val title: String, val glyph: String) {
+    COMMUNICATION("Kommunikation", "◎"),
+    WORK("Arbeit", "▣"),
+    MEDIA("Medien", "◉"),
+    TOOLS("Werkzeuge", "⌁"),
+    AI("KI", "✦"),
+    OTHER("Weitere", "▦"),
+}
+
+data class LauncherFolder(
+    val id: String,
+    val title: String,
+    val kind: FolderKind,
+    val appKeys: List<String>,
+    val generatedLocally: Boolean = true,
+)
+
 data class TilePosition(
     val x: Float,
     val y: Float,
