@@ -11,8 +11,8 @@ data class SearchDocument(
 
 object SearchRanker {
     fun rank(query: String, documents: List<SearchDocument>): List<SearchDocument> {
-        val needle = query.normalized()
-        if (needle.isEmpty()) return documents.sortedBy { it.title.lowercase(Locale.ROOT) }
+        val needle = query.searchVariants()
+        if (needle.spaced.isEmpty()) return documents.sortedBy { it.title.lowercase(Locale.ROOT) }
 
         return documents.mapNotNull { document ->
             score(needle, document)?.let { score -> document to score }
@@ -22,20 +22,16 @@ object SearchRanker {
         ).map { it.first }
     }
 
-    private fun score(needle: String, document: SearchDocument): Int? {
-        val title = document.title.normalized()
-        val keywords = document.keywords.map { it.normalized() }
+    private fun score(needle: SearchVariants, document: SearchDocument): Int? {
+        val title = document.title.searchVariants()
+        val keywords = document.keywords.map { it.searchVariants() }
         val candidates = listOf(title) + keywords
 
         val best = candidates.maxOfOrNull { candidate ->
-            when {
-                candidate == needle -> 1_000
-                candidate.startsWith(needle) -> 800 - candidate.length
-                candidate.split(' ').any { it.startsWith(needle) } -> 650 - candidate.length
-                candidate.contains(needle) -> 500 - candidate.length
-                needle.length >= 3 && isSubsequence(needle, candidate) -> 250 - candidate.length
-                else -> Int.MIN_VALUE
-            }
+            maxOf(
+                matchScore(needle.spaced, candidate.spaced, exactScore = 1_000),
+                matchScore(needle.compact, candidate.compact, exactScore = 980),
+            )
         } ?: Int.MIN_VALUE
 
         return best.takeUnless { it == Int.MIN_VALUE }
@@ -49,12 +45,32 @@ object SearchRanker {
         return cursor == needle.length
     }
 
-    private fun String.normalized(): String = Normalizer
+    private fun matchScore(needle: String, candidate: String, exactScore: Int): Int {
+        if (needle.isEmpty() || candidate.isEmpty()) return Int.MIN_VALUE
+        return when {
+            candidate == needle -> exactScore
+            candidate.startsWith(needle) -> 800 - candidate.length
+            candidate.split(' ').any { it.startsWith(needle) } -> 650 - candidate.length
+            candidate.contains(needle) -> 500 - candidate.length
+            needle.length >= 3 && isSubsequence(needle, candidate) -> 250 - candidate.length
+            else -> Int.MIN_VALUE
+        }
+    }
+
+    private fun String.searchVariants(): SearchVariants {
+        val spaced = Normalizer
         .normalize(lowercase(Locale.GERMAN), Normalizer.Form.NFD)
         .replace("\\p{M}+".toRegex(), "")
-        .replace("[^a-z0-9 ]".toRegex(), "")
+        .replace("[^a-z0-9]+".toRegex(), " ")
         .replace("\\s+".toRegex(), " ")
         .trim()
+        return SearchVariants(spaced = spaced, compact = spaced.replace(" ", ""))
+    }
+
+    private data class SearchVariants(
+        val spaced: String,
+        val compact: String,
+    )
 }
 
 enum class SmartCollection(val title: String) {

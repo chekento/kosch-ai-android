@@ -40,6 +40,11 @@ class SystemActionGateway(context: Context) {
             Intent(Settings.ACTION_SETTINGS),
         )
 
+        SystemPanel.NOTIFICATION_ACCESS -> startWithFallback(
+            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        )
+
         SystemPanel.ANDROID_SETTINGS -> start(Intent(Settings.ACTION_SETTINGS))
         SystemPanel.HOME_SELECTION -> startWithFallback(
             Intent(Settings.ACTION_HOME_SETTINGS),

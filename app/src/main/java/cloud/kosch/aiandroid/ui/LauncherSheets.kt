@@ -36,11 +36,13 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Phone
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Tune
@@ -369,8 +371,23 @@ fun ControlCenterSheet(
                     left = ControlItem("Meldungen", "Systembereich", Icons.Rounded.Notifications) {
                         controller.openSystemPanel(SystemPanel.NOTIFICATIONS)
                     },
-                    right = ControlItem("Android", "Einstellungen", Icons.Rounded.Settings) {
+                    right = ControlItem(
+                        "App-Punkte",
+                        if (controller.notificationAccessGranted) "Aktiv · nur Anzahl" else "Opt-in",
+                        Icons.Rounded.Notifications,
+                    ) {
+                        controller.openNotificationAccess()
+                    },
+                )
+            }
+            item {
+                ControlPair(
+                    left = ControlItem("Android", "Einstellungen", Icons.Rounded.Settings) {
                         controller.openSystemPanel(SystemPanel.ANDROID_SETTINGS)
+                    },
+                    right = ControlItem("Smart Space", "Dock & Ordner", Icons.Rounded.AutoAwesome) {
+                        controller.closeControlCenter()
+                        controller.switchHomePage(cloud.kosch.aiandroid.model.HomePage.SMART_SPACE)
                     },
                 )
             }
@@ -493,7 +510,11 @@ fun PhoneSheet(controller: LauncherController) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun FileIntelligenceSheet(controller: LauncherController, requestDocument: () -> Unit) {
+fun FileIntelligenceSheet(
+    controller: LauncherController,
+    requestDocument: () -> Unit,
+    forgetDocument: () -> Unit,
+) {
     ModalBottomSheet(
         onDismissRequest = controller::closeFileSheet,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -555,6 +576,9 @@ fun FileIntelligenceSheet(controller: LauncherController, requestDocument: () ->
                             Spacer(Modifier.width(5.dp))
                             Text("Öffnen")
                         }
+                    }
+                    TextButton(onClick = forgetDocument, modifier = Modifier.fillMaxWidth()) {
+                        Text("Gespeicherten Dateizugriff vergessen")
                     }
                     Spacer(Modifier.height(20.dp))
                 }
@@ -663,6 +687,18 @@ fun AppActionsSheet(controller: LauncherController) {
                     Icon(Icons.Rounded.Info, contentDescription = null)
                     Spacer(Modifier.width(5.dp))
                     Text("App-Info")
+                }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = controller::toggleSelectedAppPin, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Rounded.PushPin, contentDescription = null)
+                    Spacer(Modifier.width(5.dp))
+                    Text(if (controller.isPinned(app)) "Dock lösen" else "Ins Dock")
+                }
+                OutlinedButton(onClick = controller::addSelectedAppToSmartFolder, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Rounded.CreateNewFolder, contentDescription = null)
+                    Spacer(Modifier.width(5.dp))
+                    Text("In Ordner")
                 }
             }
             HorizontalDivider()

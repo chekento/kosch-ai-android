@@ -47,6 +47,7 @@ class LocalCommandPlanner {
         "wlan", "wifi", "wi-fi", "wlan einstellungen" -> SystemPanel.WIFI
         "bluetooth", "bluetooth einstellungen" -> SystemPanel.BLUETOOTH
         "benachrichtigungen", "notification settings" -> SystemPanel.NOTIFICATIONS
+        "benachrichtigungspunkte", "notification dots", "app punkte" -> SystemPanel.NOTIFICATION_ACCESS
         "android einstellungen", "systemeinstellungen", "settings" -> SystemPanel.ANDROID_SETTINGS
         "home auswahl", "launcher auswahl", "start app auswahl", "standard launcher" -> SystemPanel.HOME_SELECTION
         else -> null

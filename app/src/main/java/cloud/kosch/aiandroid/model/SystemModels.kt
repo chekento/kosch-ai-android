@@ -8,6 +8,7 @@ enum class SystemPanel(val title: String) {
     WIFI("WLAN"),
     BLUETOOTH("Bluetooth"),
     NOTIFICATIONS("Benachrichtigungen"),
+    NOTIFICATION_ACCESS("Benachrichtigungspunkte"),
     ANDROID_SETTINGS("Android-Einstellungen"),
     HOME_SELECTION("Start-App-Auswahl"),
 }

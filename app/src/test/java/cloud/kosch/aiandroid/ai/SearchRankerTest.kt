@@ -25,6 +25,12 @@ class SearchRankerTest {
     }
 
     @Test
+    fun `punctuation and spaces are equivalent in both directions`() {
+        assertEquals("mail", SearchRanker.rank("E Mail", documents).first().id)
+        assertEquals("mail", SearchRanker.rank("E-Mail", documents).first().id)
+    }
+
+    @Test
     fun `keywords are searchable`() {
         val result = SearchRanker.rank("agenda", documents)
         assertEquals("calendar", result.first().id)
@@ -35,4 +41,3 @@ class SearchRankerTest {
         assertTrue(SearchRanker.rank("zz", documents).isEmpty())
     }
 }
-

@@ -8,11 +8,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
+import android.provider.Settings
 import cloud.kosch.aiandroid.ui.theme.Ink
 import cloud.kosch.aiandroid.ui.theme.Mint
 import cloud.kosch.aiandroid.ui.theme.Sky
@@ -23,16 +26,27 @@ import kotlin.math.sin
 /** Code-native living background. It is intentionally a neutral visual layer, not an LCARS theme. */
 @Composable
 fun NeuralGlassBackground(modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "neural-glass")
-    val phase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(18_000),
-            repeatMode = RepeatMode.Reverse,
-        ),
-        label = "ambient-phase",
-    )
+    val context = LocalContext.current
+    val motionEnabled = remember(context) {
+        runCatching {
+            Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
+        }.getOrDefault(true)
+    }
+    val phase = if (motionEnabled) {
+        val transition = rememberInfiniteTransition(label = "neural-glass")
+        val animatedPhase by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 1f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(18_000),
+                repeatMode = RepeatMode.Reverse,
+            ),
+            label = "ambient-phase",
+        )
+        animatedPhase
+    } else {
+        0.35f
+    }
 
     Canvas(modifier) {
         drawRect(

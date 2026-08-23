@@ -11,6 +11,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import cloud.kosch.aiandroid.system.HomeRoleController
+import cloud.kosch.aiandroid.system.DocumentGrantManager
 import cloud.kosch.aiandroid.system.WidgetHostController
 import cloud.kosch.aiandroid.ui.LauncherRoot
 import cloud.kosch.aiandroid.ui.theme.KoSchLauncherTheme
@@ -18,6 +19,7 @@ import cloud.kosch.aiandroid.ui.theme.KoSchLauncherTheme
 class MainActivity : ComponentActivity() {
     private lateinit var controller: LauncherController
     private lateinit var widgetHostController: WidgetHostController
+    private lateinit var documentGrantManager: DocumentGrantManager
     private var pendingWidgetId: Int? = null
 
     private val homeRoleRequest = registerForActivityResult(
@@ -43,12 +45,10 @@ class MainActivity : ComponentActivity() {
         ActivityResultContracts.OpenDocument(),
     ) { uri: Uri? ->
         if (uri != null) {
-            runCatching {
-                contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                )
-            }
+            documentGrantManager.adopt(uri)
+                .onFailure {
+                    controller.postNotice("Datei wird geprüft; dauerhafter Lesezugriff wurde nicht gespeichert")
+                }
             controller.inspectDocument(uri)
         }
     }
@@ -91,8 +91,12 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        pendingWidgetId = savedInstanceState
+            ?.getInt(STATE_PENDING_WIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+            ?.takeUnless { it == AppWidgetManager.INVALID_APPWIDGET_ID }
         controller = LauncherController(applicationContext)
         widgetHostController = WidgetHostController(applicationContext)
+        documentGrantManager = DocumentGrantManager(applicationContext)
         controller.start()
         controller.widgetIds.toList()
             .filterNot(widgetHostController::isValid)
@@ -108,6 +112,7 @@ class MainActivity : ComponentActivity() {
                     requestWidget = ::requestWidget,
                     createWidgetView = widgetHostController::createView,
                     deleteWidget = ::deleteWidget,
+                    forgetDocument = ::forgetDocument,
                 )
             }
         }
@@ -131,6 +136,11 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         controller.close()
         super.onDestroy()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        pendingWidgetId?.let { outState.putInt(STATE_PENDING_WIDGET_ID, it) }
+        super.onSaveInstanceState(outState)
     }
 
     private fun requestHomeRole() {
@@ -185,5 +195,19 @@ class MainActivity : ComponentActivity() {
     private fun deleteWidget(appWidgetId: Int) {
         widgetHostController.deleteId(appWidgetId)
         controller.removeWidgetRecord(appWidgetId)
+    }
+
+    private fun forgetDocument() {
+        documentGrantManager.releaseCurrent()
+            .onSuccess { released ->
+                controller.forgetDocument(released)
+            }
+            .onFailure {
+                controller.postNotice("Der gespeicherte Dateizugriff konnte nicht vollständig gelöst werden")
+            }
+    }
+
+    private companion object {
+        const val STATE_PENDING_WIDGET_ID = "pending_widget_id"
     }
 }

@@ -2,11 +2,20 @@ package cloud.kosch.aiandroid.data
 
 import android.content.Context
 import cloud.kosch.aiandroid.model.DefaultWorkspace
+import cloud.kosch.aiandroid.model.FolderKind
+import cloud.kosch.aiandroid.model.HomePage
+import cloud.kosch.aiandroid.model.LauncherFolder
 import cloud.kosch.aiandroid.model.SceneId
 import cloud.kosch.aiandroid.model.TilePosition
+import org.json.JSONArray
+import org.json.JSONObject
 
 class WorkspaceStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+
+    init {
+        migrateIfNeeded()
+    }
 
     fun loadScene(): SceneId = runCatching {
         SceneId.valueOf(preferences.getString(KEY_SCENE, SceneId.AI.name).orEmpty())
@@ -14,6 +23,14 @@ class WorkspaceStore(context: Context) {
 
     fun saveScene(scene: SceneId) {
         preferences.edit().putString(KEY_SCENE, scene.name).apply()
+    }
+
+    fun loadHomePage(): HomePage = runCatching {
+        HomePage.valueOf(preferences.getString(KEY_HOME_PAGE, HomePage.WORKSPACE.name).orEmpty())
+    }.getOrDefault(HomePage.WORKSPACE)
+
+    fun saveHomePage(page: HomePage) {
+        preferences.edit().putString(KEY_HOME_PAGE, page.name).apply()
     }
 
     fun loadPositions(): Map<SceneId, Map<String, TilePosition>> = SceneId.entries.associateWith { scene ->
@@ -73,10 +90,90 @@ class WorkspaceStore(context: Context) {
         saveWidgetIds(widgetIds().filterNot { it == appWidgetId })
     }
 
+    fun pinnedAppKeys(): List<String> = readStringArray(KEY_PINNED_APPS)
+
+    fun savePinnedAppKeys(keys: List<String>) {
+        writeStringArray(KEY_PINNED_APPS, keys.distinct().take(MAX_PINNED_APPS))
+    }
+
+    fun folders(): List<LauncherFolder> = runCatching {
+        val array = JSONArray(preferences.getString(KEY_FOLDERS, "[]"))
+        buildList {
+            repeat(array.length()) { index ->
+                val item = array.getJSONObject(index)
+                val appKeysJson = item.optJSONArray("appKeys") ?: JSONArray()
+                val appKeys = buildList {
+                    repeat(appKeysJson.length()) { appIndex ->
+                        appKeysJson.optString(appIndex).takeIf(String::isNotBlank)?.let(::add)
+                    }
+                }.distinct()
+                val kind = runCatching {
+                    FolderKind.valueOf(item.optString("kind", FolderKind.OTHER.name))
+                }.getOrDefault(FolderKind.OTHER)
+                val id = item.optString("id").takeIf(String::isNotBlank) ?: return@repeat
+                add(
+                    LauncherFolder(
+                        id = id,
+                        title = item.optString("title", kind.title).ifBlank { kind.title },
+                        kind = kind,
+                        appKeys = appKeys,
+                        generatedLocally = item.optBoolean("generatedLocally", true),
+                    ),
+                )
+            }
+        }
+    }.getOrDefault(emptyList())
+
+    fun saveFolders(folders: List<LauncherFolder>) {
+        val array = JSONArray()
+        folders.distinctBy(LauncherFolder::id).take(MAX_FOLDERS).forEach { folder ->
+            array.put(
+                JSONObject()
+                    .put("id", folder.id)
+                    .put("title", folder.title)
+                    .put("kind", folder.kind.name)
+                    .put("generatedLocally", folder.generatedLocally)
+                    .put("appKeys", JSONArray(folder.appKeys.distinct().take(MAX_FOLDER_APPS))),
+            )
+        }
+        preferences.edit().putString(KEY_FOLDERS, array.toString()).apply()
+    }
+
     private fun saveWidgetIds(ids: List<Int>) {
         preferences.edit()
             .putString(KEY_WIDGET_IDS, ids.distinct().joinToString("|"))
             .apply()
+    }
+
+    private fun readStringArray(key: String): List<String> = runCatching {
+        val array = JSONArray(preferences.getString(key, "[]"))
+        buildList {
+            repeat(array.length()) { index ->
+                array.optString(index).takeIf(String::isNotBlank)?.let(::add)
+            }
+        }.distinct()
+    }.getOrDefault(emptyList())
+
+    private fun writeStringArray(key: String, values: List<String>) {
+        preferences.edit().putString(key, JSONArray(values).toString()).apply()
+    }
+
+    private fun migrateIfNeeded() {
+        val current = preferences.getInt(KEY_SCHEMA_VERSION, 0)
+        if (current >= SCHEMA_VERSION) return
+
+        val editor = preferences.edit()
+        if (current < 1) {
+            // M1/M2 values already used stable keys. Version 1 records that baseline.
+            editor.putInt(KEY_SCHEMA_VERSION, 1)
+        }
+        if (current < 2) {
+            // New collections are JSON arrays so component keys cannot corrupt delimiter parsing.
+            editor.putString(KEY_PINNED_APPS, preferences.getString(KEY_PINNED_APPS, "[]"))
+            editor.putString(KEY_FOLDERS, preferences.getString(KEY_FOLDERS, "[]"))
+            editor.putInt(KEY_SCHEMA_VERSION, 2)
+        }
+        editor.apply()
     }
 
     private fun positionPrefix(scene: SceneId, tileId: String) =
@@ -85,9 +182,17 @@ class WorkspaceStore(context: Context) {
     private companion object {
         const val PREFERENCES_NAME = "kosch_launcher_workspace"
         const val KEY_SCENE = "active_scene"
+        const val KEY_HOME_PAGE = "home_page_v2"
         const val KEY_RECENT = "recent_packages"
         const val KEY_ONBOARDING_COMPLETE = "onboarding_complete_v2"
         const val KEY_WIDGET_IDS = "widget_ids_v1"
+        const val KEY_SCHEMA_VERSION = "schema_version"
+        const val KEY_PINNED_APPS = "pinned_app_keys_v2"
+        const val KEY_FOLDERS = "launcher_folders_v2"
+        const val SCHEMA_VERSION = 2
         const val MAX_RECENT = 16
+        const val MAX_PINNED_APPS = 8
+        const val MAX_FOLDERS = 12
+        const val MAX_FOLDER_APPS = 32
     }
 }

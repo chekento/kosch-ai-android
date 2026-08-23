@@ -109,6 +109,7 @@ import cloud.kosch.aiandroid.ai.AiProviderKind
 import cloud.kosch.aiandroid.ai.AiProviderRegistry
 import cloud.kosch.aiandroid.ai.SmartCollection
 import cloud.kosch.aiandroid.model.ContextSnapshot
+import cloud.kosch.aiandroid.model.HomePage
 import cloud.kosch.aiandroid.model.PositionedTile
 import cloud.kosch.aiandroid.model.SceneId
 import cloud.kosch.aiandroid.model.TileAction
@@ -134,6 +135,7 @@ fun LauncherRoot(
     requestWidget: () -> Unit,
     createWidgetView: (Context, Int) -> View?,
     deleteWidget: (Int) -> Unit,
+    forgetDocument: () -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val askFocusRequester = remember { FocusRequester() }
@@ -152,10 +154,12 @@ fun LauncherRoot(
         enabled = controller.drawerVisible || controller.providerChooserVisible ||
             controller.contextDetailsVisible || controller.controlCenterVisible ||
             controller.phoneVisible || controller.fileSheetVisible ||
-            controller.widgetBoardVisible || controller.appActionsVisible,
+            controller.widgetBoardVisible || controller.appActionsVisible ||
+            controller.folderSheetVisible,
     ) {
         when {
             controller.appActionsVisible -> controller.hideAppActions()
+            controller.folderSheetVisible -> controller.closeFolder()
             controller.phoneVisible -> controller.closePhone()
             controller.fileSheetVisible -> controller.closeFileSheet()
             controller.widgetBoardVisible -> controller.closeWidgetBoard()
@@ -188,26 +192,32 @@ fun LauncherRoot(
                     controller = controller,
                     requestHomeRole = requestHomeRole,
                 )
+                HomePageSelector(controller)
                 SceneSelector(
                     activeScene = controller.activeScene,
                     suggestedScene = controller.contextSnapshot.suggestedScene,
                     onSceneSelected = controller::switchScene,
                     onUseSuggestion = controller::useSuggestedScene,
                 )
-                EditToolbar(controller)
-                WorkspaceSurface(
-                    controller = controller,
-                    onAsk = {
-                        askFocusRequester.requestFocus()
-                        keyboardController?.show()
-                    },
-                )
+                if (controller.homePage == HomePage.WORKSPACE) {
+                    EditToolbar(controller)
+                    WorkspaceSurface(
+                        controller = controller,
+                        onAsk = {
+                            askFocusRequester.requestFocus()
+                            keyboardController?.show()
+                        },
+                    )
+                } else {
+                    SmartHomeSurface(controller)
+                }
                 QuickActionsRail(
                     onPhone = controller::openPhone,
                     onFiles = requestDocument,
                     onWidgets = controller::openWidgetBoard,
                     onControls = controller::openControlCenter,
                 )
+                PersistentSmartDock(controller)
                 AskDock(
                     text = askText,
                     onTextChange = { askText = it },
@@ -250,13 +260,16 @@ fun LauncherRoot(
         PhoneSheet(controller)
     }
     if (controller.fileSheetVisible) {
-        FileIntelligenceSheet(controller, requestDocument)
+        FileIntelligenceSheet(controller, requestDocument, forgetDocument)
     }
     if (controller.widgetBoardVisible) {
         WidgetBoardSheet(controller, requestWidget, createWidgetView, deleteWidget)
     }
     if (controller.appActionsVisible) {
         AppActionsSheet(controller)
+    }
+    if (controller.folderSheetVisible) {
+        FolderSheet(controller)
     }
     if (controller.onboardingVisible) {
         OnboardingExperience(
