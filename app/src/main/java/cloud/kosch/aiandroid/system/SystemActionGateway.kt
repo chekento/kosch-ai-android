@@ -3,6 +3,7 @@ package cloud.kosch.aiandroid.system
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
 import cloud.kosch.aiandroid.model.FileInsight
 import cloud.kosch.aiandroid.model.SystemPanel
@@ -29,7 +30,13 @@ class SystemActionGateway(context: Context) {
         )
 
         SystemPanel.NOTIFICATIONS -> startWithFallback(
-            Intent(Settings.ACTION_NOTIFICATION_SETTINGS),
+            Intent(
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    Settings.ACTION_ALL_APPS_NOTIFICATION_SETTINGS
+                } else {
+                    Settings.ACTION_APPLICATION_SETTINGS
+                },
+            ),
             Intent(Settings.ACTION_SETTINGS),
         )
 
