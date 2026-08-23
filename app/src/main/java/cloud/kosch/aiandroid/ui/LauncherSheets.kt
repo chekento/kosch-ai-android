@@ -6,6 +6,7 @@ import android.widget.TextView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -213,7 +214,13 @@ fun OnboardingExperience(
                     }
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(20.dp)) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(vertical = 20.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp),
+                ) {
                     Surface(
                         modifier = Modifier.size(72.dp),
                         color = Mint.copy(alpha = 0.15f),

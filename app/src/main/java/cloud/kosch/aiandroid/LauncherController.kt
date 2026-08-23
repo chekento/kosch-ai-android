@@ -15,6 +15,7 @@ import cloud.kosch.aiandroid.ai.LauncherCommand
 import cloud.kosch.aiandroid.ai.LocalAppClassifier
 import cloud.kosch.aiandroid.ai.LocalCommandPlanner
 import cloud.kosch.aiandroid.ai.LocalFileIntelligenceEngine
+import cloud.kosch.aiandroid.ai.PhoneNumberParser
 import cloud.kosch.aiandroid.ai.SearchDocument
 import cloud.kosch.aiandroid.ai.SearchRanker
 import cloud.kosch.aiandroid.ai.SmartCollection
@@ -272,7 +273,12 @@ class LauncherController(context: Context) {
     }
 
     fun dial(number: String?) {
-        systemActions.openDialer(number)
+        val sanitized = number?.takeIf(String::isNotBlank)?.let(PhoneNumberParser::sanitize)
+        if (!number.isNullOrBlank() && sanitized == null) {
+            notice = "Bitte gib eine gültige Telefonnummer ein"
+            return
+        }
+        systemActions.openDialer(sanitized)
             .onSuccess {
                 phoneVisible = false
                 notice = "Nummer im System-Telefon geöffnet – du bestätigst den Anruf"
@@ -397,6 +403,7 @@ class LauncherController(context: Context) {
                 store.recordRecent(app.packageName)
                 recentPackages = store.recentPackages()
                 drawerVisible = false
+                appActionsVisible = false
             }
             .onFailure { notice = "${app.label} konnte nicht gestartet werden" }
     }

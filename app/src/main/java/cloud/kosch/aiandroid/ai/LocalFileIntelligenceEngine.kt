@@ -44,7 +44,7 @@ class LocalFileIntelligenceEngine(private val resolver: ContentResolver) {
         )?.use { cursor ->
             if (cursor.moveToFirst()) {
                 name = cursor.stringOrNull(OpenableColumns.DISPLAY_NAME)?.ifBlank { name } ?: name
-                size = cursor.longOrNull(OpenableColumns.SIZE)
+                size = cursor.longOrNull(OpenableColumns.SIZE)?.takeIf { it >= 0 }
             }
         }
         return Metadata(name, size)

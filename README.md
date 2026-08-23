@@ -1,70 +1,70 @@
 # KoSch AI Android
 
-KoSch AI Android ist ein nativer, KI-zentrierter Android-Launcher: ein programmierbarer Workspace statt eines starren App-Rasters. Er registriert sich als echte HOME-App, indexiert startbare Apps über Androids Launcher-API und stellt einen universellen Eingang für lokale Befehle sowie bewusst gewählte KI-Übergaben bereit.
+KoSch ist ein nativer, KI-zentrierter Android-Launcher: eine belastbare HOME-Shell und ein programmierbarer Workspace statt eines starren App-Rasters. Der Kern funktioniert **ab dem ersten Start offline, ohne Konto, API-Schlüssel oder Modell-Download**. KI ist eine austauschbare Schicht unter Suche, Kontext, Dateien, Aktionen und Layout – nicht eine einzelne Chat-Seite.
 
-LCARS ist **kein Bestandteil des Kerns**. Darstellung und Verhalten werden später als austauschbare Themes/Programme behandelt – LCARS kann dann eines davon sein, ohne die Architektur zu bestimmen.
+LCARS gehört bewusst nicht zum Kern. Themes werden später deklarative, austauschbare Programme; LCARS kann eines davon sein, ohne Architektur oder Bedienung festzulegen.
 
-## Aktueller Stand: M1 Vertical Slice
+## Aktueller Stand: M2 Local-first System Shell
 
-Dieser erste Meilenstein ist absichtlich schmal, aber echt:
-
-- echte HOME-Rolle mit Android-Systemdialog;
+- professionelle vierstufige Ersteinrichtung mit klarer Datenschutz- und Sicherheitskommunikation;
+- echte HOME-Rolle und ein dauerhaft erreichbarer **Sicherheitsausgang** in Androids Start-App-Auswahl;
 - App-Katalog und App-Start via `LauncherApps`, ohne `QUERY_ALL_PACKAGES`;
-- Szenen: AI, Work, Studio, Social und Evening;
-- PLAY-/EDIT-Modus mit frei verschiebbaren, persistenten Workspace-Karten;
-- lokaler Layout-Vorschlag mit **Vorschau → Anwenden/Verwerfen → Rückgängig**;
-- `⌘ Ask` mit lokaler deutscher/englischer Befehlsplanung;
-- explizite Auswahl zwischen ChatGPT, Gemini, Claude, Grok, Meta AI, Perplexity und NotebookLM;
-- Übergaben nur über dokumentierte Android-Wege: App-Start, Share-Intent oder Web-Fallback;
+- veröffentlichte App-Shortcuts per langem Druck;
+- echtes `AppWidgetHost`-Board mit persistierten IDs, Konfiguration, Entfernen und Cleanup abgebrochener Bindungen;
+- fünf Szenen, frei verschiebbare Karten, PLAY/EDIT, Vorschau, Anwenden/Verwerfen und Undo;
+- `⌘ Ask` mit lokalem deutschen/englischen Command Planner;
+- Telefonzugang über `ACTION_DIAL`: KoSch bereitet vor, die Person bestätigt den Anruf im System-Wähler;
+- Dateiauswahl über das Storage Access Framework und begrenzte lokale Metadaten-/Textanalyse;
+- Kontrollzentrum für WLAN, Bluetooth, Benachrichtigungen, Android-Einstellungen, Widgets und HOME-Auswahl;
 - lokaler Kontext aus Uhrzeit, Akku, Netzwerkstatus und Audioausgabe;
-- animierter Begleiter als Sprach-Einstieg – ohne so zu tun, als wäre schon ein Agent aktiv;
-- lokale Unit-Tests, Lint und reproduzierbarer Debug-APK-Build in GitHub Actions.
+- PocketPal AI, ChatterUI und Maid als freie/Open-Source-Übergabeziele;
+- bewusste Übergabe an ChatGPT, Gemini, Claude, Grok, Meta AI, Perplexity oder NotebookLM per App, Android Share oder Web;
+- Runtime-Registry für Local Core, llama.cpp, LiteRT-LM und MLC LLM;
+- vorbereiteter Android-Keystore-Vault mit AES-GCM und HTTPS-/Loopback-Endpoint-Policy;
+- lebender, code-nativer Neural-Glass-Hintergrund – kein fest verdrahtetes Theme;
+- Unit-Tests, Android Lint und reproduzierbarer Debug-APK-Build in GitHub Actions.
 
-Reguläre Android-Widgets und direkte Modell-APIs sind in diesem Commit noch nicht als fertige Funktionen sichtbar. Der `AppWidgetHost`-Lebenszyklus und die Provider-Grenzen sind vorbereitet; Bindung, persistente Host-IDs, Credential Vault und Agenten-Aktionen folgen in separaten Meilensteinen.
+## Was „lokale KI“ in M2 exakt bedeutet
 
-## Projekt bauen
+`KoSch Local Core` ist sofort aktiv und deterministisch: Befehlsplanung, App-Ranking, regelbasierte Szenen, Kontextbewertung, Layoutvorschläge und eine begrenzte Dateiinspektion. Das ist nützlich und offline, aber **noch kein generatives LLM**.
 
-Voraussetzungen:
+Ein lokales generatives Modell wird nicht ungefragt mit der APK gebündelt: Modellgrößen, RAM, Thermik, Lizenz und Gerätebeschleunigung unterscheiden sich stark. M2 zeigt deshalb geprüfte freie Routen und hält die native Backend-Grenze bereit. Der nächste Lauf kann einen optionalen, geräteklassifizierten Modell-Pack über llama.cpp oder LiteRT-LM integrieren.
 
-- JDK 17
-- Android SDK 36
-- Android Studio mit Android-Gradle-Plugin-8.13-Unterstützung oder die Gradle-Kommandozeile
+Direkte Cloud-APIs sind in M2 absichtlich nicht aktiv. Die App besitzt kein eigenes `INTERNET`-Recht. Der Vault ist eine ungenutzte Sicherheitsgrenze für einen späteren, optionalen Netzwerk-Modul-Split – keine versteckte Verbindung.
+
+## Bauen
+
+Voraussetzungen: JDK 17, Android SDK 36 und Android Studio mit AGP-8.13-Unterstützung.
 
 ```bash
 ./gradlew testDebugUnitTest lintDebug assembleDebug
 ```
 
-Die APK liegt danach unter `app/build/outputs/apk/debug/app-debug.apk`. Bei jedem Push auf `main` erstellt GitHub Actions zusätzlich das Artefakt `kosch-ai-launcher-debug`.
+Die APK liegt danach unter `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions veröffentlicht bei erfolgreichen Läufen zusätzlich das Artefakt `kosch-ai-launcher-debug`.
 
-## Auf einem Testgerät verwenden
+## Sicher testen
 
-1. Debug-APK installieren.
-2. KoSch AI Launcher öffnen.
-3. Auf **Festlegen** tippen und KoSch als Start-App auswählen.
-4. Für Experimente zunächst ein Zweitgerät oder Emulatorprofil verwenden.
+1. Debug-APK zunächst auf einem Emulator oder Zweitgerät installieren.
+2. KoSch öffnen und die Einführung durchlaufen.
+3. Optional auf **Android-Start-App auswählen** tippen.
+4. Das Kontrollzentrum öffnen und den **Sicherheitsausgang** testen.
+5. KoSch lässt sich dort jederzeit durch einen anderen Launcher ersetzen.
 
-KoSch lässt sich jederzeit in den Android-Einstellungen unter Standard-Apps → Start-App wieder ersetzen.
+Telefon, Dateien, Spracheingabe, Widgets und externe KI-Ziele öffnen jeweils sichtbare Android-System- oder App-Oberflächen. KoSch simuliert keine Berührungen und übernimmt keine Notruf-/Dialer-Rolle.
 
-## Sicherheitsprinzipien
+## Dokumentation
 
-- local-first und minimale Berechtigungen;
-- keine Accessibility-Automation im Basissystem;
-- keine verdeckte Kontrolle fremder Apps;
-- keine ungefragte Cloud-Übertragung;
-- Vorschau und Bestätigung vor KI-basierten Änderungen;
-- zukünftige API-Schlüssel ausschließlich verschlüsselt über Android Keystore;
-- Themes erhalten keine impliziten Systemrechte.
-
-Mehr Details stehen in [Architektur](docs/ARCHITECTURE.md), [Sicherheit & Datenschutz](docs/SECURITY.md) und [Roadmap](docs/ROADMAP.md).
+- [Architektur](docs/ARCHITECTURE.md)
+- [KI-Usecases und Open-Source-Routen](docs/AI_USE_CASES.md)
+- [Sicherheit und Datenschutz](docs/SECURITY.md)
+- [Roadmap](docs/ROADMAP.md)
+- [Strenges M2-Review](docs/EXPERT_REVIEW_M2.md) und vollständige [25×60-Matrix](docs/expert_scores_m2.csv)
 
 ## Technischer Rahmen
 
 - Package: `cloud.kosch.aiandroid`
+- Version: `0.2.0-alpha01`
 - minSdk 29, targetSdk/compileSdk 36
 - Kotlin 2.3, Jetpack Compose, Material 3
 - Gradle 8.13, Android Gradle Plugin 8.13
-
-## Lizenz
-
-Apache License 2.0 – siehe [LICENSE](LICENSE).
-
+- Lizenz: Apache-2.0

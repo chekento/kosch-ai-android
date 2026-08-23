@@ -2,84 +2,103 @@
 
 ## Leitidee
 
-Der Launcher ist der System-Shell-Kern. KI ist keine einzelne Chat-Seite, sondern ein Orchestrator hinter Eingabe, Kontext, Aktionen und Workspace-Änderungen. Android-Sicherheitsgrenzen bleiben dabei verbindlich.
+KoSch ist zuerst eine ausfallsichere Android-HOME-Shell. KI ist ein Orchestrator unter Eingabe, Kontext, Suche, Dateien, Aktionen und Workspace-Mutationen. Fällt ein Modell oder Provider aus, müssen App-Start, Telefon, Dateien, Widgets, Einstellungen und die HOME-Auswahl weiterhin funktionieren.
 
 ```mermaid
 flowchart TD
-    Input["Touch · Text · Sprache · Geste"] --> Orchestrator["AI Orchestrator"]
-    Orchestrator --> Local["Lokaler Planner"]
-    Orchestrator --> Context["Context Engine"]
-    Orchestrator --> Actions["Action Gateway"]
-    Actions --> Android["LauncherApps · Intents · Widgets"]
-    Actions --> Providers["Wählbare KI-Provider"]
+    Input["Touch · Text · Sprache"] --> Planner["Local Core"]
+    Planner --> Preview["Vorschau / Auswahl"]
+    Preview --> Gateway["Capability Gateways"]
+    Gateway --> Android["LauncherApps · SAF · Intents · Widgets"]
+    Preview --> Models["optionale lokale / externe Modelle"]
 ```
 
-M1 implementiert `Local`, den privacy-sicheren Teil von `Context` sowie die erlaubten Android-/Provider-Übergaben. Ein generativer Router wird erst ergänzt, wenn Zustimmung, Secret-Speicher und Observability vorhanden sind.
+M2 implementiert `Local Core` und die Android-Gateways. Generative Modelllaufzeiten sind registrierte, aber noch nicht in den HOME-Prozess geladene Erweiterungen.
 
 ## Gegenwärtige Paketgrenzen
 
-Der erste Build bleibt für zuverlässige CI in einem Android-App-Modul. Die Paketgrenzen entsprechen bereits den späteren Gradle-Modulen:
-
-| Paket | Verantwortung | Späteres Modul |
+| Paket | Verantwortung | Vertrauensniveau |
 |---|---|---|
-| `model` | unveränderliche Szenen-, Workspace- und App-Modelle | `launcher-core` |
-| `data` | App-Katalog und lokaler Workspace-Speicher | `launcher-core` |
-| `ai` | Befehlsplanung, Suche, lokale Gruppierung, Providerprofile | `ai-core` |
-| `system` | HOME-Rolle, Kontextquellen, Widget-Host-Lebenszyklus | `integrations` |
-| `ui` | Compose-Workspace, Drawer, Begleiter, Bestätigungsflächen | `workspace-engine`, `companion`, `creator` |
-| `LauncherController` | M1-Orchestrierung und explizite Seiteneffekte | später `orchestrator` |
+| `model` | unveränderliche Workspace-, Datei-, Shortcut- und Systemmodelle | rein |
+| `data` | App-/Shortcut-Katalog, Workspace- und Widget-ID-Persistenz | lokal |
+| `ai` | Befehlsplanung, Suche, Klassifikation, Runtime-/Providerprofile | lokal; keine Netzschicht |
+| `system` | HOME-Rolle, Kontext, Dialer/Settings/File-Gateways, Widget Host | Android-Grenze |
+| `security` | Endpoint-Policy und ruhender Keystore-Vault | Secret-Grenze |
+| `ui` | Compose-Shell, Onboarding, Sheets, Neural Glass, Bestätigungen | Darstellung |
+| `LauncherController` | explizite Orchestrierung und UI-Zustand | Application Layer |
 
-Die Aufteilung in mehrere Module erfolgt erst, wenn mindestens zwei unabhängige Implementierungen eine Schnittstelle benötigen. So vermeiden wir frühe Modulzeremonie, ohne Zuständigkeiten zu vermischen.
+Ein Modulsplit folgt, sobald der native Modelladapter oder ein optionaler Netzwerkadapter hinzukommt. Besonders `ai-network` darf später als eigener Build Flavor/Modul das `INTERNET`-Recht besitzen; der offline Kern behält es nicht automatisch.
 
-## Vertrauensgrenzen
+## HOME und Sicherheitsausgang
 
-### App-Erkennung und Start
+`RoleManager.ROLE_HOME` öffnet ausschließlich Androids geschützten Rollendialog. Zusätzlich ist `Settings.ACTION_HOME_SETTINGS` im Onboarding und Kontrollzentrum erreichbar. Der Fallback ist `Settings.ACTION_SETTINGS`. KoSch fängt die Zurück-Taste nicht ab, um einen Lock-in zu erzeugen.
 
-Startbare Activities werden über `LauncherApps.getActivityList` gelesen und über `startMainActivity` gestartet. Der Launcher verlangt bewusst nicht `QUERY_ALL_PACKAGES`.
+## App-Katalog und Shortcuts
 
-### KI-Anbieter
+Startbare Activities kommen aus `LauncherApps.getActivityList`; Apps werden mit `startMainActivity` gestartet. M2 liest veröffentlichte dynamische, Manifest- und gepinnte Shortcuts erst nach langem Druck und startet sie mit `LauncherApps.startShortcut`. Der Launcher liest keine privaten Shortcut-Intents und fordert kein `QUERY_ALL_PACKAGES` an.
 
-Jeder Anbieter besitzt ein Capability-Profil. M1 unterstützt:
+## Dateien
 
-| Fähigkeit | M1 | Verhalten |
-|---|---:|---|
-| installierte App erkennen | ja | Paket-Hinweis plus sichtbarer App-Name |
-| App öffnen | ja | `LauncherApps` |
-| Text übergeben | ja | expliziter `ACTION_SEND` nach Nutzertipp |
-| Web-Fallback | ja | HTTPS im Standardbrowser |
-| direkter API-Aufruf | nein | erst mit Credential Vault und Zustimmung |
-| fremde App fernsteuern | nein | bleibt außerhalb der Vertrauensgrenze |
+```mermaid
+stateDiagram-v2
+    [*] --> Picker
+    Picker --> Cancelled: Abbruch
+    Picker --> Granted: Dokument gewählt
+    Granted --> Inspect: Metadaten + begrenzter Text
+    Inspect --> Preview: lokale Hinweise
+    Preview --> ExternalApp: Öffnen
+    Preview --> [*]: Schließen
+```
 
-### Workspace-Mutationen
+Die Activity nutzt `ACTION_OPEN_DOCUMENT` über den Activity-Result-Vertrag und versucht, nur die READ-URI-Berechtigung zu persistieren. `LocalFileIntelligenceEngine` liest Metadaten sowie maximal 4.096 Zeichen aus erkannten Textformaten. Binärdateien werden nicht als Text geraten. M2 verändert, löscht oder benennt Dokumente nicht um.
+
+## Telefon und Systemeinstellungen
+
+`SystemActionGateway` kennt nur explizite, dokumentierte Android-Ziele. Telefon verwendet `ACTION_DIAL`, nie `ACTION_CALL`. WLAN, Bluetooth, Benachrichtigungen, App-Info, Android-Einstellungen und HOME-Auswahl öffnen Systemoberflächen; Fehler werden abgefangen und sichtbar gemeldet.
+
+## Widgets
+
+```mermaid
+stateDiagram-v2
+    [*] --> Allocated: Host-ID vergeben
+    Allocated --> Picked: Android-Auswahl OK
+    Allocated --> Released: Abbruch
+    Picked --> Configure: Provider verlangt Setup
+    Picked --> Persisted: kein Setup
+    Configure --> Persisted: OK
+    Configure --> Released: Abbruch
+    Persisted --> Released: Entfernen
+```
+
+`WidgetHostController` besitzt eine stabile Host-ID. Erst nach erfolgreicher Bindung wird die Widget-ID im Workspace Store persistiert. Abbruch und Löschen geben IDs frei. Beim Start werden nicht mehr gültige Records entfernt. M2 hostet Widgets in einem separaten Board; freie Position, Resize, Restore-Mapping und Undo für Widgets sind noch nicht fertig.
+
+## Workspace-Mutationen
 
 ```mermaid
 stateDiagram-v2
     [*] --> Edit
-    Edit --> Preview: Vorschlag erzeugen
+    Edit --> Preview: Vorschlag
     Preview --> Edit: Verwerfen
     Preview --> Applied: Anwenden
     Applied --> Edit: Rückgängig
 ```
 
-M1 speichert Positionen normalisiert zwischen `0` und `1`, sodass sie sich an unterschiedliche Bildschirmgrößen anpassen. Der momentane Vorschlag ist deterministisch und lokal; die gleiche Sicherheitssequenz wird später auch für LLM-generierte Layouts verwendet.
+Positionen sind zwischen `0` und `1` normalisiert. Jede spätere LLM-generierte Mutation muss dieselbe Preview-/Apply-/Undo-Schiene nutzen; direkte Modellschreibrechte am Store sind ausgeschlossen.
 
-## Widget-Host
+## KI-Schichten
 
-Eine stabile Host-ID und der `AppWidgetHost`-Lebenszyklus existieren bereits. Widget-Auswahl und -Bindung bleiben unsichtbar, bis folgende Invarianten implementiert sind:
+| Schicht | M2 | Verhalten bei Ausfall |
+|---|---:|---|
+| KoSch Local Core | aktiv | HOME-Funktionen bleiben deterministisch |
+| externe lokale App | optional | Projektseite oder sichtbarer Fehler |
+| natives On-Device-LLM | noch nicht gebündelt | Local Core übernimmt |
+| Cloud-App/Web | explizite Übergabe | Launcher bleibt lokal |
+| direkte API | deaktiviert | kein `INTERNET`-Recht vorhanden |
 
-1. jede vergebene Widget-ID wird atomar mit dem Workspace gespeichert;
-2. abgebrochene Bindungen geben ihre ID wieder frei;
-3. Restore/Migration ist getestet;
-4. Provider-Fehler können den Launcher nicht blockieren;
-5. Löschen und Undo behandeln Widget-ID und Layout gemeinsam.
+Die Zielabstraktion `LocalModelBackend` erhält später `load`, `stream`, `cancel`, `unload` und `health`. Modellinferenz darf nicht den UI-/HOME-Prozess blockieren. Geräteprobe, Speicherlimit, Thermalstatus, Modelllizenz und ein hartes Timeout sind Teil des Load-Gates.
 
-## Geplante Zielmodule
+## Credential Vault
 
-- `launcher-core`: HOME, App-/Shortcut-Katalog, Profile
-- `workspace-engine`: freie Geometrie, Ebenen, Container, Portale
-- `ai-core`: Router, Planner, Agenten, Capability Registry
-- `integrations`: Intents, Deep Links, Share, Widgets, Systemrollen
-- `companion`: Zustände, STT/TTS, Animation, keine Geschäftslogik
-- `automation`: Regeln, Trigger, Bestätigung und Audit Log
-- `creator`: Action Matrix, Layer-Editor, Themes als Programme
+`SecureCredentialVault` generiert einen nicht exportierbaren AES-256-Schlüssel im Android Keystore und bindet Ciphertexte per GCM-AAD an die Provider-ID. Klartext wird nicht persistiert; übergebene `CharArray`s werden bestmöglich geleert. `ProviderEndpointPolicy` erlaubt Remote-Endpunkte nur per HTTPS und unverschlüsseltes HTTP ausschließlich für explizit aktivierte Loopback-Ziele.
 
+Der Vault ist in M2 absichtlich nicht an UI oder Transport gekoppelt. Vor Aktivierung direkter APIs fehlen noch Biometrieoption, Secret-Rotation, Redaction-E2E-Tests, Kontextvorschau, Audit, Timeout/Rate Limits und ein separater Netzwerk-Flavour.
