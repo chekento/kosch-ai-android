@@ -52,6 +52,33 @@ class WorkspaceStore(context: Context) {
         preferences.edit().putString(KEY_RECENT, updated.joinToString("|")).apply()
     }
 
+    fun isOnboardingComplete(): Boolean = preferences.getBoolean(KEY_ONBOARDING_COMPLETE, false)
+
+    fun completeOnboarding() {
+        preferences.edit().putBoolean(KEY_ONBOARDING_COMPLETE, true).apply()
+    }
+
+    fun widgetIds(): List<Int> = preferences
+        .getString(KEY_WIDGET_IDS, null)
+        ?.split('|')
+        ?.mapNotNull(String::toIntOrNull)
+        ?.distinct()
+        .orEmpty()
+
+    fun addWidgetId(appWidgetId: Int) {
+        saveWidgetIds(widgetIds() + appWidgetId)
+    }
+
+    fun removeWidgetId(appWidgetId: Int) {
+        saveWidgetIds(widgetIds().filterNot { it == appWidgetId })
+    }
+
+    private fun saveWidgetIds(ids: List<Int>) {
+        preferences.edit()
+            .putString(KEY_WIDGET_IDS, ids.distinct().joinToString("|"))
+            .apply()
+    }
+
     private fun positionPrefix(scene: SceneId, tileId: String) =
         "position_${scene.name.lowercase()}_$tileId"
 
@@ -59,7 +86,8 @@ class WorkspaceStore(context: Context) {
         const val PREFERENCES_NAME = "kosch_launcher_workspace"
         const val KEY_SCENE = "active_scene"
         const val KEY_RECENT = "recent_packages"
+        const val KEY_ONBOARDING_COMPLETE = "onboarding_complete_v2"
+        const val KEY_WIDGET_IDS = "widget_ids_v1"
         const val MAX_RECENT = 16
     }
 }
-

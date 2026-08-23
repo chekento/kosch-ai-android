@@ -6,6 +6,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -52,6 +53,7 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Undo
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Button
@@ -99,8 +101,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.content.Context
+import android.view.View
 import cloud.kosch.aiandroid.LauncherController
 import cloud.kosch.aiandroid.ai.AiProviderProfile
+import cloud.kosch.aiandroid.ai.AiProviderKind
 import cloud.kosch.aiandroid.ai.AiProviderRegistry
 import cloud.kosch.aiandroid.ai.SmartCollection
 import cloud.kosch.aiandroid.model.ContextSnapshot
@@ -125,6 +130,10 @@ fun LauncherRoot(
     controller: LauncherController,
     requestHomeRole: () -> Unit,
     requestVoiceInput: () -> Unit,
+    requestDocument: () -> Unit,
+    requestWidget: () -> Unit,
+    createWidgetView: (Context, Int) -> View?,
+    deleteWidget: (Int) -> Unit,
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val askFocusRequester = remember { FocusRequester() }
@@ -140,9 +149,17 @@ fun LauncherRoot(
     }
 
     BackHandler(
-        enabled = controller.drawerVisible || controller.providerChooserVisible || controller.contextDetailsVisible,
+        enabled = controller.drawerVisible || controller.providerChooserVisible ||
+            controller.contextDetailsVisible || controller.controlCenterVisible ||
+            controller.phoneVisible || controller.fileSheetVisible ||
+            controller.widgetBoardVisible || controller.appActionsVisible,
     ) {
         when {
+            controller.appActionsVisible -> controller.hideAppActions()
+            controller.phoneVisible -> controller.closePhone()
+            controller.fileSheetVisible -> controller.closeFileSheet()
+            controller.widgetBoardVisible -> controller.closeWidgetBoard()
+            controller.controlCenterVisible -> controller.closeControlCenter()
             controller.providerChooserVisible -> controller.closeProviderChooser()
             controller.contextDetailsVisible -> controller.hideContextDetails()
             controller.drawerVisible -> controller.closeDrawer()
@@ -156,14 +173,9 @@ fun LauncherRoot(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(Color(0xFF173548), Ink),
-                        center = Offset(140f, 100f),
-                        radius = 1_150f,
-                    ),
-                ),
+                .background(Ink),
         ) {
+            NeuralGlassBackground(Modifier.fillMaxSize())
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -190,12 +202,18 @@ fun LauncherRoot(
                         keyboardController?.show()
                     },
                 )
+                QuickActionsRail(
+                    onPhone = controller::openPhone,
+                    onFiles = requestDocument,
+                    onWidgets = controller::openWidgetBoard,
+                    onControls = controller::openControlCenter,
+                )
                 AskDock(
                     text = askText,
                     onTextChange = { askText = it },
                     focusRequester = askFocusRequester,
                     onSubmit = {
-                        controller.submitCommand(askText, requestVoiceInput)
+                        controller.submitCommand(askText, requestVoiceInput, requestDocument)
                         askText = ""
                         keyboardController?.hide()
                     },
@@ -219,6 +237,31 @@ fun LauncherRoot(
                 controller.hideContextDetails()
             },
             onDismiss = controller::hideContextDetails,
+        )
+    }
+    if (controller.controlCenterVisible) {
+        ControlCenterSheet(
+            controller = controller,
+            requestDocument = requestDocument,
+            requestWidget = requestWidget,
+        )
+    }
+    if (controller.phoneVisible) {
+        PhoneSheet(controller)
+    }
+    if (controller.fileSheetVisible) {
+        FileIntelligenceSheet(controller, requestDocument)
+    }
+    if (controller.widgetBoardVisible) {
+        WidgetBoardSheet(controller, requestWidget, createWidgetView, deleteWidget)
+    }
+    if (controller.appActionsVisible) {
+        AppActionsSheet(controller)
+    }
+    if (controller.onboardingVisible) {
+        OnboardingExperience(
+            controller = controller,
+            requestHomeRole = requestHomeRole,
         )
     }
 }
@@ -249,6 +292,9 @@ private fun LauncherHeader(
                 mode = controller.workspaceMode,
                 onModeSelected = controller::selectWorkspaceMode,
             )
+            IconButton(onClick = controller::openControlCenter) {
+                Icon(Icons.Rounded.Tune, contentDescription = "Kontrollzentrum", tint = Sky)
+            }
         }
 
         if (!controller.isDefaultHome) {
@@ -431,7 +477,7 @@ private fun ColumnScope.WorkspaceSurface(
                         TileAction.FOCUS -> controller.openDrawer(SmartCollection.WORK)
                         TileAction.MEDIA -> controller.openDrawer(SmartCollection.MEDIA)
                         TileAction.COMMUNICATION -> controller.openDrawer(SmartCollection.COMMUNICATION)
-                        TileAction.TOOLS -> controller.openDrawer(SmartCollection.TOOLS)
+                        TileAction.TOOLS -> controller.openControlCenter()
                     }
                 },
             )
@@ -643,7 +689,7 @@ private fun AskDock(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 private fun AppDrawerSheet(controller: LauncherController) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -729,7 +775,10 @@ private fun AppDrawerSheet(controller: LauncherController) {
                         Column(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
-                                .clickable { controller.launch(app) }
+                                .combinedClickable(
+                                    onClick = { controller.launch(app) },
+                                    onLongClick = { controller.showAppActions(app) },
+                                )
                                 .padding(8.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.spacedBy(7.dp),
@@ -772,9 +821,9 @@ private fun ProviderChooserSheet(controller: LauncherController) {
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("KI-Ziel auswählen", style = MaterialTheme.typography.headlineSmall)
+                    Text("KI-Modus auswählen", style = MaterialTheme.typography.headlineSmall)
                     Text(
-                        "KoSch entscheidet nicht heimlich für dich.",
+                        "Local Core ist immer aktiv. Externe Übergaben entscheidest du.",
                         color = MutedMist,
                         style = MaterialTheme.typography.bodyMedium,
                     )
@@ -793,27 +842,42 @@ private fun ProviderChooserSheet(controller: LauncherController) {
                 maxLines = 5,
             )
             Surface(
-                color = Violet.copy(alpha = 0.11f),
+                color = Mint.copy(alpha = 0.11f),
                 shape = RoundedCornerShape(16.dp),
             ) {
-                Text(
-                    text = "Übergabe erst nach deinem Tippen. Verwendet werden nur Android Share, App-Start oder Web – keine verdeckte Fernsteuerung.",
-                    modifier = Modifier.padding(12.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("LOCAL CORE · AKTIV", color = Mint, style = MaterialTheme.typography.labelMedium)
+                    Text(
+                        text = "Befehle, Suche, Kontext, Szenen und Datei-Analyse laufen ohne Modell, API oder Internetrecht. Generative Antworten können bewusst an eine lokale Open-Source-App oder Cloud-App übergeben werden.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                items(AiProviderRegistry.providers, key = { it.id }) { provider ->
-                    ProviderCard(
-                        provider = provider,
-                        installed = controller.installedProviderApp(provider) != null,
-                        hasPrompt = controller.providerPrompt.isNotBlank(),
-                        onClick = { controller.routeToProvider(provider) },
-                    )
+                AiProviderKind.entries.forEach { kind ->
+                    item(key = "heading-${kind.name}") {
+                        Text(
+                            kind.title,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(top = 5.dp),
+                        )
+                    }
+                    items(
+                        items = AiProviderRegistry.providers.filter { it.kind == kind },
+                        key = { it.id },
+                    ) { provider ->
+                        ProviderCard(
+                            provider = provider,
+                            installed = controller.installedProviderApp(provider) != null,
+                            hasPrompt = controller.providerPrompt.isNotBlank(),
+                            onClick = { controller.routeToProvider(provider) },
+                        )
+                    }
                 }
             }
         }
@@ -857,7 +921,11 @@ private fun ProviderCard(
                     Text(provider.name, fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        if (installed) "APP" else "WEB",
+                        when {
+                            installed -> "APP"
+                            provider.kind == AiProviderKind.LOCAL_OPEN_SOURCE -> "OPEN SOURCE"
+                            else -> "WEB"
+                        },
                         color = if (installed) Mint else Sky,
                         style = MaterialTheme.typography.labelSmall,
                     )
@@ -867,6 +935,9 @@ private fun ProviderCard(
                     color = MutedMist,
                     style = MaterialTheme.typography.bodySmall,
                 )
+                provider.license?.let { license ->
+                    Text(license, color = Mint, style = MaterialTheme.typography.labelSmall)
+                }
             }
             Button(onClick = onClick) {
                 Icon(
@@ -875,7 +946,13 @@ private fun ProviderCard(
                     modifier = Modifier.size(18.dp),
                 )
                 Spacer(Modifier.width(5.dp))
-                Text(if (installed && hasPrompt) "Teilen" else "Öffnen")
+                Text(
+                    when {
+                        installed && hasPrompt -> "Teilen"
+                        provider.kind == AiProviderKind.LOCAL_OPEN_SOURCE && !installed -> "Projekt"
+                        else -> "Öffnen"
+                    },
+                )
             }
         }
     }
@@ -943,7 +1020,7 @@ private fun ContextDetailsSheet(
             }
             HorizontalDivider()
             Text(
-                text = "M1 liest nur Uhrzeit, Akkustatus, verfügbare Netzwerkverbindung und aktive Audioausgänge. Standort, Kalender und Benachrichtigungen sind nicht freigeschaltet.",
+                text = "M2 liest hier nur Uhrzeit, Akkustatus, verfügbare Netzwerkverbindung und aktive Audioausgänge. Dateien werden ausschließlich nach deiner Android-Auswahl in einem separaten, begrenzten lokalen Vorgang gelesen. Standort, Kalender, Kontakte und Benachrichtigungsinhalte sind nicht freigeschaltet.",
                 color = MutedMist,
                 style = MaterialTheme.typography.bodyMedium,
             )

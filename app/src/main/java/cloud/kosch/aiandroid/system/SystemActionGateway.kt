@@ -1,0 +1,64 @@
+package cloud.kosch.aiandroid.system
+
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
+import cloud.kosch.aiandroid.model.FileInsight
+import cloud.kosch.aiandroid.model.SystemPanel
+
+class SystemActionGateway(context: Context) {
+    private val appContext = context.applicationContext
+
+    fun openDialer(number: String? = null): Result<Unit> = start(
+        Intent(
+            Intent.ACTION_DIAL,
+            number?.takeIf(String::isNotBlank)?.let { Uri.fromParts("tel", it, null) },
+        ),
+    )
+
+    fun openPanel(panel: SystemPanel): Result<Unit> = when (panel) {
+        SystemPanel.WIFI -> startWithFallback(
+            Intent(Settings.ACTION_WIFI_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        )
+
+        SystemPanel.BLUETOOTH -> startWithFallback(
+            Intent(Settings.ACTION_BLUETOOTH_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        )
+
+        SystemPanel.NOTIFICATIONS -> startWithFallback(
+            Intent(Settings.ACTION_NOTIFICATION_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        )
+
+        SystemPanel.ANDROID_SETTINGS -> start(Intent(Settings.ACTION_SETTINGS))
+        SystemPanel.HOME_SELECTION -> startWithFallback(
+            Intent(Settings.ACTION_HOME_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        )
+    }
+
+    fun openAppInfo(packageName: String): Result<Unit> = start(
+        Intent(
+            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+            Uri.fromParts("package", packageName, null),
+        ),
+    )
+
+    fun openFile(insight: FileInsight): Result<Unit> = start(
+        Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(insight.uri, insight.mimeType)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        },
+    )
+
+    private fun startWithFallback(primary: Intent, fallback: Intent): Result<Unit> =
+        start(primary).recoverCatching { start(fallback).getOrThrow() }
+
+    private fun start(intent: Intent): Result<Unit> = runCatching {
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        appContext.startActivity(intent)
+    }
+}

@@ -10,9 +10,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import cloud.kosch.aiandroid.ai.AiProviderProfile
 import cloud.kosch.aiandroid.ai.AiProviderRegistry
+import cloud.kosch.aiandroid.ai.AiProviderKind
 import cloud.kosch.aiandroid.ai.LauncherCommand
 import cloud.kosch.aiandroid.ai.LocalAppClassifier
 import cloud.kosch.aiandroid.ai.LocalCommandPlanner
+import cloud.kosch.aiandroid.ai.LocalFileIntelligenceEngine
 import cloud.kosch.aiandroid.ai.SearchDocument
 import cloud.kosch.aiandroid.ai.SearchRanker
 import cloud.kosch.aiandroid.ai.SmartCollection
@@ -21,12 +23,16 @@ import cloud.kosch.aiandroid.data.WorkspaceStore
 import cloud.kosch.aiandroid.model.ContextSnapshot
 import cloud.kosch.aiandroid.model.DefaultWorkspace
 import cloud.kosch.aiandroid.model.LaunchableApp
+import cloud.kosch.aiandroid.model.LaunchableShortcut
+import cloud.kosch.aiandroid.model.FileInsight
 import cloud.kosch.aiandroid.model.PositionedTile
 import cloud.kosch.aiandroid.model.SceneId
+import cloud.kosch.aiandroid.model.SystemPanel
 import cloud.kosch.aiandroid.model.TilePosition
 import cloud.kosch.aiandroid.model.WorkspaceMode
 import cloud.kosch.aiandroid.system.HomeRoleController
 import cloud.kosch.aiandroid.system.LocalContextEngine
+import cloud.kosch.aiandroid.system.SystemActionGateway
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -37,6 +43,8 @@ class LauncherController(context: Context) {
     private val store = WorkspaceStore(appContext)
     private val commandPlanner = LocalCommandPlanner()
     private val contextEngine = LocalContextEngine(appContext)
+    private val fileIntelligence = LocalFileIntelligenceEngine(appContext.contentResolver)
+    private val systemActions = SystemActionGateway(appContext)
     private val appCatalog = AppCatalog(appContext, mainHandler, ::refreshApps)
 
     var apps by mutableStateOf<List<LaunchableApp>>(emptyList())
@@ -66,6 +74,30 @@ class LauncherController(context: Context) {
     var providerPrompt by mutableStateOf("")
         private set
     var contextDetailsVisible by mutableStateOf(false)
+        private set
+    var onboardingVisible by mutableStateOf(!store.isOnboardingComplete())
+        private set
+    var controlCenterVisible by mutableStateOf(false)
+        private set
+    var phoneVisible by mutableStateOf(false)
+        private set
+    var fileSheetVisible by mutableStateOf(false)
+        private set
+    var fileLoading by mutableStateOf(false)
+        private set
+    var fileInsight by mutableStateOf<FileInsight?>(null)
+        private set
+    var widgetBoardVisible by mutableStateOf(false)
+        private set
+    var widgetIds by mutableStateOf(store.widgetIds())
+        private set
+    var appActionsVisible by mutableStateOf(false)
+        private set
+    var selectedApp by mutableStateOf<LaunchableApp?>(null)
+        private set
+    var appShortcuts by mutableStateOf<List<LaunchableShortcut>>(emptyList())
+        private set
+    var shortcutsLoading by mutableStateOf(false)
         private set
     var notice by mutableStateOf<String?>(null)
         private set
@@ -212,14 +244,147 @@ class LauncherController(context: Context) {
         contextDetailsVisible = false
     }
 
+    fun completeOnboarding() {
+        store.completeOnboarding()
+        onboardingVisible = false
+        notice = "KoSch ist bereit – der lokale Kern bleibt ohne API aktiv"
+    }
+
+    fun reopenOnboarding() {
+        controlCenterVisible = false
+        onboardingVisible = true
+    }
+
+    fun openControlCenter() {
+        controlCenterVisible = true
+    }
+
+    fun closeControlCenter() {
+        controlCenterVisible = false
+    }
+
+    fun openPhone() {
+        phoneVisible = true
+    }
+
+    fun closePhone() {
+        phoneVisible = false
+    }
+
+    fun dial(number: String?) {
+        systemActions.openDialer(number)
+            .onSuccess {
+                phoneVisible = false
+                notice = "Nummer im System-Telefon geöffnet – du bestätigst den Anruf"
+            }
+            .onFailure { notice = "Auf diesem Gerät ist kein Telefon-Wähler verfügbar" }
+    }
+
+    fun openSystemPanel(panel: SystemPanel) {
+        systemActions.openPanel(panel)
+            .onSuccess {
+                if (panel == SystemPanel.HOME_SELECTION) {
+                    notice = "Hier kannst du jederzeit einen anderen Launcher wählen"
+                }
+            }
+            .onFailure { notice = "${panel.title} konnte nicht geöffnet werden" }
+    }
+
+    fun inspectDocument(uri: Uri) {
+        fileSheetVisible = true
+        fileLoading = true
+        fileInsight = null
+        executor.execute {
+            val result = runCatching { fileIntelligence.inspect(uri) }
+            mainHandler.post {
+                result.onSuccess { fileInsight = it }
+                    .onFailure { notice = "Die Datei konnte nicht sicher gelesen werden" }
+                fileLoading = false
+            }
+        }
+    }
+
+    fun closeFileSheet() {
+        fileSheetVisible = false
+    }
+
+    fun openInspectedFile() {
+        val insight = fileInsight ?: return
+        systemActions.openFile(insight)
+            .onFailure { notice = "Für diesen Dateityp ist keine App verfügbar" }
+    }
+
+    fun openWidgetBoard() {
+        widgetBoardVisible = true
+    }
+
+    fun closeWidgetBoard() {
+        widgetBoardVisible = false
+    }
+
+    fun acceptWidget(appWidgetId: Int) {
+        store.addWidgetId(appWidgetId)
+        widgetIds = store.widgetIds()
+        widgetBoardVisible = true
+        notice = "Widget sicher zum Board hinzugefügt"
+    }
+
+    fun removeWidgetRecord(appWidgetId: Int) {
+        store.removeWidgetId(appWidgetId)
+        widgetIds = store.widgetIds()
+        notice = "Widget entfernt"
+    }
+
+    fun showAppActions(app: LaunchableApp) {
+        drawerVisible = false
+        selectedApp = app
+        appActionsVisible = true
+        shortcutsLoading = true
+        appShortcuts = emptyList()
+        executor.execute {
+            val result = runCatching { appCatalog.loadShortcuts(app) }
+            mainHandler.post {
+                appShortcuts = result.getOrDefault(emptyList())
+                shortcutsLoading = false
+            }
+        }
+    }
+
+    fun hideAppActions() {
+        appActionsVisible = false
+    }
+
+    fun launch(shortcut: LaunchableShortcut) {
+        runCatching { appCatalog.launch(shortcut) }
+            .onSuccess {
+                store.recordRecent(shortcut.packageName)
+                recentPackages = store.recentPackages()
+                appActionsVisible = false
+                drawerVisible = false
+            }
+            .onFailure { notice = "${shortcut.label} konnte nicht gestartet werden" }
+    }
+
+    fun openSelectedAppInfo() {
+        val app = selectedApp ?: return
+        systemActions.openAppInfo(app.packageName)
+            .onFailure { notice = "App-Info konnte nicht geöffnet werden" }
+    }
+
     fun submitCommand(
         text: String,
         requestVoice: () -> Unit,
+        requestDocument: () -> Unit,
     ) {
         when (val command = commandPlanner.plan(text)) {
             LauncherCommand.Empty -> Unit
             LauncherCommand.OpenDrawer -> openDrawer()
             LauncherCommand.StartVoice -> requestVoice()
+            LauncherCommand.OpenFiles -> requestDocument()
+            LauncherCommand.OpenControls -> openControlCenter()
+            LauncherCommand.OpenWidgets -> openWidgetBoard()
+            is LauncherCommand.OpenPhone -> if (command.number == null) openPhone() else dial(command.number)
+            is LauncherCommand.OpenSystemPanel -> openSystemPanel(command.panel)
             is LauncherCommand.SwitchScene -> switchScene(command.scene)
             is LauncherCommand.LaunchApp -> launchBestMatch(command.query)
             is LauncherCommand.RoutePrompt -> openProviderChooser(command.prompt)
@@ -284,7 +449,11 @@ class LauncherController(context: Context) {
         result.onSuccess {
             providerChooserVisible = false
             notice = if (installed == null) {
-                "${provider.name} im Browser geöffnet"
+                if (provider.kind == AiProviderKind.LOCAL_OPEN_SOURCE) {
+                    "Open-Source-Projekt ${provider.name} geöffnet"
+                } else {
+                    "${provider.name} im Browser geöffnet"
+                }
             } else if (prompt.isBlank()) {
                 "${provider.name} geöffnet"
             } else {

@@ -3,6 +3,8 @@ package cloud.kosch.aiandroid.data
 import android.content.ComponentName
 import android.content.Context
 import android.content.pm.LauncherApps
+import android.content.pm.ShortcutInfo
+import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.os.Handler
@@ -11,6 +13,7 @@ import android.os.UserHandle
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
 import cloud.kosch.aiandroid.model.LaunchableApp
+import cloud.kosch.aiandroid.model.LaunchableShortcut
 import java.util.Locale
 
 class AppCatalog(
@@ -77,6 +80,41 @@ class AppCatalog(
         )
     }
 
+    fun loadShortcuts(app: LaunchableApp): List<LaunchableShortcut> {
+        val query = LauncherApps.ShortcutQuery()
+            .setPackage(app.packageName)
+            .setQueryFlags(
+                LauncherApps.ShortcutQuery.FLAG_MATCH_DYNAMIC or
+                    LauncherApps.ShortcutQuery.FLAG_MATCH_MANIFEST or
+                    LauncherApps.ShortcutQuery.FLAG_MATCH_PINNED,
+            )
+        return launcherApps.getShortcuts(query, app.user).orEmpty()
+            .filter(ShortcutInfo::isEnabled)
+            .sortedBy(ShortcutInfo::getRank)
+            .map { shortcut ->
+                LaunchableShortcut(
+                    id = shortcut.id,
+                    packageName = shortcut.`package`,
+                    label = shortcut.shortLabel?.toString()?.ifBlank { shortcut.id } ?: shortcut.id,
+                    user = app.user,
+                    icon = launcherApps.getShortcutBadgedIconDrawable(
+                        shortcut,
+                        Resources.getSystem().displayMetrics.densityDpi,
+                    )?.safeBitmap()?.asImageBitmap(),
+                )
+            }
+    }
+
+    fun launch(shortcut: LaunchableShortcut) {
+        launcherApps.startShortcut(
+            shortcut.packageName,
+            shortcut.id,
+            null,
+            null,
+            shortcut.user,
+        )
+    }
+
     private fun Drawable.safeBitmap(): Bitmap = runCatching {
         toBitmap(width = ICON_SIZE_PX, height = ICON_SIZE_PX, config = Bitmap.Config.ARGB_8888)
     }.getOrElse {
@@ -87,4 +125,3 @@ class AppCatalog(
         const val ICON_SIZE_PX = 96
     }
 }
-

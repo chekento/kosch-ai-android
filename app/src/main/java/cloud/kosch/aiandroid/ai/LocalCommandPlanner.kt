@@ -1,6 +1,7 @@
 package cloud.kosch.aiandroid.ai
 
 import cloud.kosch.aiandroid.model.SceneId
+import cloud.kosch.aiandroid.model.SystemPanel
 import java.text.Normalizer
 import java.util.Locale
 
@@ -8,6 +9,11 @@ sealed interface LauncherCommand {
     data object Empty : LauncherCommand
     data object OpenDrawer : LauncherCommand
     data object StartVoice : LauncherCommand
+    data object OpenFiles : LauncherCommand
+    data object OpenControls : LauncherCommand
+    data object OpenWidgets : LauncherCommand
+    data class OpenPhone(val number: String?) : LauncherCommand
+    data class OpenSystemPanel(val panel: SystemPanel) : LauncherCommand
     data class SwitchScene(val scene: SceneId) : LauncherCommand
     data class LaunchApp(val query: String) : LauncherCommand
     data class RoutePrompt(val prompt: String) : LauncherCommand
@@ -21,6 +27,11 @@ class LocalCommandPlanner {
         val normalized = raw.normalized()
         if (normalized in drawerCommands) return LauncherCommand.OpenDrawer
         if (normalized in voiceCommands) return LauncherCommand.StartVoice
+        if (normalized in fileCommands) return LauncherCommand.OpenFiles
+        if (normalized in controlCommands) return LauncherCommand.OpenControls
+        if (normalized in widgetCommands) return LauncherCommand.OpenWidgets
+        systemPanelFrom(normalized)?.let { return LauncherCommand.OpenSystemPanel(it) }
+        phoneFrom(raw, normalized)?.let { return it }
 
         sceneFrom(normalized)?.let { return LauncherCommand.SwitchScene(it) }
 
@@ -30,6 +41,23 @@ class LocalCommandPlanner {
         }
 
         return LauncherCommand.RoutePrompt(raw)
+    }
+
+    private fun systemPanelFrom(value: String): SystemPanel? = when (value) {
+        "wlan", "wifi", "wi-fi", "wlan einstellungen" -> SystemPanel.WIFI
+        "bluetooth", "bluetooth einstellungen" -> SystemPanel.BLUETOOTH
+        "benachrichtigungen", "notification settings" -> SystemPanel.NOTIFICATIONS
+        "android einstellungen", "systemeinstellungen", "settings" -> SystemPanel.ANDROID_SETTINGS
+        "home auswahl", "launcher auswahl", "start app auswahl", "standard launcher" -> SystemPanel.HOME_SELECTION
+        else -> null
+    }
+
+    private fun phoneFrom(raw: String, normalized: String): LauncherCommand.OpenPhone? {
+        if (normalized in phoneCommands) return LauncherCommand.OpenPhone(null)
+        val prefix = dialPrefixes.firstOrNull { normalized.startsWith(it) } ?: return null
+        val rawNumber = raw.drop(prefix.length).removeSuffix(" an").trim()
+        val number = PhoneNumberParser.sanitize(rawNumber) ?: return LauncherCommand.OpenPhone(null)
+        return LauncherCommand.OpenPhone(number)
     }
 
     private fun sceneFrom(value: String): SceneId? {
@@ -63,6 +91,21 @@ class LocalCommandPlanner {
             "hor zu",
             "listen",
         )
+        val fileCommands = setOf(
+            "datei", "dateien", "datei offnen", "datei analysieren", "file", "files",
+        )
+        val controlCommands = setOf(
+            "kontrollzentrum", "schnelleinstellungen", "systemsteuerung", "quick controls",
+        )
+        val widgetCommands = setOf(
+            "widget", "widgets", "widget board", "widget-bereich",
+        )
+        val phoneCommands = setOf(
+            "telefon", "wahler", "dialer", "anrufen", "phone",
+        )
+        val dialPrefixes = listOf(
+            "wahle ", "wähle ", "ruf ", "rufe ", "dial ", "call ",
+        )
         val scenePrefixes = listOf(
             "szene ",
             "scene ",
@@ -79,3 +122,13 @@ class LocalCommandPlanner {
     }
 }
 
+object PhoneNumberParser {
+    fun sanitize(value: String): String? {
+        val trimmed = value.trim()
+        if (trimmed.isBlank()) return null
+        val hasLeadingPlus = trimmed.startsWith('+')
+        val digits = trimmed.filter(Char::isDigit)
+        if (digits.length !in 3..20) return null
+        return (if (hasLeadingPlus) "+" else "") + digits
+    }
+}
