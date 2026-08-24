@@ -31,16 +31,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Bluetooth
+import androidx.compose.material.icons.rounded.BusinessCenter
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.CreateNewFolder
+import androidx.compose.material.icons.rounded.ContactPhone
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Phone
@@ -56,6 +60,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -74,6 +79,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -89,6 +95,7 @@ import cloud.kosch.aiandroid.LauncherController
 import cloud.kosch.aiandroid.ai.LocalRuntimeRegistry
 import cloud.kosch.aiandroid.ai.RuntimeStage
 import cloud.kosch.aiandroid.model.SystemPanel
+import cloud.kosch.aiandroid.model.WidgetSizePreset
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 import cloud.kosch.aiandroid.ui.theme.Ink
 import cloud.kosch.aiandroid.ui.theme.Mint
@@ -315,6 +322,7 @@ fun OnboardingExperience(
 fun ControlCenterSheet(
     controller: LauncherController,
     requestDocument: () -> Unit,
+    requestContact: () -> Unit,
     requestWidget: () -> Unit,
 ) {
     ModalBottomSheet(
@@ -360,6 +368,27 @@ fun ControlCenterSheet(
                     right = ControlItem("Datei-KI", "Lokal prüfen", Icons.Rounded.FolderOpen) {
                         controller.closeControlCenter()
                         requestDocument()
+                    },
+                )
+            }
+            item {
+                ControlPair(
+                    left = ControlItem("Kontakt", "Einmalige Systemauswahl", Icons.Rounded.ContactPhone) {
+                        controller.closeControlCenter()
+                        requestContact()
+                    },
+                    right = ControlItem("Pro Desk", "Kommandozentrale", Icons.Rounded.BusinessCenter) {
+                        controller.openProDesk()
+                    },
+                )
+            }
+            item {
+                ControlPair(
+                    left = ControlItem("Backup", "Verschlüsselt", Icons.Rounded.Backup) {
+                        controller.openBackup()
+                    },
+                    right = ControlItem("Audit", "Nur Metadaten", Icons.Rounded.History) {
+                        controller.openAudit()
                     },
                 )
             }
@@ -502,8 +531,12 @@ private fun ControlCard(item: ControlItem, modifier: Modifier = Modifier) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PhoneSheet(controller: LauncherController) {
+fun PhoneSheet(controller: LauncherController, requestContact: () -> Unit) {
     var number by remember { mutableStateOf("") }
+    val selectedContact = controller.selectedContact
+    LaunchedEffect(selectedContact) {
+        if (selectedContact != null) number = selectedContact.phoneNumber
+    }
     ModalBottomSheet(
         onDismissRequest = controller::closePhone,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -514,6 +547,19 @@ fun PhoneSheet(controller: LauncherController) {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             SheetHeader("Telefon", "Sicher über Android ACTION_DIAL", controller::closePhone)
+            OutlinedButton(onClick = requestContact, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Rounded.ContactPhone, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Kontakt einmalig auswählen")
+            }
+            if (selectedContact != null) {
+                Surface(color = Mint.copy(alpha = 0.10f), shape = RoundedCornerShape(15.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                        Text(selectedContact.displayName, fontWeight = FontWeight.SemiBold)
+                        Text("Nur für diesen Vorgang übernommen", color = MutedMist, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
             OutlinedTextField(
                 value = number,
                 onValueChange = { number = it.filter { char -> char.isDigit() || char in "+ ()-/" } },
@@ -525,7 +571,7 @@ fun PhoneSheet(controller: LauncherController) {
             )
             Surface(color = Violet.copy(alpha = 0.10f), shape = RoundedCornerShape(16.dp)) {
                 Text(
-                    "KoSch besitzt keine Anrufberechtigung. Der System-Wähler zeigt die Nummer; erst du startest den Anruf. Kontakte werden nicht gelesen.",
+                    "KoSch besitzt keine Anrufberechtigung. Der System-Wähler zeigt die Nummer; erst du startest den Anruf. Es gibt keinen globalen Kontaktzugriff – nur die von dir gewählte Nummer wird temporär übernommen.",
                     modifier = Modifier.padding(13.dp),
                     color = MutedMist,
                     style = MaterialTheme.typography.bodySmall,
@@ -635,7 +681,7 @@ private fun InsightBlock(title: String, body: String) {
 fun WidgetBoardSheet(
     controller: LauncherController,
     requestWidget: () -> Unit,
-    createWidgetView: (Context, Int) -> View?,
+    createWidgetView: (Context, Int, WidgetSizePreset) -> View?,
     deleteWidget: (Int) -> Unit,
 ) {
     ModalBottomSheet(
@@ -664,23 +710,38 @@ fun WidgetBoardSheet(
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxSize()) {
                     items(controller.widgetIds, key = { it }) { appWidgetId ->
+                        val preset = controller.widgetSize(appWidgetId)
                         Surface(color = RaisedSurface, shape = RoundedCornerShape(20.dp)) {
                             Column(Modifier.fillMaxWidth().padding(10.dp)) {
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                Row(
+                                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    WidgetSizePreset.entries.forEach { option ->
+                                        FilterChip(
+                                            selected = preset == option,
+                                            onClick = { controller.setWidgetSize(appWidgetId, option) },
+                                            label = { Text(option.title) },
+                                        )
+                                    }
+                                    Spacer(Modifier.width(8.dp))
                                     IconButton(onClick = { deleteWidget(appWidgetId) }) {
                                         Icon(Icons.Rounded.DeleteOutline, contentDescription = "Widget entfernen")
                                     }
                                 }
-                                AndroidView(
-                                    factory = { context ->
-                                        createWidgetView(context, appWidgetId) ?: TextView(context).apply {
-                                            text = "Widget nicht mehr verfügbar"
-                                            setTextColor(android.graphics.Color.WHITE)
-                                            setPadding(24, 24, 24, 24)
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 420.dp),
-                                )
+                                key(appWidgetId, preset) {
+                                    AndroidView(
+                                        factory = { context ->
+                                            createWidgetView(context, appWidgetId, preset) ?: TextView(context).apply {
+                                                text = "Widget nicht mehr verfügbar"
+                                                setTextColor(android.graphics.Color.WHITE)
+                                                setPadding(24, 24, 24, 24)
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth().height(preset.boardHeightDp.dp),
+                                    )
+                                }
                             }
                         }
                     }
@@ -767,7 +828,7 @@ fun AppActionsSheet(controller: LauncherController) {
 }
 
 @Composable
-private fun SheetHeader(title: String, subtitle: String, onClose: () -> Unit) {
+fun SheetHeader(title: String, subtitle: String, onClose: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)

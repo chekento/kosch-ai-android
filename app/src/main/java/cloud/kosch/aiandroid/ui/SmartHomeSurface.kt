@@ -27,6 +27,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.BusinessCenter
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Draw
@@ -79,6 +80,10 @@ fun HomePageSelector(controller: LauncherController) {
                 onClick = { controller.switchHomePage(page) },
                 label = { Text(page.title) },
                 leadingIcon = when (page) {
+                    HomePage.PRO_DESK -> {
+                        { Icon(Icons.Rounded.BusinessCenter, contentDescription = null, modifier = Modifier.size(17.dp)) }
+                    }
+
                     HomePage.SMART_SPACE -> {
                         { Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(17.dp)) }
                     }

@@ -1,0 +1,10 @@
+Lcloud/kosch/aiandroid/MainActivity;
+Lcloud/kosch/aiandroid/LauncherController;
+Lcloud/kosch/aiandroid/data/AppCatalog;
+Lcloud/kosch/aiandroid/data/WorkspaceStore;
+Lcloud/kosch/aiandroid/system/HomeRoleController;
+Lcloud/kosch/aiandroid/system/LocalContextEngine;
+Lcloud/kosch/aiandroid/ui/LauncherRootKt;
+Lcloud/kosch/aiandroid/ui/ProfessionalSurfacesKt;
+Lcloud/kosch/aiandroid/ui/SmartHomeSurfaceKt;
+Lcloud/kosch/aiandroid/ui/theme/ThemeKt;

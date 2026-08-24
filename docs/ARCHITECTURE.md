@@ -13,17 +13,17 @@ flowchart TD
     Preview --> Models["optionale lokale / externe Modelle"]
 ```
 
-M2.2 implementiert `Local Core`, die Android-Gateways, einen persistierten Smart Space, eine adaptive HOME-Shell, profilbewusste Apps sowie einen lokalen Pen Space. Generative Modelllaufzeiten sind registrierte, aber noch nicht in den HOME-Prozess geladene Erweiterungen.
+M2.3 implementiert zusätzlich Pro Desk, Hardware-Keyboard-Routing, sichere Einmalkontakte, verschlüsselten Workspace-Export/Restore, ein metadatenarmes lokales Audit und Widget-Größenpresets. Generative Modelllaufzeiten sind registrierte, aber noch nicht in den HOME-Prozess geladene Erweiterungen.
 
 ## Gegenwärtige Paketgrenzen
 
 | Paket | Verantwortung | Vertrauensniveau |
 |---|---|---|
-| `model` | Workspace-, Datei-, Shortcut-, Profil-, FAQ-, Stylus- und Ink-Modelle | rein |
-| `data` | App-/Shortcut-/FAQ-Katalog, Workspace-Schema v3, Dock-/Ordner-/Ink- und Widget-ID-Persistenz | lokal |
+| `model` | Workspace-, Professional-, Audit-, Datei-, Shortcut-, Profil-, FAQ-, Stylus- und Ink-Modelle | rein |
+| `data` | App-/Shortcut-/FAQ-Katalog, Workspace-Schema v5, Audit, Dock-/Ordner-/Ink- und Widget-Persistenz | lokal |
 | `ai` | Befehlsplanung, Suche, Smart-Dock-/Ordner-Klassifikation, Runtime-/Providerprofile | lokal; keine Netzschicht |
 | `system` | HOME-Rolle, Kontext, Stylus-Monitor, Dialer/Settings/File-Gateways, Grant-Owner, Badge Listener, Widget Host | Android-Grenze |
-| `security` | Endpoint-Policy und ruhender Keystore-Vault | Secret-Grenze |
+| `security` | portabler Backup-Codec, Endpoint-Policy und ruhender Keystore-Vault | Secret-Grenze |
 | `ui` | Compose-Shell, Onboarding, Sheets, Neural Glass, Bestätigungen | Darstellung |
 | `LauncherController` | explizite Orchestrierung und UI-Zustand | Application Layer |
 
@@ -38,6 +38,12 @@ Ein Modulsplit folgt, sobald der native Modelladapter oder ein optionaler Netzwe
 `LauncherRoot` leitet die Darstellung aus den aktuellen `BoxWithConstraints`-Fenstermaßen ab. Kompakte Fenster verwenden eine vertikale Shell; ab 840 dp beziehungsweise ab 720 dp im Querformat werden Navigation und Arbeitsfläche getrennt. Die Entscheidung hängt nicht an einer einmal ermittelten Displayklasse und reagiert deshalb auf Rotation, Multi-Window und Foldable-Resize.
 
 Android 12+ liefert `dynamicDarkColorScheme`; ältere Versionen erhalten die kuratierte KoSch-Palette. Systemleisten bleiben edge-to-edge mit Inset-Schutz. Die Animator-Dauer des Systems steuert den statischen Reduced-Motion-Fallback. Screenshot-, 320-dp-, Hinge- und 200-%-Schrifttests sind noch ein M2.3-Gate.
+
+Ein konservatives `baseline-prof.txt` markiert ausschließlich den nachweislich startkritischen HOME-/Controller-/Store-/Compose-Pfad. Das ist ein Installationshinweis für ART, kein Performance-Beweis. Startzeit, Jank, RSS, Akku und Pen-Latenz bleiben erst nach Macrobenchmark auf realen Geräteklassen bewertbar.
+
+## Pro Desk und Hardware-Tastatur
+
+`ProfessionalHubSurface` ist die Standard-Home-Seite neuer Installationen. Sie aggregiert nur bereits begrenzte Controller-Zustände: HOME-Lage, Local-Core-Status, zugängliche Work-App-Anzahl, Audit-Anzahl, Smart-Dock-Apps und explizite Capability-Einstiege. `ProfessionalShortcutResolver` ist eine reine, unit-getestete Zuordnung. `MainActivity.onKeyShortcut` führt ausschließlich bekannte Aktionen aus; `onProvideKeyboardShortcuts` veröffentlicht sie an Android. Escape schließt über `closeTopSurface` genau den obersten transienten Zustand.
 
 ## App-Katalog und Shortcuts
 
@@ -54,18 +60,18 @@ flowchart LR
     Cap --> Shell["Pen-Seite + Schnellaktionen"]
     Device --> Ink["PressureInkView"]
     Ink --> Normalize["normalisierte InkPoint-Striche"]
-    Normalize --> Store["Workspace Store v3"]
+    Normalize --> Store["Workspace Store v5"]
 ```
 
 `StylusMonitor` registriert einen `InputManager.InputDeviceListener` und erkennt `SOURCE_STYLUS`, `SOURCE_BLUETOOTH_STYLUS`, `TOOL_TYPE_STYLUS` sowie `TOOL_TYPE_ERASER`. MotionEvents aktualisieren Druck, Neigung, Orientierung, Hover, Werkzeugtyp und Stifttasten mit gedrosselten UI-Samples. Herstellername, Vendor-/Product-ID oder Seriennummer werden nicht persistiert.
 
 `PressureInkView` akzeptiert ausschließlich Stylus-/Eraser-Werkzeuge und ignoriert Fingerkontakte. Druck verändert die Strichbreite; Stift, Marker, Hardware-/Software-Radierer, Hover, Undo und Clear sind lokale Operationen. Striche werden als normierte Vektorpunkte persistiert, begrenzt auf 100 Striche und 2.048 Punkte je Strich. Dadurch bleiben sie bei Resize/Rotation stabil und können keine unbegrenzte Preference-Payload erzeugen.
 
-Systemhandschrift in regulären Compose-Textfeldern bleibt eine Android-14+-IME-Funktion. KoSch behauptet weder eigene OCR noch semantisches Verständnis der Ink-Daten. AndroidX Ink ist eine spätere, benchmarkpflichtige Option, keine versteckte M2.2-Abhängigkeit.
+Systemhandschrift in regulären Compose-Textfeldern bleibt eine Android-14+-IME-Funktion. KoSch behauptet weder eigene OCR noch semantisches Verständnis der Ink-Daten. AndroidX Ink ist eine spätere, benchmarkpflichtige Option, keine versteckte Kernabhängigkeit.
 
 ## FAQ und Self-Service
 
-`FaqRegistry` enthält 32 versionierte, kategorisierte Einträge. Die Suche normalisiert Großschreibung, Diakritika und Trennzeichen vollständig lokal. `FaqSheet` zeigt Filter, Volltextsuche und aufklappbare Antworten; `LocalCommandPlanner` kann die FAQ und Pen Space ohne Modell öffnen. Die ausführliche Entwickler-/Betriebsfassung liegt in `docs/FAQ.md`.
+`FaqRegistry` enthält mindestens 40 versionierte, kategorisierte Einträge einschließlich Professional-, Backup-, Kontakt-, Audit- und Recovery-Themen. Die Suche normalisiert Großschreibung, Diakritika und Trennzeichen vollständig lokal. `LocalCommandPlanner` kann diese Arbeitsbereiche ohne Modell öffnen. Die ausführliche Entwickler-/Betriebsfassung liegt in `docs/FAQ.md`.
 
 ## Dateien
 
@@ -80,11 +86,11 @@ stateDiagram-v2
     Preview --> [*]: Schließen
 ```
 
-Die Activity nutzt `ACTION_OPEN_DOCUMENT` über den Activity-Result-Vertrag. `DocumentGrantManager` besitzt höchstens eine persistierte READ-URI-Freigabe: Eine neue Wahl ersetzt die alte, und die Oberfläche kann den Zugriff explizit lösen. `LocalFileIntelligenceEngine` liest Metadaten sowie maximal 4.096 Zeichen aus erkannten Textformaten. Binärdateien werden nicht als Text geraten. M2.2 verändert, löscht oder benennt Dokumente nicht um.
+Die Activity nutzt `ACTION_OPEN_DOCUMENT` über den Activity-Result-Vertrag. `DocumentGrantManager` besitzt höchstens eine persistierte READ-URI-Freigabe: Eine neue Wahl ersetzt die alte, und die Oberfläche kann den Zugriff explizit lösen. `LocalFileIntelligenceEngine` liest Metadaten sowie maximal 4.096 Zeichen aus erkannten Textformaten. Binärdateien werden nicht als Text geraten. M2.3 verändert, löscht oder benennt Dokumente nicht um.
 
 ## Telefon und Systemeinstellungen
 
-`SystemActionGateway` kennt nur explizite, dokumentierte Android-Ziele. Telefon verwendet `ACTION_DIAL`, nie `ACTION_CALL`. WLAN, Bluetooth, Benachrichtigungen, App-Info, Android-Einstellungen und HOME-Auswahl öffnen Systemoberflächen; Fehler werden abgefangen und sichtbar gemeldet.
+`SystemActionGateway` kennt nur explizite, dokumentierte Android-Ziele. Telefon verwendet `ACTION_DIAL`, nie `ACTION_CALL`. Die Activity startet eine auf Phone-Daten begrenzte `ACTION_PICK`-Auswahl und setzt auf API 37 den System-Picker-Hinweis; der Controller fragt nur die temporär freigegebene Ergebnis-URI ab. WLAN, Bluetooth, Benachrichtigungen, App-Info, Android-Einstellungen und HOME-Auswahl öffnen Systemoberflächen; Fehler werden sichtbar gemeldet.
 
 ## Widgets
 
@@ -100,9 +106,24 @@ stateDiagram-v2
     Persisted --> Released: Entfernen
 ```
 
-`WidgetHostController` besitzt eine stabile Host-ID. Erst nach erfolgreicher Bindung wird die Widget-ID im Workspace Store persistiert. Abbruch und Löschen geben IDs frei. Beim Start werden nicht mehr gültige Records entfernt. M2 hostet Widgets in einem separaten Board; freie Position, Resize, Restore-Mapping und Undo für Widgets sind noch nicht fertig.
+`WidgetHostController` besitzt eine stabile Host-ID. Erst nach erfolgreicher Bindung wird die Widget-ID im Workspace Store persistiert. Abbruch und Löschen geben IDs frei. Beim Start werden nicht mehr gültige Records entfernt. M2.3 persistiert die Presets Kompakt, Standard und Hoch und meldet die gewählten Min-/Max-Größen über `AppWidgetHostView.updateAppWidgetSize` an den Provider. Freie Position, Stacks, Restore-Mapping und Undo sind noch nicht fertig.
 
 Die während Androids Picker/Provider-Konfiguration offene Host-ID wird zusätzlich in `onSaveInstanceState` erhalten. Dadurch geht sie bei Activity-Recreation nicht sofort verloren; vollständige Prozess-Tod- und Provider-Restore-Tests bleiben ein M2.3-Gate.
+
+## Backup, Restore und Audit
+
+```mermaid
+stateDiagram-v2
+    [*] --> Snapshot: Export
+    Snapshot --> Encrypted: PBKDF2 + AES-GCM
+    Encrypted --> SAF: Nutzer wählt Ziel
+    SAF --> Staged: Import gewählt
+    Staged --> Validated: Passphrase + Schema-Prüfung
+    Validated --> Applied: zweite Bestätigung
+    Staged --> [*]: Fehler / Abbruch
+```
+
+`WorkspaceStore` serialisiert nur portable Werte. `PortableBackupCodec` authentifiziert Header und Payload; `LauncherController` hält Staging-Daten ausschließlich im Prozess und schützt asynchrone Ergebnisse mit einem monotonen Token. Restore wird nach vollständiger Validierung in einem synchronen Commit angewendet. `LocalAuditLog` verwendet ein geschlossenes Enum-Schema ohne Ziel- oder Freitextdaten, begrenzt Retention/Anzahl und exportiert nur `timestamp_utc,action,outcome`.
 
 ## Smart Space, Dock und Ordner
 
@@ -129,7 +150,7 @@ Positionen sind zwischen `0` und `1` normalisiert. Jede spätere LLM-generierte 
 
 ## KI-Schichten
 
-| Schicht | M2.2 | Verhalten bei Ausfall |
+| Schicht | M2.3 | Verhalten bei Ausfall |
 |---|---:|---|
 | KoSch Local Core | aktiv | HOME-Funktionen bleiben deterministisch |
 | externe lokale App | optional | Projektseite oder sichtbarer Fehler |
@@ -143,4 +164,4 @@ Die Zielabstraktion `LocalModelBackend` erhält später `load`, `stream`, `cance
 
 `SecureCredentialVault` generiert einen nicht exportierbaren AES-256-Schlüssel im Android Keystore und bindet Ciphertexte per GCM-AAD an die Provider-ID. Klartext wird nicht persistiert; übergebene `CharArray`s werden bestmöglich geleert. `ProviderEndpointPolicy` erlaubt Remote-Endpunkte nur per HTTPS und unverschlüsseltes HTTP ausschließlich für explizit aktivierte Loopback-Ziele.
 
-Der Vault ist in M2.2 absichtlich nicht an UI oder Transport gekoppelt. Vor Aktivierung direkter APIs fehlen noch Biometrieoption, Secret-Rotation, Redaction-E2E-Tests, Kontextvorschau, Audit, Timeout/Rate Limits und ein separater Netzwerk-Flavour.
+Der Vault ist in M2.3 absichtlich nicht an UI oder Transport gekoppelt. Das lokale Aktionsaudit ist keine Freigabe für Netztransport. Vor Aktivierung direkter APIs fehlen weiter Biometrieoption, Secret-Rotation, Redaction-E2E-Tests, Kontextvorschau, Timeout/Rate Limits und ein separater Netzwerk-Flavour.

@@ -1,8 +1,8 @@
-# FAQ – KoSch AI Android M2.2
+# FAQ – KoSch AI Android M2.3 Professional Command Center
 
 Stand: 24. August 2026
 
-Diese Datei dokumentiert Bedienung, Smartpen, Android-Integration, KI-Grenzen, Datenschutz, Wiederherstellung und Entwicklung. Im Launcher selbst ist eine kompaktere, vollständig lokale und durchsuchbare FAQ mit 32 Einträgen integriert: **Kontrollzentrum → FAQ & Hilfe** oder `faq` in **⌘ Ask**. Die In-App-Suche benötigt weder Konto noch Netzwerk.
+Diese Datei dokumentiert Bedienung, Smartpen, Android-Integration, Professional-Workflows, KI-Grenzen, Datenschutz, Wiederherstellung und Entwicklung. Im Launcher selbst ist eine kompaktere, vollständig lokale und durchsuchbare FAQ mit mindestens 40 Einträgen integriert: **Kontrollzentrum → FAQ & Hilfe** oder `faq` in **⌘ Ask**. Die In-App-Suche benötigt weder Konto noch Netzwerk.
 
 ## Start und Sicherheit
 
@@ -26,9 +26,9 @@ Androids Einstellungen öffnen und unter Apps beziehungsweise Standard-Apps eine
 
 Ja. **Kontrollzentrum → Einführung erneut ansehen** startet das Onboarding neu, ohne Workspace-Daten zu löschen.
 
-### Ist M2.2 schon produktionsreif?
+### Ist M2.3 schon produktionsreif?
 
-Nein. M2.2 ist `0.2.2-alpha01`. Unit-Tests, Lint und Debug-Build sind in CI grün, aber ein vollständiges OEM-Gerätelabor, instrumentierte Prozess-Tod-Tests, Macrobenchmarks, Accessibility-Abnahme, verschlüsseltes Backup und Widget-Restore fehlen noch.
+Nein. M2.3 bleibt eine Alpha. Verschlüsseltes Backup, lokales Audit, sichere Kontaktauswahl, Keyboard-Shortcuts, Pro Desk und Widget-Größen schließen wichtige Produktlücken. Produktionsfreigabe erfordert weiterhin ein echtes OEM-/Tablet-/Foldable-Gerätelabor, instrumentierte Prozess-Tod- und Restore-Tests, Macrobenchmarks, Accessibility-Abnahme und unabhängiges Security Review.
 
 ## Launcher und Bedienung
 
@@ -38,7 +38,7 @@ KoSch fragt startbare Activities über Androids `LauncherApps` ab und benötigt 
 
 ### Werden Arbeitsprofile unterstützt?
 
-Ja. M2.2 liest alle für den HOME-Host zugänglichen `LauncherApps.profiles`, verwendet stabile Benutzer-Seriennummern in App-Schlüsseln, zeigt systemgebadgte Icons und kennzeichnet Work-Apps. Gesperrte oder vom System verborgene Profile werden nicht umgangen.
+Ja. M2.3 liest alle für den HOME-Host zugänglichen `LauncherApps.profiles`, verwendet stabile Benutzer-Seriennummern in App-Schlüsseln, zeigt systemgebadgte Icons und kennzeichnet Work-Apps. Gesperrte oder vom System verborgene Profile werden nicht umgangen.
 
 ### Unterstützt KoSch Android Private Space?
 
@@ -62,11 +62,11 @@ Bis zu fünf Plätze priorisieren manuell gepinnte Apps und ergänzen lokale, ü
 
 ### Welche Seiten gibt es?
 
-Der Home-Bereich besitzt einen frei angeordneten Workspace und einen Smart Space. Wenn ein kompatibler Stift erkannt wird, kommt **Pen Space** als zusätzliche Seite hinzu. Widgets liegen derzeit in einem eigenen Board.
+**Pro Desk** ist für Neuinstallationen der professionelle Standardbereich. Hinzu kommen frei angeordneter Workspace und Smart Space. Wenn ein kompatibler Stift erkannt wird, erscheint **Pen Space**. Widgets liegen in einem eigenen, größenadaptiven Board.
 
 ### Wie füge ich Widgets hinzu?
 
-**Kontrollzentrum → Widget +** startet Androids Widget-Auswahl. KoSch persistiert nur erfolgreich gebundene IDs und gibt abgebrochene oder entfernte IDs frei. Freie Platzierung, Resize, Provider-Restore-Mapping, Stacks und transaktionales Undo sind noch offen.
+**Kontrollzentrum → Widget +** startet Androids Widget-Auswahl. KoSch persistiert nur erfolgreich gebundene IDs und gibt abgebrochene oder entfernte IDs frei. Die Presets **Kompakt**, **Standard** und **Hoch** aktualisieren die Größenoptionen des Providers. Freie Board-Platzierung, Stacks, transaktionales Undo und Provider-Restore-Mapping zwischen Geräten bleiben offen.
 
 ### Was lesen Notification Dots?
 
@@ -74,11 +74,41 @@ Nur Paketname und Anzahl badgefähiger, aktiver Benachrichtigungen werden nach s
 
 ### Kann KoSch telefonieren?
 
-KoSch bereitet eine geprüfte Nummer mit `ACTION_DIAL` im System-Wähler vor. Es besitzt kein `CALL_PHONE`, liest keine Kontakte oder Anrufliste und bestätigt keinen Anruf selbst. Notruf- und vollständige Dialer-Funktionen sind ausdrücklich nicht Teil des Launchers.
+KoSch bereitet eine geprüfte Nummer mit `ACTION_DIAL` im System-Wähler vor. Es besitzt kein `CALL_PHONE`, liest weder das gesamte Adressbuch noch die Anrufliste und bestätigt keinen Anruf selbst. Eine Person kann genau eine Telefonnummer über Androids `ACTION_PICK` wählen; Android 17s neuer System-Contact-Picker wird über `EXTRA_USE_SYSTEM_CONTACTS_PICKER` bevorzugt. Name und Nummer bleiben nur im aktuellen Vorgang.
+
+## Professional und Produktivität
+
+### Was ist Pro Desk?
+
+Pro Desk bündelt HOME-Status, API-freien Local Core, Anzahl zugänglicher Arbeitsprofil-Apps, lokale Audit-Lage, relevante Apps sowie Telefon-, Kontakt-, Datei-, Widget-, Backup- und Audit-Aktionen. Es ist keine separate Cloud-Oberfläche, sondern eine adaptive Sicht auf bereits vorhandene, eng begrenzte Capabilities.
+
+### Welche Hardware-Tastatur-Shortcuts sind verfügbar?
+
+`Ctrl/Meta+K` fokussiert die Command Bar, `Ctrl/Meta+Leertaste` öffnet Apps, `Ctrl/Meta+H` Pro Desk, `Ctrl/Meta+,` das Kontrollzentrum, `Ctrl/Meta+D` Telefon, `Ctrl/Meta+O` Datei-KI, `Ctrl/Meta+B` Backup und `Ctrl/Meta+L` Audit. `Ctrl/Meta+Shift+P` öffnet Pen Space, sofern ein Stift erkannt wurde. `Escape` schließt genau die oberste temporäre KoSch-Fläche. Androids systemweite Shortcut-Hilfe listet dieselben Befehle.
+
+### Welche Professional-Befehle versteht der Local Core?
+
+Zusätzlich zu Apps, Szenen und Systembereichen versteht er deterministisch unter anderem „Pro Desk“, „Workspace sichern“, „Sicherheitsverlauf“ und „Kontakt auswählen“. Dadurch bleiben zentrale Arbeitsabläufe auch ohne LLM, Netzwerk und API-Schlüssel erreichbar. Unbekannte Texte erhalten keine autonomen Rechte, sondern führen weiterhin in die bewusste Anbieterwahl.
+
+### Wie funktioniert der verschlüsselte Export?
+
+**Pro Desk/Kontrollzentrum → Backup** erzeugt einen versionierten JSON-Snapshot und verschlüsselt ihn lokal mit PBKDF2-HMAC-SHA-256 (210.000 Iterationen, zufälliges 128-Bit-Salt) und AES-256-GCM (zufällige 96-Bit-Nonce, 128-Bit-Tag). Formatversion und Work Factor sind als Additional Authenticated Data gebunden. Die Passphrase muss mindestens zwölf Zeichen haben, wird weder gespeichert noch auditiert und wird nach der Ableitung im verarbeitbaren Puffer überschrieben.
+
+### Was enthält das Workspace-Backup?
+
+Aktive Szene und Home-Seite, geprüfte Kartenpositionen, lokaler KoSch-Verlauf, Pins, Smart-Ordner und begrenzte Pen-Vektordaten. Widget-Host-IDs, Storage-Access-Freigaben, Zugangsdaten, Notification-Daten und Audit-Log sind absichtlich ausgeschlossen, weil sie geräte- oder sicherheitsgebunden sind.
+
+### Wie läuft ein Restore ab?
+
+Import und Restore sind getrennt. KoSch begrenzt die Dateigröße, authentifiziert und entschlüsselt den Envelope, validiert Format, Version, Zeitstempel, Mengenlimits, Enum-Werte, Schlüssel-/Titellängen, Kartenkoordinaten sowie endliche Stiftwerte und zeigt erst dann eine Zusammenfassung. Eine zweite Checkbox-/Button-Bestätigung ist nötig. Erst danach werden die validierten Workspace-Werte in einem synchronen Preferences-Commit ersetzt; ein Fehler lässt den bestehenden Workspace unangetastet.
+
+### Was zeichnet das lokale Audit auf?
+
+Nur drei typisierte Werte: UTC-Zeitpunkt, fest definierter Aktionstyp und Ergebnis. Das Schema hat kein Freitextfeld und kann daher keine Prompts, Namen, Telefonnummern, Datei- oder Paketziele, Pfade oder Benachrichtigungsinhalte aufnehmen. Es hält maximal 250 Ereignisse und verwirft Werte nach 90 Tagen. Export ist eine explizite SAF-CSV-Auswahl; vollständiges Löschen verlangt eine zweite Bestätigung. Audit-Daten sind nicht Teil des Backups.
 
 ### Ist KoSch ein vollständiger Dateimanager?
 
-Noch nicht. M2.2 ist ein sicheres Datei-Gateway: Die Person wählt über das Storage Access Framework genau ein Dokument aus. KoSch kann Metadaten und bei bekannten Textformaten höchstens 4.096 Zeichen lokal prüfen, die Datei extern öffnen und seine read-only Freigabe wieder lösen. Löschen, Verschieben und Umbenennen sind nicht implementiert.
+Noch nicht. M2.3 ist ein sicheres Datei-Gateway: Die Person wählt über das Storage Access Framework genau ein Dokument aus. KoSch kann Metadaten und bei bekannten Textformaten höchstens 4.096 Zeichen lokal prüfen, die Datei extern öffnen und seine read-only Freigabe wieder lösen. Löschen, Verschieben und Umbenennen sind nicht implementiert.
 
 ### Welche Systemfunktionen bietet das Kontrollzentrum?
 
@@ -108,11 +138,11 @@ Ja, sofern Android und das Gerät Werte liefern. Druck beeinflusst die Breite; N
 
 ### Wie verhindert Pen Space Handballen- oder Fingerstriche?
 
-Die Zeichenfläche akzeptiert im M2.2-Modus nur Stylus- und Eraser-Ereignisse. Fingerkontakte werden nicht gezeichnet. Zusätzliche Palm-Rejection des Geräts oder Systems bleibt davon unabhängig.
+Die Zeichenfläche akzeptiert im M2.3-Modus nur Stylus- und Eraser-Ereignisse. Fingerkontakte werden nicht gezeichnet. Zusätzliche Palm-Rejection des Geräts oder Systems bleibt davon unabhängig.
 
 ### Wie werden Zeichnungen gespeichert?
 
-Lokal im versionierten Workspace-Schema v3 als Werkzeug plus normalisierte Punkte mit `x`, `y`, Druck und Neigung. Der Store begrenzt auf 100 Striche und 2.048 Punkte pro Strich. Es gibt keinen Upload, keine Bildkonvertierung und keine versteckte Handschriftanalyse.
+Lokal im versionierten Workspace-Schema v5 als Werkzeug plus normalisierte Punkte mit `x`, `y`, Druck und Neigung. Der Store begrenzt auf 100 Striche und 2.048 Punkte pro Strich. Es gibt keinen Upload, keine Bildkonvertierung und keine versteckte Handschriftanalyse.
 
 ### Was passiert, wenn der Stift getrennt wird?
 
@@ -126,9 +156,9 @@ Alle über Androids generische Stylus-Quellen gemeldeten Grundfunktionen sind he
 
 Auf Android 14 oder neuer kann eine kompatible IME systemweite Stylus-Handschrift in regulären Textfeldern anbieten. KoSch nutzt normale Textfelder, enthält aber keine eigene Handschrifterkennung. Qualität, Sprache und Verfügbarkeit liegen bei der installierten Tastatur.
 
-### Verwendet M2.2 Jetpack Ink?
+### Verwendet M2.3 Jetpack Ink?
 
-Noch nicht. M2.2 verwendet eine kleine eigene `PressureInkView`, damit der Launcher ohne zusätzlichen Download und mit klar begrenzter Persistenz funktioniert. Die freie AndroidX-Ink-API bleibt eine Kandidatin für Latenz-, Brush- und Exportverbesserungen nach Gerätebenchmarks.
+Noch nicht. M2.3 verwendet eine kleine eigene `PressureInkView`, damit der Launcher ohne zusätzlichen Download und mit klar begrenzter Persistenz funktioniert. Die freie AndroidX-Ink-API bleibt eine Kandidatin für Latenz-, Brush- und Exportverbesserungen nach Gerätebenchmarks.
 
 ### Versteht die KI meine Zeichnung bereits semantisch?
 
@@ -138,7 +168,7 @@ Nein. **An Ask** öffnet den lokalen Intent-Eingang, überträgt aber keine Zeic
 
 ### Nutzt KoSch Material You?
 
-Ja. Ab Android 12 übernimmt M2.2 dynamische Systemfarben in ein dunkles Neural-Glass-System. Ältere Geräte erhalten eine kuratierte, kontrastreiche Palette. LCARS ist keine Kernabhängigkeit und kann später als deklaratives Theme entstehen.
+Ja. Ab Android 12 übernimmt M2.3 dynamische Systemfarben in ein dunkles Neural-Glass-System. Ältere Geräte erhalten eine kuratierte, kontrastreiche Palette. LCARS ist keine Kernabhängigkeit und kann später als deklaratives Theme entstehen.
 
 ### Wie passt sich die Oberfläche an Display und Haltung an?
 
@@ -148,9 +178,9 @@ Die Compose-Shell entscheidet aus aktuellen Fenstermaßen. Kompakte Fenster blei
 
 Ja. KoSch liest Androids Animator-Dauer. Bei deaktivierten Systemanimationen wird Neural Glass statisch und wichtige Zustände bleiben textlich beziehungsweise strukturell erkennbar.
 
-### Welche modernen Android-Funktionen nutzt M2.2 außerdem?
+### Welche modernen Android-Funktionen nutzt M2.3 außerdem?
 
-HOME-Rolle, vorausschauende Zurück-Navigation, Edge-to-edge, `LauncherApps`, Multi-Profile-App-Katalog, App-Shortcuts, `AppWidgetHost`, Storage Access Framework, Notification Listener als Opt-in, Activity-Result-Verträge, Android Keystore, dynamische Material-3-Farben und die generische Eingabegeräte-Pipeline.
+HOME-Rolle, vorausschauende Zurück-Navigation, Edge-to-edge, `LauncherApps`, Multi-Profile-App-Katalog, App-Shortcuts, `AppWidgetHost` samt Größenoptionen, Storage Access Framework, privacy-preserving Kontakt-Picker-Route, Notification Listener als Opt-in, Activity-Result-Verträge, Android Keystore, dynamische Material-3-Farben, Hardware-Keyboard-Shortcut-Hilfe und die generische Eingabegeräte-Pipeline.
 
 ## KI, freie Modelle und optionale APIs
 
@@ -168,7 +198,7 @@ PocketPal AI, ChatterUI und Maid sind sichtbare Übergabeziele. Für eine späte
 
 ### Wann verlassen Eingaben das Gerät?
 
-Erst wenn die Person einen externen Anbieter auswählt und eine sichtbare App-, Share- oder Browserübergabe bestätigt. Der M2.2-Launcher selbst deklariert kein `INTERNET`-Recht und führt keine Modell-API-Anfrage aus.
+Erst wenn die Person einen externen Anbieter auswählt und eine sichtbare App-, Share- oder Browserübergabe bestätigt. Der M2.3-Launcher selbst deklariert kein `INTERNET`-Recht und führt keine Modell-API-Anfrage aus.
 
 ### Wie können APIs später sicher hinzukommen?
 
@@ -184,7 +214,7 @@ Nein. Stimmung, Zyklus oder Fokus können später freiwillige Designparameter ei
 
 ## Datenschutz und Wiederherstellung
 
-### Welche Android-Berechtigungen fordert M2.2 an?
+### Welche Android-Berechtigungen fordert M2.3 an?
 
 Als `uses-permission` nur `ACCESS_NETWORK_STATE`, um validierte Netzverfügbarkeit lokal als Kontext zu erkennen. Es gibt kein `INTERNET`, `CALL_PHONE`, `READ_CONTACTS`, `READ_MEDIA_*`, `MANAGE_EXTERNAL_STORAGE`, `QUERY_ALL_PACKAGES`, Standort-, Kalender- oder Mikrofonrecht und keinen Accessibility Service.
 
@@ -194,7 +224,7 @@ Nein. Persistiert werden nur die begrenzten Vektorstriche. Aktuelle Fähigkeiten
 
 ### Gibt es Backup und Export?
 
-Noch nicht vollständig. `allowBackup=false` verhindert unkontrolliertes App-Daten-Backup. Schema v3 ist migrationsfähig, aber verschlüsselter Export/Import, Dry Run, stale App-Keys und Widget-Restore-Mapping fehlen. Für M2.2 darf keine Sicherungszusage gemacht werden.
+Ja, als manueller verschlüsselter Workspace-Export mit validierter Vorschau und bewusstem Restore. `allowBackup=false` verhindert weiterhin unkontrolliertes Android-Cloud-Backup. Das Workspace-Schema v5 ist migrationsfähig. Widget-Provider-Zuordnung, Dateifreigaben und Secrets werden nicht portiert; ein geräteübergreifend vollständiges Systemabbild wird ausdrücklich nicht zugesagt.
 
 ### Wie setze ich ein fehlerhaftes Layout zurück?
 
@@ -202,7 +232,7 @@ In **EDIT** auf **Zurücksetzen** tippen oder für den letzten angewendeten Vors
 
 ### Wie lösche ich alle lokalen Daten?
 
-Bis eine granulare Datenverwaltung existiert, über Android **App-Info → Speicher und Cache → Speicherinhalt löschen** beziehungsweise Deinstallation. Zuvor sollte ein anderer Standard-Launcher gewählt werden. Ein verschlüsselter selektiver Export ist für M2.3 geplant.
+Bis eine granulare Datenverwaltung existiert, über Android **App-Info → Speicher und Cache → Speicherinhalt löschen** beziehungsweise Deinstallation. Zuvor sollte ein anderer Standard-Launcher gewählt werden. Der verschlüsselte Workspace-Export sichert ausgewählte Workspace-Daten, ist aber kein vollständiges Geräteabbild.
 
 ## Entwicklung, Prüfung und Benchmark
 
@@ -211,23 +241,27 @@ Bis eine granulare Datenverwaltung existiert, über Android **App-Info → Speic
 Mit JDK 17, Android SDK 36 und AGP 8.13:
 
 ```bash
-./gradlew testDebugUnitTest lintDebug assembleDebug
+./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease
 ```
 
 Die Debug-APK entsteht unter `app/build/outputs/apk/debug/app-debug.apk`; GitHub Actions veröffentlicht `kosch-ai-launcher-debug`.
 
 ### Was prüft die CI?
 
-Unit-Tests einschließlich FAQ-Registry und Command Planner, Android Lint sowie `assembleDebug`. Der grüne Lauf beweist Buildbarkeit dieses Quellstands, ersetzt aber keine instrumentierten Geräte-, Eingabe-, Accessibility-, Performance- oder OEM-Tests.
+Unit-Tests einschließlich Backup-, Tamper-, Audit-, Capability-, Keyboard-, Kontrast-, FAQ- und Planner-Prüfungen, Android Lint, Manifest-Permission-Budget, nichtleeres Baseline-Profil sowie Debug- und minifizierten Release-Build. Der grüne Lauf #23 beweist Buildbarkeit dieses Quellstands, ersetzt aber keine instrumentierten Geräte-, Eingabe-, Accessibility-, Performance- oder OEM-Tests.
 
-### Wie wurde M2.2 mit anderen Launchern verglichen?
+### Wie wurde M2.3 mit anderen Launchern verglichen?
 
-Die strenge Matrix bewertet KoSch, Pixel/Android 17 als Systemreferenz sowie Nova, Niagara, Smart Launcher, Microsoft Launcher und Lawnchair in 65 Kategorien von 0,1 bis 10,0. Zusätzlich werden 25 reproduzierbare Fachperspektiven mit je 65 KoSch-Einzelwerten simuliert. Das sind keine tatsächlich befragten Personen und kein identischer Sieben-Geräte-Labortest.
+Die strenge Matrix bewertet KoSch, Pixel/Android 17 als Systemreferenz sowie Nova, Niagara, Smart Launcher, Microsoft Launcher und Lawnchair in 75 Kategorien von 0,1 bis 10,0. Zusätzlich werden 25 reproduzierbare Fachperspektiven mit je 75 KoSch-Einzelwerten simuliert. Das sind keine tatsächlich befragten Personen und kein identischer Sieben-Geräte-Labortest.
+
+### Hat M2.3 die gewünschte Wertung über 9,5 erreicht?
+
+Nein. Der belegbare Stand erreicht 7,6 allgemein und 7,4 im Rollenmittel. Das ist Rang 2 der breiten Matrix, aber kein Produktionsbeweis. Eine Wertung über 9,5 ist erst zulässig, wenn alle manuellen Geräte-, Accessibility-, Recovery-, Performance- und Security-Gates bestanden sind, keine Kategorie unter 8,5 liegt und die kritischen Qualitätsbereiche jeweils mindestens 9,5 erreichen.
 
 ### Wo liegen die vollständigen Bewertungsdaten?
 
-In `COMPETITOR_REVIEW_M2_2.md`, den drei M2.2-CSV-Dateien und der formatierten `launcher_benchmark_m2_2.xlsx` mit Summary, Vergleich, Expertenmatrizen und Quellen.
+In `COMPETITOR_REVIEW_M2_3.md`, den drei M2.3-CSV-Dateien und der formatierten `launcher_benchmark_m2_3.xlsx` mit Summary, 75-Kategorien-Vergleich, Expertenmatrizen, Evidenzplan und Quellen.
 
 ### Was ist das nächste professionelle Ziel?
 
-M2.3 priorisiert instrumentierte HOME-/SAF-/Widget-/Prozess-Tod-Tests, Macrobenchmarks mit Budgets, vollständige Widget-Engine, verschlüsseltes Backup/Restore, Accessibility- und OEM-Lab, sichere Kontakte über Android 17s Picker sowie erst danach ein isoliertes lokales LLM und einen validierten Capability Planner.
+M2.4 priorisiert instrumentierte HOME-/SAF-/Widget-/Prozess-Tod-Tests, Macrobenchmarks mit Budgets, vollständige Widget-Engine, Accessibility- und OEM-Lab, vollständige Deutsch-/Englisch-Lokalisierung, sichere Personalisierung und erst danach ein isoliertes lokales LLM. Der Evidenzplan liegt zusätzlich als eigenes Blatt in der M2.3-Arbeitsmappe.

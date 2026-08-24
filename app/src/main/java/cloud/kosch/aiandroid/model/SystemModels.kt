@@ -38,3 +38,14 @@ data class LaunchableShortcut(
 data class WidgetRecord(
     val appWidgetId: Int,
 )
+
+enum class WidgetSizePreset(
+    val title: String,
+    val minWidthDp: Int,
+    val minHeightDp: Int,
+    val boardHeightDp: Int,
+) {
+    COMPACT("Kompakt", 180, 110, 150),
+    STANDARD("Standard", 280, 150, 210),
+    TALL("Hoch", 220, 300, 350),
+}
