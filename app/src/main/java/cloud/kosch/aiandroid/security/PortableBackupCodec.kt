@@ -111,6 +111,10 @@ class PortableBackupCodec(
 
     private fun decode(value: String, exactSize: Int?, label: String): ByteArray = try {
         Base64.getUrlDecoder().decode(value).also { decoded ->
+            if (encode(decoded) != value) {
+                decoded.fill(0)
+                throw BackupDecryptionException("Invalid $label encoding")
+            }
             if (exactSize != null && decoded.size != exactSize) {
                 decoded.fill(0)
                 throw BackupDecryptionException("Invalid $label size")

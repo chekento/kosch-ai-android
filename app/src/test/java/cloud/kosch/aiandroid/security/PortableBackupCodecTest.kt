@@ -4,6 +4,7 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import java.util.Base64
 
 class PortableBackupCodecTest {
     private val codec = PortableBackupCodec()
@@ -32,8 +33,22 @@ class PortableBackupCodecTest {
     @Test
     fun modifiedCiphertextIsRejected() {
         val encrypted = codec.encrypt("workspace".encodeToByteArray(), "this is the right phrase".toCharArray())
-        val replacement = if (encrypted.last() == 'A') 'B' else 'A'
-        val modified = encrypted.dropLast(1) + replacement
+        val parts = encrypted.split(':').toMutableList()
+        val ciphertext = Base64.getUrlDecoder().decode(parts.last())
+        ciphertext[0] = (ciphertext[0].toInt() xor 0x01).toByte()
+        parts[parts.lastIndex] = Base64.getUrlEncoder().withoutPadding().encodeToString(ciphertext)
+        val modified = parts.joinToString(":")
+
+        assertThrows(BackupDecryptionException::class.java) {
+            codec.decrypt(modified, "this is the right phrase".toCharArray())
+        }
+        ciphertext.fill(0)
+    }
+
+    @Test
+    fun nonCanonicalBase64IsRejected() {
+        val encrypted = codec.encrypt("workspace".encodeToByteArray(), "this is the right phrase".toCharArray())
+        val modified = "$encrypted=="
 
         assertThrows(BackupDecryptionException::class.java) {
             codec.decrypt(modified, "this is the right phrase".toCharArray())
