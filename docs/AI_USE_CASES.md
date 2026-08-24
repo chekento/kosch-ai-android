@@ -14,46 +14,51 @@ KoSch trennt drei Ebenen sichtbar:
 
 | Priorität | Usecase | Nutzwert | Ausführung / Daten | Stand |
 |---:|---|---|---|---|
-| 1 | Universeller Intent-Eingang | „Öffne Kamera“, „Workspace sichern“, „Dateien verwalten“ statt Navigation | lokaler Planner → explizites Android-Gateway | M2.4 aktiv |
-| 2 | Pro Desk | professionelle Lage, Work-Apps und sichere Aktionen an einem Ort | ausschließlich lokaler Controller-Zustand | M2.4 aktiv |
-| 3 | Adaptive App-Suche | schnelleres Finden ohne Cloudindex | Label/Paket, Suchrelevanz, lokaler Count/Recency; vier sichtbare Sortierungen | M2.4 aktiv |
-| 4 | Transparente lokale Personalisierung | relevante Apps ohne globalen Usage-Zugriff | höchstens 512 App-Schlüssel/Count/Zeit; vollständiger Reset | M2.4 aktiv |
-| 5 | Kontextuelle Szenen | passender Workspace für Arbeit, Studio, Social, Abend | Uhr, Akku, Netz, Audio lokal | M2.4 aktiv |
-| 6 | Adaptives Dock und Smart-Ordner | wichtige Apps ohne manuelles Mikromanagement | Szene, lokales Nutzungsranking, Pinning, Label/Paketname | M2.4 aktiv |
-| 7 | Einzeldatei-Intelligenz | Metadaten, Kategorie, Textumfang, Namensvorschlag | genau eine read-only SAF-URI; Textpräfix max. 4.096 Zeichen | M2.4 aktiv |
-| 8 | Datei-Arbeitsraum-Intelligenz | Übersicht ohne Vollinhaltsindex | gewählter SAF-Baum; Kategorie, bekannte Größe, Namensduplikate, größte Dateien | M2.4 aktiv |
-| 9 | Bestätigte Dateiaktionen | Ordner erstellen, umbenennen, löschen | feste Provider-Capabilities; Preview, Bestätigung, Rename-Undo | M2.4 aktiv |
-| 10 | Sicherer Kontakt-/Telefonfluss | eine Nummer finden, ohne das Adressbuch freizugeben | einmaliger System-Picker → `ACTION_DIAL` | M2.4 aktiv |
-| 11 | Erklärbares lokales Audit | nachvollziehen, welche Capability ausgeführt wurde | nur Zeit, Enum-Aktion, Ergebnis; keine Inhalte | M2.4 aktiv |
-| 12 | Verschlüsselter Workspace-Transfer | professionelle Konfiguration sichern und prüfen | lokaler Snapshot → AES-GCM → SAF; Dry Run vor Restore | M2.4 aktiv |
-| 13 | Prozessfester Export-Handoff | Android-Zieldialog über Recreation/Prozessneustart fortsetzen | privates No-Backup-Payload + Saved-State-Einmaltoken | M2.4 aktiv |
-| 14 | Layout-Assistent | weniger manuelles Sortieren | Vorschau → Anwenden/Verwerfen → Undo | M2.4 aktiv, regelbasiert |
-| 15 | Modell-/Provider-Routing | lokal, frei oder Cloud je Aufgabe wählen | Übergabe erst nach Tipp; keine verdeckte API | M2.4 aktiv |
-| 16 | App-Shortcut- und Verwaltungsraum | tiefe App-Aktionen ohne UI-Automation | `LauncherApps` + sichtbare Android-Systemdialoge | M2.4 aktiv |
-| 17 | Widget-Zentrale | Systeminformationen und App-Funktionen bündeln | `AppWidgetHost`, Größenpresets, Reihenfolge, Undo | M2.4 aktiv |
-| 18 | Datensparsame Notification Dots | offene Meldungen sichtbar, ohne Nachrichtentext zu kopieren | opt-in Listener; nur Paket und Anzahl flüchtig | M2.4 aktiv |
-| 19 | Adaptiver Pen Workspace | schneller Capture, lange Striche und Vektorexport | generische Stylus-Events; begrenzte lokale Striche; SVG | M2.4 aktiv |
-| 20 | Erklärbare Self-Service-KI | Funktionen und Grenzen ohne Websuche auffindbar | mehr als 50 lokale FAQ-Einträge + Planner | M2.4 aktiv |
-| 21 | Lokale Zusammenfassung | Notizen/gewählte Dokumente offline verdichten | optionales On-Device-LLM; Daten bleiben lokal | nächster Lauf |
-| 22 | Semantische Gerätesuche | Apps, eigene Dateien, Einstellungen, Shortcuts in einem Index | opt-in lokaler Embedding-Index, je Quelle löschbar | nächster Lauf |
-| 23 | Skizze zu Layout/Notiz | Ink erklären oder in reversible Workspace-Vorschläge übersetzen | explizit gewählte Ink-Daten; lokales multimodales Modell | M4 |
-| 24 | Benachrichtigungs-Triage | weniger Unterbrechungen und gruppierte Wichtigkeit | separates opt-in für Inhalte; Vorschau, Retention und Löschen | M3 |
-| 25 | Kalender-/Aufgabenplanung | realistische Tagespläne statt bloßer Antworten | einzelne opt-in Provider, Vorschau vor Schreibzugriff | M3 |
-| 26 | Kommunikationsentwürfe | Antworten formulieren, Ton/Barrierefreiheit anpassen | ausgewählter Text; immer Vorschau vor Share | M3 |
-| 27 | Gerätesupport | „Warum ist mein Akku leer?“ mit nachvollziehbaren Diagnosen | erlaubte lokale Telemetrie, keine Root-/Shell-Tricks | M3 |
-| 28 | Adaptive Bedienung | größere Ziele, ruhigere Oberfläche, kontextuelle Vereinfachung | lokale Präferenzregeln, Accessibility-Test | M3 |
-| 29 | Regelautomation | Szenen nach Zeit, Akku, Audio oder Netz | Capability-Tokens, Dry Run, Audit, Undo | M3 |
-| 30 | Persönlicher Memory-Vault | Vorlieben und Routinen ohne Cloudprofil | verschlüsselt, pro Quelle sichtbar/exportierbar/löschbar | M4 |
-| 31 | Lokale Sprache | offline STT/TTS und unterbrechbare Dialoge | austauschbare On-Device-Engines | M4 |
-| 32 | Theme-/Wallpaper-Designer | PMDD, Stimmung, Tagesphase oder Fokus in Visuals übersetzen | generiertes Asset nur nach Vorschau setzen | M4 |
-| 33 | Multi-App-Workflows | dokumentierte Deep Links/Intents sinnvoll verketten | keine Accessibility-Fernsteuerung; Bestätigung je Risikoklasse | M4 |
+| 1 | Universeller Intent-Eingang | „Öffne Kamera“, „Workspace sichern“, „Dateien verwalten“ statt Navigation | lokaler Planner → explizites Android-Gateway | M2.5 aktiv |
+| 2 | Pro Desk | professionelle Lage, Work-Apps und sichere Aktionen an einem Ort | ausschließlich lokaler Controller-Zustand | M2.5 aktiv |
+| 3 | Adaptive App-Suche | schnelleres Finden ohne Cloudindex | Label/Paket, Suchrelevanz, lokaler Count/Recency; vier sichtbare Sortierungen | M2.5 aktiv |
+| 4 | Transparente lokale Personalisierung | relevante Apps ohne globalen Usage-Zugriff | höchstens 512 App-Schlüssel/Count/Zeit; vollständiger Reset | M2.5 aktiv |
+| 5 | Kontextuelle Szenen | passender Workspace für Arbeit, Studio, Social, Abend | Uhr, Akku, Netz, Audio lokal | M2.5 aktiv |
+| 6 | Adaptives Dock und Smart-Ordner | wichtige Apps ohne manuelles Mikromanagement | Szene, lokales Nutzungsranking, Pinning, Label/Paketname | M2.5 aktiv |
+| 7 | Einzeldatei-Intelligenz | Metadaten, Kategorie, Textumfang, Namensvorschlag | genau eine read-only SAF-URI; Textpräfix max. 4.096 Zeichen | M2.5 aktiv |
+| 8 | Datei-Arbeitsraum-Intelligenz | Übersicht ohne Vollinhaltsindex | gewählter SAF-Baum; Kategorie, bekannte Größe, Namensduplikate, größte Dateien | M2.5 aktiv |
+| 9 | Bestätigte Dateiaktionen | Ordner erstellen, umbenennen, löschen | feste Provider-Capabilities; Preview, Bestätigung, Rename-Undo | M2.5 aktiv |
+| 10 | Sicherer Kontakt-/Telefonfluss | eine Nummer finden, ohne das Adressbuch freizugeben | einmaliger System-Picker → `ACTION_DIAL` | M2.5 aktiv |
+| 11 | Erklärbares lokales Audit | nachvollziehen, welche Capability ausgeführt wurde | nur Zeit, Enum-Aktion, Ergebnis; keine Inhalte | M2.5 aktiv |
+| 12 | Verschlüsselter Workspace-Transfer | professionelle Konfiguration sichern und prüfen | lokaler Snapshot → AES-GCM → SAF; Dry Run vor Restore | M2.5 aktiv |
+| 13 | Prozessfester Export-Handoff | Android-Zieldialog über Recreation/Prozessneustart fortsetzen | privates No-Backup-Payload + Saved-State-Einmaltoken | M2.5 aktiv |
+| 14 | Layout-Assistent | weniger manuelles Sortieren | Vorschau → Anwenden/Verwerfen → Undo | M2.5 aktiv, regelbasiert |
+| 15 | Modell-/Provider-Routing | lokal, frei oder Cloud je Aufgabe wählen | Übergabe erst nach Tipp; keine verdeckte API | M2.5 aktiv |
+| 16 | App-Shortcut- und Verwaltungsraum | tiefe App-Aktionen ohne UI-Automation | `LauncherApps` + sichtbare Android-Systemdialoge | M2.5 aktiv |
+| 17 | Widget-Zentrale | Systeminformationen und App-Funktionen bündeln | `AppWidgetHost`, Größenpresets, Reihenfolge, Undo | M2.5 aktiv |
+| 18 | Datensparsame Notification Dots | offene Meldungen sichtbar, ohne Nachrichtentext zu kopieren | opt-in Listener; nur Paket und Anzahl flüchtig | M2.5 aktiv |
+| 19 | Adaptiver Pen Workspace | schneller Capture, lange Striche und Vektorexport | generische Stylus-Events; begrenzte lokale Striche; SVG | M2.5 aktiv |
+| 20 | Erklärbare Self-Service-KI | Funktionen und Grenzen ohne Websuche auffindbar | 57 lokale FAQ-Einträge + Planner | M2.5 aktiv |
+| 21 | Arbeitsprofil-Fokus | Work-Apps klar pausieren oder aktivieren | Android Quiet Mode; kein eigener Geräteadministrator | M2.5 aktiv |
+| 22 | Professionelle Systemübergaben | SMS, Kalender, Wecker und Kamera ohne Rechteausweitung | dokumentierte Intents; finale Aktion in der Ziel-App | M2.5 aktiv |
+| 23 | Stiftbewusste Systemnotiz | nach Pen-Erkennung schneller in eine zuständige Notes-App | Android 14 ACTION_CREATE_NOTE + Stylus-Modus; Pen Space als Fallback | M2.5 aktiv |
+| 24 | Korrekte Datei-Erfolgssemantik | Provider-Effekt, Audit und Refresh nachvollziehbar trennen | pure Completion-Regel; aktueller Pfad bleibt erhalten | M2.5 aktiv |
+| 25 | Lokale Zusammenfassung | Notizen/gewählte Dokumente offline verdichten | optionales On-Device-LLM; Daten bleiben lokal | nächster Lauf |
+| 26 | Semantische Gerätesuche | Apps, eigene Dateien, Einstellungen, Shortcuts in einem Index | opt-in lokaler Embedding-Index, je Quelle löschbar | nächster Lauf |
+| 27 | Skizze zu Layout/Notiz | Ink erklären oder in reversible Workspace-Vorschläge übersetzen | explizit gewählte Ink-Daten; lokales multimodales Modell | M4 |
+| 28 | Benachrichtigungs-Triage | weniger Unterbrechungen und gruppierte Wichtigkeit | separates opt-in für Inhalte; Vorschau, Retention und Löschen | M3 |
+| 29 | Kalender-/Aufgabenplanung | realistische Tagespläne statt bloßer Antworten | einzelne opt-in Provider, Vorschau vor Schreibzugriff | M3 |
+| 30 | Kommunikationsentwürfe | Antworten formulieren, Ton/Barrierefreiheit anpassen | ausgewählter Text; immer Vorschau vor Share | M3 |
+| 31 | Gerätesupport | „Warum ist mein Akku leer?“ mit nachvollziehbaren Diagnosen | erlaubte lokale Telemetrie, keine Root-/Shell-Tricks | M3 |
+| 32 | Adaptive Bedienung | größere Ziele, ruhigere Oberfläche, kontextuelle Vereinfachung | lokale Präferenzregeln, Accessibility-Test | M3 |
+| 33 | Regelautomation | Szenen nach Zeit, Akku, Audio oder Netz | Capability-Tokens, Dry Run, Audit, Undo | M3 |
+| 34 | Persönlicher Memory-Vault | Vorlieben und Routinen ohne Cloudprofil | verschlüsselt, pro Quelle sichtbar/exportierbar/löschbar | M4 |
+| 35 | Lokale Sprache | offline STT/TTS und unterbrechbare Dialoge | austauschbare On-Device-Engines | M4 |
+| 36 | Theme-/Wallpaper-Designer | PMDD, Stimmung, Tagesphase oder Fokus in Visuals übersetzen | generiertes Asset nur nach Vorschau setzen | M4 |
+| 37 | Multi-App-Workflows | dokumentierte Deep Links/Intents sinnvoll verketten | keine Accessibility-Fernsteuerung; Bestätigung je Risikoklasse | M4 |
 
 ## Smartpen-Usecases und Sicherheitsstufen
 
-| Usecase | M2.4 | sinnvolle KI-Erweiterung | Sicherheitsregel |
+| Usecase | M2.5 | sinnvolle KI-Erweiterung | Sicherheitsregel |
 |---|---|---|---|
 | handschriftliche Textsuche | Android-14+-IME kann reguläre Felder bedienen | lokales Sprach-/Intent-Ranking | IME-Ergebnis bleibt editierbar; keine heimliche Aktion |
 | schnelle Skizze/Notiz | druckempfindliche lokale Vektorfläche | Titel, Zusammenfassung oder Tags durch lokales Modell | Ink explizit auswählen; Preview und vollständiges Löschen |
+| Systemnotiz | Android-14+-Notes-App mit Stylus-Modus; Pen Space als Fallback | lokale Titel-/Tag-Vorschläge erst nach expliziter Ink-Auswahl | Ziel-App besitzt Inhalt; kein Rücklesen oder stilles Speichern |
 | Skizze → Workspace | noch nicht aktiv | Karten/Ordner aus Diagramm als strukturiertes Schema | ausschließlich Vorschau → Anwenden → Undo |
 | Pen-Gesten | Werkzeug, Hover und Taste werden erkannt | frei konfigurierbare lokale Shortcuts | keine globale Gestenerkennung ohne Opt-in; feste Capability-Allowlist |
 | Annotation/Export | SVG-Export ist aktiv | PNG/PDF oder Dokument-Overlay | Ziel und Daten sichtbar; keine automatische Überschreibung |
@@ -61,7 +66,7 @@ KoSch trennt drei Ebenen sichtbar:
 
 ## Freie und Open-Source-Optionen
 
-| Option | Rolle | Lizenz | M2.4-Verwendung |
+| Option | Rolle | Lizenz | M2.5-Verwendung |
 |---|---|---|---|
 | KoSch Local Core | Befehle, Suche, Kontext, Dateien, Layout, Dock, Ordner, Pen Space und FAQ | Apache-2.0 | eingebaut und aktiv |
 | [PocketPal AI](https://github.com/a-ghorbani/pocketpal-ai) | lokale GGUF-Inferenz über llama.cpp | MIT | installierte App erkennen/öffnen/teilen, sonst Projektseite |

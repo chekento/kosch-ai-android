@@ -1,8 +1,8 @@
-# FAQ – KoSch AI Android M2.4 Evidence & Resilience
+# FAQ – KoSch AI Android M2.5 Professional Parity & Correctness
 
 Stand: 24. August 2026
 
-Diese Datei dokumentiert Bedienung, Smartpen, Android-Integration, Professional-Workflows, Datei-Arbeitsraum, KI-Grenzen, Datenschutz, Wiederherstellung und Entwicklung. Im Launcher selbst sind **52 vollständig lokale, kategorisierte und durchsuchbare FAQ-Einträge** integriert: **Kontrollzentrum → FAQ & Hilfe** oder `faq` in **⌘ Ask**. Die In-App-Suche benötigt weder Konto noch Netzwerk.
+Diese Datei dokumentiert Bedienung, Smartpen, Android-Integration, Professional-Workflows, Datei-Arbeitsraum, KI-Grenzen, Datenschutz, Wiederherstellung und Entwicklung. Im Launcher selbst sind **57 vollständig lokale, kategorisierte und durchsuchbare FAQ-Einträge** integriert: **Kontrollzentrum → FAQ & Hilfe** oder `faq` in **⌘ Ask**. Die In-App-Suche benötigt weder Konto noch Netzwerk.
 
 ## Start und Sicherheit
 
@@ -26,9 +26,9 @@ Androids Einstellungen öffnen und unter Apps beziehungsweise Standard-Apps eine
 
 Ja. **Kontrollzentrum → Einführung erneut ansehen** startet das Onboarding neu, ohne Workspace-Daten zu löschen.
 
-### Ist M2.4 schon produktionsreif?
+### Ist M2.5 schon produktionsreif?
 
-Nein. M2.4 bleibt eine Alpha. Lifecycle-Härtung, sichere Exporte, lokale Personalisierung, Datei-Arbeitsraum, App-Verwaltung, Pen-SVG und Widget-Reihenfolge schließen wichtige Produktlücken. Produktionsfreigabe erfordert weiterhin ein echtes OEM-/Tablet-/Foldable-/Stylus-Lab, instrumentierte Prozess-Tod-/Provider-Tests, Macrobenchmarks, vollständige Accessibility-Abnahme, Release-Signing/SBOM und unabhängiges Security Review.
+Nein. M2.5 bleibt eine Alpha. Eigene Ordner, Dock-Reihenfolge, Work-Profile-Steuerung, korrekte Datei-Erfolgssemantik und zusätzliche Systemwege schließen wichtige Produktlücken. Produktionsfreigabe erfordert weiterhin ein echtes OEM-/Tablet-/Foldable-/Stylus-Lab, instrumentierte Prozess-Tod-/Provider-Tests, Macrobenchmarks, vollständige Accessibility-Abnahme, Release-Signing/SBOM und unabhängiges Security Review.
 
 ## Launcher und Bedienung
 
@@ -38,7 +38,11 @@ KoSch fragt startbare Activities über Androids `LauncherApps` ab und benötigt 
 
 ### Werden Arbeitsprofile unterstützt?
 
-Ja. M2.4 liest alle für den HOME-Host zugänglichen `LauncherApps.profiles`, verwendet stabile Benutzer-Seriennummern in App-Schlüsseln, migriert ältere Schlüssel nur bei eindeutiger Zuordnung, zeigt systemgebadgte Icons und kennzeichnet Work-Apps. Gesperrte oder vom System verborgene Profile werden nicht umgangen.
+Ja. M2.5 liest alle für den HOME-Host zugänglichen `LauncherApps.profiles`, verwendet stabile Benutzer-Seriennummern in App- und Shortcut-Schlüsseln, migriert ältere Schlüssel nur bei eindeutiger Zuordnung, zeigt systemgebadgte Icons und kennzeichnet Work-Apps. Gesperrte oder vom System verborgene Profile werden nicht umgangen.
+
+### Wie pausiere oder aktiviere ich ein Arbeitsprofil?
+
+Im Kontrollzentrum zeigt KoSch jedes zugängliche Arbeitsprofil samt Status. Als aktive Standard-Start-App kann KoSch Androids `UserManager.requestQuietModeEnabled` anfordern. Beim Aktivieren kann Android eine Gerätebestätigung verlangen. Pausierte Work-Apps werden markiert und nicht gestartet; Richtlinien, Daten und Authentifizierung bleiben beim System beziehungsweise Geräteadministrator.
 
 ### Unterstützt KoSch Android Private Space?
 
@@ -54,11 +58,11 @@ Oben auf **EDIT** wechseln. Karten lassen sich verschieben; ein lokaler Layoutvo
 
 ### Was sind Smart Space und Smart-Ordner?
 
-Der Local Core gruppiert Apps transparent anhand von App-Schlüssel, Label und Paketname. Vorschläge werden vor dem Speichern gezeigt. Es werden keine fremden App-Inhalte oder vollständigen Android-Nutzungsverläufe gelesen.
+Der Local Core gruppiert Apps transparent anhand von App-Schlüssel, Label und Paketname. Vorschläge werden vor dem Speichern gezeigt. **Smart Space → Neu** legt zusätzlich eine eigene persistente Sammlung an. Im Edit-Modus lassen sich Titel ändern, Apps verschieben/entfernen und Ordner nach zweiter Bestätigung löschen. Maximal 12 Ordner mit je 32 Apps begrenzen Oberfläche und Backup.
 
 ### Wie arbeitet das Smart Dock?
 
-Bis zu fünf Plätze priorisieren manuell gepinnte Apps und ergänzen lokale, über KoSch gestartete Apps sowie szenenbezogene Vorschläge. Langer Druck öffnet Pin/Unpin. Profilzugehörigkeit ist Bestandteil des stabilen App-Schlüssels.
+Bis zu fünf Plätze priorisieren manuell gepinnte Apps und ergänzen lokale, über KoSch gestartete Apps sowie szenenbezogene Vorschläge. Langer Druck öffnet Pin/Unpin und verschiebt einen Pin nach links oder rechts. Profilzugehörigkeit ist Bestandteil des stabilen App-Schlüssels.
 
 ### Wie lernt KoSch meine App-Prioritäten?
 
@@ -74,7 +78,7 @@ Langer Druck → **Verbergen** entfernt die App aus normalen KoSch-Sammlungen, D
 
 ### Welche App-Aktionen sind verfügbar?
 
-Der Langdruck-Aktionsraum kann App und veröffentlichte Shortcuts starten, App-Info und Store öffnen, Dock/Ordner/Sichtbarkeit verwalten und Androids Deinstallationsdialog anfordern. KoSch deinstalliert nicht selbst und bestätigt den Systemdialog nicht.
+Der Langdruck-Aktionsraum kann App und veröffentlichte Shortcuts starten, profilbezogene App-Info und Store öffnen, Dock/konkrete Ordner/Sichtbarkeit verwalten und Androids Deinstallationsdialog für genau das gewählte persönliche oder Arbeitsprofil anfordern. KoSch deinstalliert nicht selbst und bestätigt den Systemdialog nicht.
 
 ### Welche Seiten gibt es?
 
@@ -92,6 +96,10 @@ Nur Paketname und Anzahl badgefähiger, aktiver Benachrichtigungen werden nach s
 
 KoSch bereitet eine geprüfte Nummer mit `ACTION_DIAL` im System-Wähler vor. Es besitzt kein `CALL_PHONE`, liest weder das gesamte Adressbuch noch die Anrufliste und bestätigt keinen Anruf selbst. Eine Person kann genau eine Telefonnummer über Androids `ACTION_PICK` wählen; Android 17s neuer System-Contact-Picker wird über `EXTRA_USE_SYSTEM_CONTACTS_PICKER` bevorzugt. Name und Nummer bleiben nur im aktuellen Vorgang.
 
+### Kann KoSch eine SMS oder Nachricht beginnen?
+
+Ja. Telefonraum, Pro Desk oder der lokale Befehl „SMS“ öffnen die vom System gewählte Nachrichten-App über `ACTION_SENDTO` und `smsto:`. Eine validierte Nummer kann vorausgefüllt werden. KoSch liest keine Nachrichten, setzt keinen Inhalt und versendet nichts selbst; die Ziel-App besitzt Empfänger, Text und Bestätigung.
+
 ## Professional und Produktivität
 
 ### Was ist Pro Desk?
@@ -104,7 +112,7 @@ Pro Desk bündelt HOME-Status, API-freien Local Core, Anzahl zugänglicher Arbei
 
 ### Welche Professional-Befehle versteht der Local Core?
 
-Zusätzlich zu Apps, Szenen und Systembereichen versteht er deterministisch unter anderem „Pro Desk“, „Workspace sichern“, „Sicherheitsverlauf“, „Kontakt auswählen“, „Dateien verwalten“ und „Arbeitsordner“. Dadurch bleiben zentrale Arbeitsabläufe auch ohne LLM, Netzwerk und API-Schlüssel erreichbar. Unbekannte Texte erhalten keine autonomen Rechte, sondern führen weiterhin in die bewusste Anbieterwahl.
+Zusätzlich zu Apps, Szenen und Systembereichen versteht er deterministisch unter anderem „Pro Desk“, „Workspace sichern“, „Sicherheitsverlauf“, „Kontakt auswählen“, „Dateien verwalten“, „Arbeitsordner“, „SMS“, „Kalender“, „Wecker“, „Kamera“ und „Systemnotiz“. Dadurch bleiben zentrale Arbeitsabläufe auch ohne LLM, Netzwerk und API-Schlüssel erreichbar. Unbekannte Texte erhalten keine autonomen Rechte, sondern führen weiterhin in die bewusste Anbieterwahl.
 
 ### Wie funktioniert der verschlüsselte Export?
 
@@ -128,7 +136,7 @@ Nur drei typisierte Werte: UTC-Zeitpunkt, fest definierter Aktionstyp und Ergebn
 
 ### Ist KoSch ein vollständiger Dateimanager?
 
-Noch nicht im Sinn eines rekursiven System-Explorers. M2.4 besitzt zwei getrennte sichere Routen:
+Noch nicht im Sinn eines rekursiven System-Explorers. M2.5 besitzt zwei getrennte sichere Routen:
 
 1. **Datei prüfen:** genau ein read-only Dokument; Metadaten und höchstens 4.096 Zeichen bekannter Textformate.
 2. **Datei-Arbeitsraum:** genau ein von der Person gewählter SAF-Dokumentbaum mit READ/WRITE.
@@ -143,13 +151,17 @@ Nein. Es gibt weder `MANAGE_EXTERNAL_STORAGE` noch `READ_MEDIA_*`. KoSch konstru
 
 Anbieter-Flags bestimmen, ob Create/Rename/Delete überhaupt angeboten werden. Neue Namen sind auf 120 Zeichen begrenzt; Separatoren, Steuerzeichen, `.` und `..` werden abgelehnt. Erstellen und Umbenennen benötigen Vorschau und Bestätigung; die letzte Umbenennung bietet Undo. Löschen hat einen separaten endgültigen Dialog und kein KoSch-Undo, weil der DocumentsProvider direkt schreibt.
 
+### Was passiert, wenn die Dateiänderung gelingt, die Ansicht danach aber nicht lädt?
+
+KoSch trennt Provider-Mutation, Audit und Refresh. Eine bestätigte Änderung bleibt erfolgreich und wird auch auditiert, wenn die Datei-Fläche bereits geschlossen wurde. Scheitert nur die anschließende Verzeichnisliste, erhält dieser Refresh ein eigenes Fehlerereignis und macht den Provider-Effekt nicht rückwirkend zum Fehlschlag. **Aktualisieren** bleibt im aktuellen Ordner statt unbemerkt zur Tree-Wurzel zu springen.
+
 ### Bedeutet „lokal analysiert“, dass ein Cloudordner offline ist?
 
 Nein. KoSch sendet selbst keine API-Anfrage und analysiert nur Metadaten im Prozess. Der vom Nutzer gewählte DocumentsProvider kann aber beispielsweise Cloudspeicher darstellen und nach seinen eigenen Regeln Daten laden. Quelle und Provider bleiben daher sichtbar und unter Nutzerkontrolle.
 
 ### Welche Systemfunktionen bietet das Kontrollzentrum?
 
-Sichtbare Android-Oberflächen für WLAN, Bluetooth, Benachrichtigungszugriff, Hintergrund, Anzeige, Ton, Akku, Datenschutz, Bedienungshilfen, Standard-Apps, Speicher, App-Info, Widgets, Onboarding und HOME-Auswahl. Proprietäre oder nicht vorhandene Ziele fallen auf die allgemeine Einstellung zurück oder werden sichtbar als Fehler gemeldet; KoSch simuliert keine Systemschalter.
+Sichtbare Android-Oberflächen für WLAN, Bluetooth, Benachrichtigungszugriff, Hintergrund, Anzeige, Ton, Akku, Datenschutz, Bedienungshilfen, Standard-Apps, Speicher, profilbezogene App-Info, Widgets, Onboarding und HOME-Auswahl. Zusätzlich öffnen Pro Desk und Kontrollzentrum Nachrichten, Kalender, Wecker, Kamera und – auf Android 14+ – die zuständige Systemnotiz-App. Proprietäre oder nicht vorhandene Ziele fallen auf dokumentierte Alternativen zurück oder werden sichtbar als Fehler gemeldet; KoSch simuliert keine Systemschalter.
 
 ### Funktioniert Spracheingabe offline?
 
@@ -163,11 +175,15 @@ KoSch startet Androids installierte Spracherkennungs-Activity. Ob sie offline ar
 
 ### Was wird nach der Erkennung zusätzlich angeboten?
 
-Pen Space erscheint als weitere Home-Seite und als Schnellaktion im Kontrollzentrum. Die Oberfläche zeigt vorhandene Fähigkeiten wie Druck, Neigung, Hover und Bluetooth transparent an. `⌘ Ask` versteht außerdem lokale Befehle wie „Pen Space öffnen“.
+Pen Space erscheint als weitere Home-Seite und als Schnellaktion im Kontrollzentrum. Die Oberfläche zeigt vorhandene Fähigkeiten wie Druck, Neigung, Hover und Bluetooth transparent an. Auf Android 14+ kann **Systemnotiz** zusätzlich die zuständige Notes-App mit aktivem Stylus-Modus öffnen. `⌘ Ask` versteht beide Wege.
 
 ### Was kann Pen Space heute?
 
 Eine lokale Zeichenfläche mit druckabhängiger Breite, Stift, Marker, Hardware-/Software-Radierer, Hover-Cursor, Undo, Leeren, Autosave und SVG-Export. Striche sind normalisierte Vektordaten und überleben Größen- und Orientierungswechsel.
+
+### Was ist der Unterschied zwischen Pen Space und Systemnotiz?
+
+Pen Space gehört zu KoSch, speichert begrenzte Vektorstriche lokal und funktioniert ohne andere App. **Systemnotiz** verwendet ab Android 14 `ACTION_CREATE_NOTE` und `EXTRA_USE_STYLUS_MODE`; Inhalt, Rolle und Speicherung gehören der kompatiblen Notes-App. Ist keine vorhanden oder Android älter, fällt KoSch sichtbar auf Pen Space zurück.
 
 ### Werden Druck, Neigung, Orientierung, Hover und Stifttasten verarbeitet?
 
@@ -175,7 +191,7 @@ Ja, sofern Android und das Gerät Werte liefern. Druck beeinflusst die Breite; N
 
 ### Wie verhindert Pen Space Handballen- oder Fingerstriche?
 
-Die Zeichenfläche akzeptiert im M2.4-Modus nur Stylus- und Eraser-Ereignisse. Fingerkontakte werden nicht gezeichnet. Zusätzliche Palm-Rejection des Geräts oder Systems bleibt davon unabhängig.
+Die Zeichenfläche akzeptiert nur Stylus- und Eraser-Ereignisse. Fingerkontakte werden nicht gezeichnet. Zusätzliche Palm-Rejection des Geräts oder Systems bleibt davon unabhängig.
 
 ### Wie werden Zeichnungen gespeichert?
 
@@ -197,9 +213,9 @@ Alle über Androids generische Stylus-Quellen gemeldeten Grundfunktionen sind he
 
 Auf Android 14 oder neuer kann eine kompatible IME systemweite Stylus-Handschrift in regulären Textfeldern anbieten. KoSch nutzt normale Textfelder, enthält aber keine eigene Handschrifterkennung. Qualität, Sprache und Verfügbarkeit liegen bei der installierten Tastatur.
 
-### Verwendet M2.4 Jetpack Ink?
+### Verwendet M2.5 Jetpack Ink?
 
-Noch nicht. M2.4 verwendet eine kleine eigene `PressureInkView`, damit der Launcher ohne zusätzlichen Download und mit klar begrenzter Persistenz funktioniert. Resampling und SVG-Export sind jetzt vorhanden. Die freie AndroidX-Ink-API bleibt eine Kandidatin für Latenz-, Brush- und Historical-Event-Verbesserungen nach Gerätebenchmarks.
+Noch nicht. M2.5 verwendet eine kleine eigene `PressureInkView`, damit der Launcher ohne zusätzlichen Download und mit klar begrenzter Persistenz funktioniert. Resampling und SVG-Export sind vorhanden. Die freie AndroidX-Ink-API bleibt eine Kandidatin für Latenz-, Brush- und Historical-Event-Verbesserungen nach Gerätebenchmarks.
 
 ### Versteht die KI meine Zeichnung bereits semantisch?
 
@@ -209,7 +225,7 @@ Nein. **An Ask** öffnet den lokalen Intent-Eingang, überträgt aber keine Zeic
 
 ### Nutzt KoSch Material You?
 
-Ja. Ab Android 12 übernimmt M2.4 dynamische Systemfarben in ein dunkles Neural-Glass-System. Ältere Geräte erhalten eine kuratierte, kontrastreiche Palette. LCARS ist keine Kernabhängigkeit und kann später als deklaratives Theme entstehen.
+Ja. Ab Android 12 übernimmt M2.5 dynamische Systemfarben in ein dunkles Neural-Glass-System. Ältere Geräte erhalten eine kuratierte, kontrastreiche Palette. LCARS ist keine Kernabhängigkeit und kann später als deklaratives Theme entstehen.
 
 ### Wie passt sich die Oberfläche an Display und Haltung an?
 
@@ -219,13 +235,13 @@ Die Compose-Shell entscheidet aus aktuellen Fenstermaßen. Kompakte Fenster blei
 
 Ja. KoSch liest Androids Animator-Dauer. Bei deaktivierten Systemanimationen wird Neural Glass statisch und wichtige Zustände bleiben textlich beziehungsweise strukturell erkennbar.
 
-### Welche Accessibility-Verbesserungen enthält M2.4?
+### Welche Accessibility-Verbesserungen enthält M2.5?
 
 App- und Dock-Kacheln besitzen zusammengeführte Button-Semantik mit Zustands- und Langdruckbeschreibung. Pen Space veröffentlicht Undo und Clear als Accessibility-Custom-Actions und aktualisiert seine Inhaltsbeschreibung mit Werkzeug und Strichzahl. Reduced Motion und statische Kontrasttests sind aktiv. Eine vollständige TalkBack-, Switch-Access- und 200-%-Schrift-Geräteabnahme bleibt offen.
 
-### Welche modernen Android-Funktionen nutzt M2.4 außerdem?
+### Welche modernen Android-Funktionen nutzt M2.5 außerdem?
 
-HOME-Rolle, vorausschauende Zurück-Navigation, Edge-to-edge, `LauncherApps`, Multi-Profile-App-Katalog, App-Shortcuts, `AppWidgetHost` samt Größenoptionen, Storage Access Framework mit Dokument- und Tree-Routen, privacy-preserving Kontakt-Picker-Route, Notification Listener als Opt-in, Activity-Result-Verträge, ViewModel, Saved State, Android Keystore, dynamische Material-3-Farben, Hardware-Keyboard-Shortcut-Hilfe, Compose-Semantik und die generische Eingabegeräte-Pipeline.
+HOME-Rolle, vorausschauende Zurück-Navigation, Edge-to-edge, `LauncherApps`, profilgebundene Shortcuts/App-Aktionen, Work-Profile-Quiet-Mode, `AppWidgetHost` samt Größenoptionen, Storage Access Framework mit Dokument- und Tree-Routen, privacy-preserving Kontakt-Picker-Route, Notification Listener als Opt-in, Activity-Result-Verträge, ViewModel, Saved State, Android Keystore, dynamische Material-3-Farben, Hardware-Keyboard-Shortcut-Hilfe, Compose-Semantik, Systemnotiz mit Stylus-Modus und die generische Eingabegeräte-Pipeline.
 
 ## KI, freie Modelle und optionale APIs
 
@@ -243,7 +259,7 @@ PocketPal AI, ChatterUI und Maid sind sichtbare Übergabeziele. Für eine späte
 
 ### Wann verlassen Eingaben das Gerät?
 
-Erst wenn die Person einen externen Anbieter auswählt und eine sichtbare App-, Share- oder Browserübergabe bestätigt. Der M2.4-Launcher selbst deklariert kein `INTERNET`-Recht und führt keine Modell-API-Anfrage aus.
+Erst wenn die Person einen externen Anbieter auswählt und eine sichtbare App-, Share- oder Browserübergabe bestätigt. Der M2.5-Launcher selbst deklariert kein `INTERNET`-Recht und führt keine Modell-API-Anfrage aus.
 
 ### Wie können APIs später sicher hinzukommen?
 
@@ -259,9 +275,9 @@ Nein. Stimmung, Zyklus oder Fokus können später freiwillige Designparameter ei
 
 ## Datenschutz und Wiederherstellung
 
-### Welche Android-Berechtigungen fordert M2.4 an?
+### Welche Android-Berechtigungen fordert M2.5 an?
 
-Als `uses-permission` nur `ACCESS_NETWORK_STATE`, um validierte Netzverfügbarkeit lokal als Kontext zu erkennen. Es gibt kein `INTERNET`, `CALL_PHONE`, `READ_CONTACTS`, `READ_MEDIA_*`, `MANAGE_EXTERNAL_STORAGE`, `QUERY_ALL_PACKAGES`, Standort-, Kalender- oder Mikrofonrecht und keinen Accessibility Service.
+Als `uses-permission` nur `ACCESS_NETWORK_STATE`, um validierte Netzverfügbarkeit lokal als Kontext zu erkennen. Es gibt kein `INTERNET`, `CALL_PHONE`, `READ_CONTACTS`, `READ_MEDIA_*`, `MANAGE_EXTERNAL_STORAGE`, `QUERY_ALL_PACKAGES`, Standort-, Kalender- oder Mikrofonrecht und keinen Accessibility Service. Die CI prüft das Quellmanifest und zusätzlich die tatsächlich paketierte APK.
 
 ### Werden Stift- oder Gerätekennungen gespeichert?
 
@@ -289,24 +305,24 @@ Mit JDK 17, Android SDK 36 und AGP 8.13:
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease
 ```
 
-Die Debug-APK entsteht unter `app/build/outputs/apk/debug/app-debug.apk`; GitHub Actions veröffentlicht `kosch-ai-launcher-m2.4-debug` mit `KoSch-AI-Launcher-M2.4-debug.apk` und SHA-256-Datei.
+Die Debug-APK entsteht unter `app/build/outputs/apk/debug/app-debug.apk`; GitHub Actions veröffentlicht `kosch-ai-launcher-m2.5-debug` mit `KoSch-AI-Launcher-M2.5-debug.apk` und SHA-256-Datei.
 
 ### Was prüft die CI?
 
-Unit-Tests einschließlich Backup/Tamper, Pending-Export, App-Key-Migration, lokalem Ranking, Datei-Arbeitsraum-Planer, Ink-Resampling/SVG, Audit, Capability, Keyboard, Kontrast, FAQ und Planner; außerdem Android Lint, Manifest-Permission-Budget, nichtleeres Baseline-Profil, Debug-/minifizierter Release-Build und APK-Prüfsumme. Der grüne [Lauf #30](https://github.com/chekento/kosch-ai-android/actions/runs/32709807342) beweist Buildbarkeit dieses Code-Stands, ersetzt aber keine instrumentierten Geräte-, Provider-, Accessibility-, Performance- oder OEM-Tests.
+Unit-Tests einschließlich Backup/Tamper, Pending-Export, App-Key-Migration, lokalem Ranking, Collection-Regeln, Datei-Arbeitsraum-Planer und Datei-Mutationssemantik, Ink-Resampling/SVG, Audit, Capability, Keyboard, Kontrast, FAQ und Planner; außerdem Android Lint, Quell- und APK-Permission-Budget, nichtleeres Baseline-Profil, Debug-/minifizierter Release-Build und APK-Prüfsumme. Der grüne [Lauf #35](https://github.com/chekento/kosch-ai-android/actions/runs/32724798845) beweist Buildbarkeit dieses Code-Stands, ersetzt aber keine instrumentierten Geräte-, Provider-, Accessibility-, Performance- oder OEM-Tests.
 
-### Wie wurde M2.4 mit anderen Launchern verglichen?
+### Wie wurde M2.5 mit anderen Launchern verglichen?
 
-Die strenge Matrix bewertet KoSch, Pixel/Android 17 als Systemreferenz sowie Nova, Niagara, Smart Launcher, Microsoft Launcher und Lawnchair in 90 Kategorien von 0,1 bis 10,0. Zusätzlich werden 25 reproduzierbare Fachperspektiven mit je 90 KoSch-Einzelwerten simuliert. Das sind keine tatsächlich befragten Personen und kein identischer Sieben-Geräte-Labortest.
+Die strenge Matrix bewertet KoSch, Pixel/Android 17 als Systemreferenz sowie Nova, Niagara, Smart Launcher, Microsoft Launcher und Lawnchair in 100 Kategorien von 0,1 bis 10,0. Zusätzlich werden 25 reproduzierbare Fachperspektiven mit je 100 KoSch-Einzelwerten simuliert. Das sind keine tatsächlich befragten Personen und kein identischer Sieben-Geräte-Labortest.
 
-### Hat M2.4 die gewünschte Wertung über 9,5 erreicht?
+### Hat M2.5 die gewünschte Wertung über 9,5 erreicht?
 
-Nein. Der belegbare Stand erreicht 8,1 allgemein und 7,9 im Rollenmittel. Das ist Rang 2 der breiten Matrix, aber kein Produktionsbeweis. Eine Wertung über 9,5 ist erst zulässig, wenn alle manuellen Geräte-, Accessibility-, Recovery-, Performance- und Security-Gates bestanden sind, keine Kategorie unter 8,5 liegt und die kritischen Qualitätsbereiche jeweils mindestens 9,5 erreichen.
+Nein. Der belegbare Stand erreicht 8,2 allgemein und 8,1 im Rollenmittel. Das ist Rang 2 der breiten Matrix, aber kein Produktionsbeweis. Eine Wertung über 9,5 ist erst zulässig, wenn alle manuellen Geräte-, Accessibility-, Recovery-, Performance- und Security-Gates bestanden sind, keine Kategorie unter 8,5 liegt und die kritischen Qualitätsbereiche jeweils mindestens 9,5 erreichen.
 
 ### Wo liegen die vollständigen Bewertungsdaten?
 
-In `COMPETITOR_REVIEW_M2_4.md`, den drei M2.4-CSV-Dateien und der formatierten `launcher_benchmark_m2_4.xlsx` mit Summary, 90-Kategorien-Vergleich, Expertenmatrizen, Feature-/Evidenzkarte, Next-Run-Plan und Quellen.
+In `COMPETITOR_REVIEW_M2_5.md`, den drei M2.5-CSV-Dateien und der formatierten `launcher_benchmark_m2_5.xlsx` mit Summary, 100-Kategorien-Vergleich, Expertenmatrizen, Feature-/Evidenzkarte, Next-Run-Plan und Quellen.
 
 ### Was ist das nächste professionelle Ziel?
 
-M2.5 priorisiert instrumentierte HOME-/SAF-/Widget-/Prozess-Tod-Tests, Macrobenchmarks mit Budgets, vollständige Widget-/Launcher-Parität, Accessibility-/OEM-/Stylus-Lab, API-37-Upgrade, Release-Signing/SBOM, Deutsch-/Englisch-Lokalisierung und erst danach ein isoliertes lokales LLM. Der Evidenzplan liegt zusätzlich als eigenes Blatt in der M2.4-Arbeitsmappe.
+M2.6 priorisiert instrumentierte HOME-/SAF-/Widget-/Prozess-Tod-Tests, Macrobenchmarks mit Budgets, vollständige Widget-/Launcher-Parität, Accessibility-/OEM-/Stylus-Lab, API-37-Upgrade, Release-Signing/SBOM, Deutsch-/Englisch-Lokalisierung und erst danach ein isoliertes lokales LLM. Der Evidenzplan liegt zusätzlich als eigenes Blatt in der M2.5-Arbeitsmappe.

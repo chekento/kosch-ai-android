@@ -101,15 +101,31 @@ Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn 
 - [x] CI #30 mit Tests, Lint, Debug-/Release-Build, Permission-Budget und APK-Prüfsumme grün
 - [x] 7-Launcher-/90-Kategorien-Review, 25×90-Fachmatrix und formatierte XLSX-Arbeitsmappe
 
-## Nächster Lauf – M2.5 Measured Professional Beta
+## M2.5 – Professional Parity & Correctness
+
+- [x] eigene persistente Ordner mit Create/Rename/Add/Remove/Reorder und 12×32-Grenzen
+- [x] Dock-Pin-Reihenfolge links/rechts steuerbar machen
+- [x] App-Info und System-Uninstall an das ausgewählte UserHandle binden
+- [x] Arbeitsprofil über Android Quiet Mode pausieren/aktivieren und pausierte Starts abweisen
+- [x] Nachricht, Kalender, Wecker und Kamera als sichere Android-Systemübergaben
+- [x] Android-14+-Systemnotiz mit Stylus-Modus und Pen-Space-Fallback
+- [x] Datei-Mutation, Audit und Refresh als getrennte Ergebnisse modellieren und testen
+- [x] eingereichte Dateiänderungen auch nach Schließen der Fläche auditieren
+- [x] Datei-Refresh im aktuellen Verzeichnis statt an der Tree-Wurzel
+- [x] Shortcut-Schlüssel auf stabile User-Seriennummern umstellen
+- [x] 57 lokale FAQ-Einträge einschließlich aller M2.5-Grenzen
+- [x] GitHub Actions modernisieren und Quell-/APK-Permission-Budget prüfen
+- [x] 7-Launcher-/100-Kategorien-Review, 25×100-Fachmatrix und formatierte XLSX-Arbeitsmappe
+
+## Nächster Lauf – M2.6 Measured Professional Beta
 
 - [ ] instrumentierte Tests für HOME, SAF, Widget-Abbruch/-Konfiguration und Stifteingabe auf API 29/33/36/37
 - [ ] Prozess-Tod-/Saved-State-Testmatrix während Backup-, Audit-, SVG-, Kontakt-, Widget- und Tree-Picker
 - [ ] TalkBack, Switch Access, Hardwaretastatur, Schrift 200 %, Reduced Motion und Kontrast auf realen Geräten
 - [ ] Foldable-Hinge-, Multi-Window-, 320-dp- und Screenshot-Golden-Matrix
-- [ ] SAF-Provider-Lab für lokale, Cloud- und OEM-Provider einschließlich Grant-Verlust und destruktiver Semantik
+- [ ] SAF-Provider-Lab für lokale, Cloud- und OEM-Provider einschließlich Grant-Verlust und Mutations-/Refresh-Semantik
 - [ ] vollständige Widget-Engine: freie Platzierung, Stacks und Restore-Mapping
-- [ ] vollständige Launcher-Parität: manuelle Ordner/Seiten, Drag/Drop, Dock-Reorder, Icon-Packs und Gesten
+- [ ] vollständige Launcher-Parität: freie Seiten/Raster, Drag/Drop, Icon-Packs und Gesten
 - [ ] Private-Space-Container erst nach Hide/Show/Lock/Unlock und Leak-Tests
 - [ ] nativer API-37-Mehrfeld-Contact-Picker nach Upgrade auf compileSdk/targetSdk 37
 - [ ] Pen-Latenz-Benchmark, Historical Events, Geräte-Lab und AndroidX-Ink-Evaluation

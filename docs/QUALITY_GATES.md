@@ -1,8 +1,8 @@
-# M2.4 Evidence & Resilience Quality Gates
+# M2.5 Professional Parity & Correctness Quality Gates
 
 Stand: 24. August 2026
 
-Ein Zielwert über 9,5 ist kein Designlabel, sondern ein Release-Gate. Der [grüne GitHub-Actions-Lauf #30](https://github.com/chekento/kosch-ai-android/actions/runs/32709807342) erfüllt die automatisierten Repository-Gates des M2.4-Code-Stands. Die reproduzierbare Neubewertung erreicht **8,1 allgemein** und **7,9 im Mittel von 25 simulierten Fachperspektiven** über 90 Kategorien. Manuelle Beta-Gates bleiben offen; 9,5 ist daher ausdrücklich nicht erfüllt.
+Ein Zielwert über 9,5 ist kein Designlabel, sondern ein Release-Gate. Der [grüne GitHub-Actions-Lauf #35](https://github.com/chekento/kosch-ai-android/actions/runs/32724798845) erfüllt Tests, Lint, Debug-/Release-Build sowie Quell- und APK-Permission-Budget des M2.5-Code-Stands. Die reproduzierbare Neubewertung erreicht **8,2 allgemein** und **8,1 im Mittel von 25 simulierten Fachperspektiven** über 100 Kategorien. Manuelle Beta-Gates bleiben offen; 9,5 ist daher ausdrücklich nicht erfüllt.
 
 ## Automatisierte Repository-Gates
 
@@ -18,20 +18,23 @@ Ein Zielwert über 9,5 ist kein Designlabel, sondern ein Release-Gate. Der [grü
 | App-Key-Migration | alte profilgebundene Schlüssel nur eindeutig migriert | `AppKeyMigrationTest` |
 | Local ranking | Count/Recency, Limits und stabile Reihenfolge | `LocalUsageModelTest` |
 | Datei-Arbeitsraum | Namensregeln, Kategorien, Größen, Duplikate und größte Dateien | `LocalFileWorkspacePlannerTest` |
+| Datei-Erfolgssemantik | Mutationserfolg bleibt von Refreshfehler getrennt | `FileMutationSemanticsTest` |
+| Workspace Collections | Ordnerlimits, Idempotenz, Entfernen und Reorder | `WorkspaceCollectionEditorTest` |
 | Ink-Integrität | lange Striche behalten Anfang/Ende; SVG bleibt begrenzt | `InkStrokeNormalizerTest`, `InkSvgExporterTest` |
 | Capability safety | sensible/destruktive Aktionen können Bestätigung nicht verlieren | `CapabilityPolicyTest` |
 | Audit privacy | CSV besitzt nur Zeitpunkt, Aktion und Ergebnis | `AuditCsvTest` |
 | Keyboard | Ctrl-/Meta-Routing einschließlich Datei-Arbeitsraum | `ProfessionalShortcutResolverTest` |
-| FAQ | mehr als 50 Einträge und M2.4-Sicherheits-/Recovery-Themen | `FaqRegistryTest` |
+| FAQ | mindestens 57 Einträge und M2.5-Profil-/Datei-/Systemthemen | `FaqRegistryTest` |
 | Static contrast | zentrale Fallback-Textpaare mindestens 4,5:1 | `WcagContrastTest` |
 | Startup profile | startkritischer Pfad als ART-Baseline-Profil vorhanden | CI prüft nichtleere `baseline-prof.txt` |
-| Supply artifact | APK vorhanden und SHA-256 erzeugt | CI-Artefakt `kosch-ai-launcher-m2.4-debug` |
+| Packaged permission | erzeugte APK enthält kein `INTERNET`-Recht | CI prüft `aapt dump permissions` |
+| Supply artifact | APK vorhanden und SHA-256 erzeugt | CI-Artefakt `kosch-ai-launcher-m2.5-debug` |
 
 ## Was der grüne Lauf nicht beweist
 
 Unit-Tests und Compiler prüfen reine Regeln und Integrationsgrenzen, aber keine reale OEM-UI, keinen DocumentsProvider, kein TalkBack-Verhalten, keine Widget-App eines Drittanbieters und keine Stiftlatenz. Deshalb bleiben folgende Abnahmen offen:
 
-| Bereich | Mindestmatrix | M2.4-Status |
+| Bereich | Mindestmatrix | M2.5-Status |
 |---|---|---|
 | HOME-Recovery | Pixel/AOSP, Samsung, weiterer OEM; Neustart, Crash, HOME-Wechsel | offen |
 | Lifecycle | Rotation, Fold, Multi-Window und erzwungener Prozess-Tod in offenem Picker/Sheet | quellseitig gehärtet, instrumentiert offen |
@@ -66,9 +69,9 @@ Eine Gesamtwertung über 9,5 ist nur zulässig, wenn gleichzeitig:
 
 1. alle automatisierten Gates grün sind;
 2. alle manuellen Beta-Gates bestanden sind;
-3. keine der 90+ Kategorien unter 8,5 liegt;
+3. keine der 100+ Kategorien unter 8,5 liegt;
 4. Security, Accessibility, Reliability, Startleistung und HOME-Recovery jeweils mindestens 9,5 erreichen;
 5. Messdaten, Geräteklassen, Build-SHA und Methodik gespeichert sind;
 6. mindestens ein unabhängiger Security-/Privacy-Review und ein Accessibility-Review ohne kritischen Befund vorliegen.
 
-Bis dahin ist 8,1/7,9 der ehrliche M2.4-Befund – kein Anlass, Bewertungszahlen zu manipulieren.
+Bis dahin ist 8,2/8,1 der ehrliche M2.5-Befund – kein Anlass, Bewertungszahlen zu manipulieren.

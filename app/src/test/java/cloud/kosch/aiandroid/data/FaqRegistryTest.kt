@@ -14,7 +14,7 @@ class FaqRegistryTest {
         assertTrue(FaqRegistry.entries.any { it.id == "private-space" })
         assertTrue(FaqRegistry.entries.any { it.id == "secure-backup" })
         assertTrue(FaqRegistry.entries.any { it.id == "audit" })
-        assertTrue(FaqRegistry.entries.any { it.id == "m2-4-rating" })
+        assertTrue(FaqRegistry.entries.any { it.id == "m2-5-rating" })
         assertTrue(FaqRegistry.entries.any { it.id == "quality-gates" })
         assertTrue(FaqRegistry.entries.any { it.id == "process-recovery" })
         assertTrue(FaqRegistry.entries.any { it.id == "pen-svg" })
