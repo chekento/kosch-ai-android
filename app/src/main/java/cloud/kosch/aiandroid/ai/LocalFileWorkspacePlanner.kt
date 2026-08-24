@@ -52,7 +52,7 @@ object LocalFileWorkspacePlanner {
             directoryCount = entries.count(Fact::isDirectory),
             knownBytes = files.sumOf { it.sizeBytes?.coerceAtLeast(0L) ?: 0L },
             duplicateNameGroups = duplicateGroups,
-            categoryCounts = files.groupingBy(FileWorkspaceEntry::category).eachCount().toSortedMap(),
+            categoryCounts = files.groupingBy(Fact::category).eachCount().toSortedMap(),
             largestFiles = files
                 .filter { it.sizeBytes != null }
                 .sortedByDescending { it.sizeBytes }
