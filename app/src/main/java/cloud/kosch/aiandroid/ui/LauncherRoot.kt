@@ -187,15 +187,18 @@ fun LauncherRoot(
                     .padding(contentPadding)
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
-                val wide = maxWidth >= 840.dp || (maxWidth >= 720.dp && maxWidth > maxHeight)
-                val spacing = if (maxHeight < 700.dp) 7.dp else 10.dp
+                val availableWidth = maxWidth
+                val availableHeight = maxHeight
+                val wide = availableWidth >= 840.dp ||
+                    (availableWidth >= 720.dp && availableWidth > availableHeight)
+                val spacing = if (availableHeight < 700.dp) 7.dp else 10.dp
                 if (wide) {
                     Row(
                         modifier = Modifier.fillMaxSize(),
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         Column(
-                            modifier = Modifier.width(if (maxWidth >= 1_000.dp) 340.dp else 292.dp),
+                            modifier = Modifier.width(if (availableWidth >= 1_000.dp) 340.dp else 292.dp),
                             verticalArrangement = Arrangement.spacedBy(spacing),
                         ) {
                             LauncherNavigation(

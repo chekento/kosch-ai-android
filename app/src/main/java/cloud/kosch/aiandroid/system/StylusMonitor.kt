@@ -33,7 +33,9 @@ class StylusMonitor(
     }
 
     fun refreshDevices() {
-        val devices = inputManager.inputDeviceIds.mapNotNull(inputManager::getInputDevice)
+        val devices = inputManager.inputDeviceIds
+            .map(inputManager::getInputDevice)
+            .filterNotNull()
         val styluses = devices.filter { device ->
             device.supportsSource(InputDevice.SOURCE_STYLUS) ||
                 device.supportsSource(InputDevice.SOURCE_BLUETOOTH_STYLUS)
