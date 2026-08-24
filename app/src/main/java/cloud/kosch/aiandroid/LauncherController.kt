@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.provider.ContactsContract
 import android.view.MotionEvent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,7 +24,12 @@ import cloud.kosch.aiandroid.ai.SearchRanker
 import cloud.kosch.aiandroid.ai.SmartAppDescriptor
 import cloud.kosch.aiandroid.ai.SmartCollection
 import cloud.kosch.aiandroid.data.AppCatalog
+import cloud.kosch.aiandroid.data.LocalAuditLog
 import cloud.kosch.aiandroid.data.WorkspaceStore
+import cloud.kosch.aiandroid.model.AuditAction
+import cloud.kosch.aiandroid.model.AuditEvent
+import cloud.kosch.aiandroid.model.AuditOutcome
+import cloud.kosch.aiandroid.model.BackupPreview
 import cloud.kosch.aiandroid.model.ContextSnapshot
 import cloud.kosch.aiandroid.model.DefaultWorkspace
 import cloud.kosch.aiandroid.model.LaunchableApp
@@ -34,6 +40,7 @@ import cloud.kosch.aiandroid.model.InkStroke
 import cloud.kosch.aiandroid.model.LauncherFolder
 import cloud.kosch.aiandroid.model.PositionedTile
 import cloud.kosch.aiandroid.model.SceneId
+import cloud.kosch.aiandroid.model.SelectedContact
 import cloud.kosch.aiandroid.model.SystemPanel
 import cloud.kosch.aiandroid.model.StylusCapabilities
 import cloud.kosch.aiandroid.model.TilePosition
@@ -44,6 +51,10 @@ import cloud.kosch.aiandroid.system.NotificationAccess
 import cloud.kosch.aiandroid.system.NotificationBadgeRepository
 import cloud.kosch.aiandroid.system.SystemActionGateway
 import cloud.kosch.aiandroid.system.StylusMonitor
+import cloud.kosch.aiandroid.security.PortableBackupCodec
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -52,6 +63,8 @@ class LauncherController(context: Context) {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private val store = WorkspaceStore(appContext)
+    private val auditLog = LocalAuditLog(appContext)
+    private val backupCodec = PortableBackupCodec()
     private val commandPlanner = LocalCommandPlanner()
     private val contextEngine = LocalContextEngine(appContext)
     private val fileIntelligence = LocalFileIntelligenceEngine(appContext.contentResolver)
@@ -135,8 +148,26 @@ class LauncherController(context: Context) {
         private set
     var faqVisible by mutableStateOf(false)
         private set
+    var backupVisible by mutableStateOf(false)
+        private set
+    var backupBusy by mutableStateOf(false)
+        private set
+    var backupFileStaged by mutableStateOf(false)
+        private set
+    var backupPreview by mutableStateOf<BackupPreview?>(null)
+        private set
+    var auditVisible by mutableStateOf(false)
+        private set
+    var auditEvents by mutableStateOf(auditLog.events())
+        private set
+    var selectedContact by mutableStateOf<SelectedContact?>(null)
+        private set
+    var commandFocusRequest by mutableStateOf(0L)
+        private set
 
     private var undoPositions: Map<SceneId, Map<String, TilePosition>>? = null
+    private var stagedBackupEnvelope: String? = null
+    private var stagedWorkspacePayload: ByteArray? = null
     private var shortcutRequestToken = 0L
     private var started = false
     private val badgeListener = NotificationBadgeRepository.Listener { counts ->
@@ -159,6 +190,9 @@ class LauncherController(context: Context) {
         stylusMonitor.stop()
         appCatalog.stopListening()
         executor.shutdownNow()
+        stagedWorkspacePayload?.fill(0)
+        stagedWorkspacePayload = null
+        stagedBackupEnvelope = null
         started = false
     }
 
@@ -183,6 +217,16 @@ class LauncherController(context: Context) {
         store.saveHomePage(page)
     }
 
+    fun openProDesk() {
+        closeTopSurface()
+        switchHomePage(HomePage.PRO_DESK)
+    }
+
+    fun requestCommandFocus() {
+        closeTopSurface()
+        commandFocusRequest += 1
+    }
+
     fun openPenSpace() {
         controlCenterVisible = false
         if (stylusState.present) {
@@ -200,6 +244,7 @@ class LauncherController(context: Context) {
 
     fun saveInkStrokes(strokes: List<InkStroke>) {
         store.saveInkStrokes(strokes)
+        audit(AuditAction.PEN_SAVE, AuditOutcome.SUCCESS)
     }
 
     fun openFaq() {
@@ -209,6 +254,199 @@ class LauncherController(context: Context) {
 
     fun closeFaq() {
         faqVisible = false
+    }
+
+    fun openBackup() {
+        controlCenterVisible = false
+        auditVisible = false
+        backupVisible = true
+    }
+
+    fun closeBackup() {
+        backupVisible = false
+        backupBusy = false
+        backupPreview = null
+        backupFileStaged = false
+        stagedBackupEnvelope = null
+        stagedWorkspacePayload?.fill(0)
+        stagedWorkspacePayload = null
+    }
+
+    fun buildEncryptedBackup(
+        passphrase: CharArray,
+        onReady: (Result<ByteArray>) -> Unit,
+    ) {
+        if (backupBusy) {
+            passphrase.fill('\u0000')
+            return
+        }
+        backupBusy = true
+        executor.execute {
+            val result = runCatching {
+                val snapshot = store.createPortableSnapshot()
+                try {
+                    backupCodec.encrypt(snapshot, passphrase).toByteArray(StandardCharsets.UTF_8)
+                } finally {
+                    snapshot.fill(0)
+                }
+            }
+            passphrase.fill('\u0000')
+            mainHandler.post {
+                backupBusy = false
+                result.onFailure { notice = it.message ?: "Backup konnte nicht vorbereitet werden" }
+                onReady(result)
+            }
+        }
+    }
+
+    fun stageEncryptedBackup(uri: Uri) {
+        if (backupBusy) return
+        backupBusy = true
+        backupPreview = null
+        stagedWorkspacePayload?.fill(0)
+        stagedWorkspacePayload = null
+        executor.execute {
+            val result = runCatching {
+                appContext.contentResolver.openInputStream(uri)?.use { input ->
+                    readBounded(input, MAX_BACKUP_ENVELOPE_BYTES)
+                } ?: error("Backup-Datei konnte nicht geöffnet werden")
+            }.map { bytes ->
+                try {
+                    bytes.toString(StandardCharsets.UTF_8).trim()
+                } finally {
+                    bytes.fill(0)
+                }
+            }
+            mainHandler.post {
+                backupBusy = false
+                result.onSuccess { envelope ->
+                    stagedBackupEnvelope = envelope
+                    backupFileStaged = true
+                    notice = "Backup geladen – Passphrase eingeben und zuerst prüfen"
+                }.onFailure {
+                    backupFileStaged = false
+                    stagedBackupEnvelope = null
+                    notice = it.message ?: "Backup-Datei konnte nicht sicher gelesen werden"
+                }
+            }
+        }
+    }
+
+    fun previewStagedBackup(passphrase: CharArray) {
+        val envelope = stagedBackupEnvelope
+        if (envelope == null || backupBusy) {
+            passphrase.fill('\u0000')
+            return
+        }
+        backupBusy = true
+        executor.execute {
+            val result = runCatching {
+                val payload = backupCodec.decrypt(envelope, passphrase)
+                payload to store.previewPortableSnapshot(payload)
+            }
+            passphrase.fill('\u0000')
+            mainHandler.post {
+                backupBusy = false
+                result.onSuccess { (payload, preview) ->
+                    stagedWorkspacePayload?.fill(0)
+                    stagedWorkspacePayload = payload
+                    backupPreview = preview
+                    notice = "Backup geprüft – Restore wartet auf deine Bestätigung"
+                }.onFailure {
+                    backupPreview = null
+                    notice = it.message ?: "Backup konnte nicht geprüft werden"
+                }
+            }
+        }
+    }
+
+    fun applyBackupPreview() {
+        val payload = stagedWorkspacePayload ?: return
+        if (backupBusy) return
+        backupBusy = true
+        executor.execute {
+            val result = runCatching { store.restorePortableSnapshot(payload) }
+            payload.fill(0)
+            mainHandler.post {
+                stagedWorkspacePayload = null
+                backupBusy = false
+                result.onSuccess {
+                    reloadWorkspaceState()
+                    backupPreview = null
+                    backupFileStaged = false
+                    stagedBackupEnvelope = null
+                    audit(AuditAction.BACKUP_IMPORT, AuditOutcome.SUCCESS)
+                    notice = "Workspace wiederhergestellt; Widgets und Freigaben bleiben gerätegebunden"
+                }.onFailure {
+                    audit(AuditAction.BACKUP_IMPORT, AuditOutcome.FAILED)
+                    notice = "Restore wurde nicht angewendet: ${it.message ?: "Validierung fehlgeschlagen"}"
+                }
+            }
+        }
+    }
+
+    fun recordBackupExport(success: Boolean) {
+        audit(AuditAction.BACKUP_EXPORT, if (success) AuditOutcome.SUCCESS else AuditOutcome.FAILED)
+        notice = if (success) "Verschlüsseltes Backup gespeichert" else "Backup wurde nicht gespeichert"
+    }
+
+    fun openAudit() {
+        controlCenterVisible = false
+        backupVisible = false
+        auditEvents = auditLog.events()
+        auditVisible = true
+    }
+
+    fun closeAudit() {
+        auditVisible = false
+    }
+
+    fun clearAudit() {
+        auditLog.clear()
+        auditEvents = emptyList()
+        notice = "Lokales Audit vollständig gelöscht"
+    }
+
+    fun auditCsv(): ByteArray = auditLog.exportCsv()
+
+    fun recordAuditExport(success: Boolean) {
+        audit(AuditAction.AUDIT_EXPORT, if (success) AuditOutcome.SUCCESS else AuditOutcome.FAILED)
+        notice = if (success) "Audit als CSV gespeichert" else "Audit wurde nicht gespeichert"
+    }
+
+    fun writeUserDocument(
+        uri: Uri,
+        payload: ByteArray,
+        onComplete: (Boolean) -> Unit,
+    ) {
+        executor.execute {
+            val success = runCatching {
+                appContext.contentResolver.openOutputStream(uri, "wt")?.use { output ->
+                    output.write(payload)
+                    output.flush()
+                } ?: error("Zieldatei konnte nicht geöffnet werden")
+            }.isSuccess
+            payload.fill(0)
+            mainHandler.post { onComplete(success) }
+        }
+    }
+
+    /** Closes exactly the top-most transient surface and never changes Android's HOME role. */
+    fun closeTopSurface(): Boolean = when {
+        onboardingVisible -> false
+        faqVisible -> true.also { closeFaq() }
+        backupVisible -> true.also { closeBackup() }
+        auditVisible -> true.also { closeAudit() }
+        appActionsVisible -> true.also { hideAppActions() }
+        folderSheetVisible -> true.also { closeFolder() }
+        phoneVisible -> true.also { closePhone() }
+        fileSheetVisible -> true.also { closeFileSheet() }
+        widgetBoardVisible -> true.also { closeWidgetBoard() }
+        controlCenterVisible -> true.also { closeControlCenter() }
+        providerChooserVisible -> true.also { closeProviderChooser() }
+        contextDetailsVisible -> true.also { hideContextDetails() }
+        drawerVisible -> true.also { closeDrawer() }
+        else -> false
     }
 
     fun selectWorkspaceMode(mode: WorkspaceMode) {
@@ -221,6 +459,7 @@ class LauncherController(context: Context) {
         store.saveScene(scene)
         previewPositions = null
         notice = "Szene ${scene.title} aktiv"
+        audit(AuditAction.SCENE_SWITCH, AuditOutcome.SUCCESS)
     }
 
     fun useSuggestedScene() {
@@ -243,6 +482,7 @@ class LauncherController(context: Context) {
         val updated = current + (id to position.clamped())
         workspacePositions = workspacePositions + (activeScene to updated)
         store.savePositions(activeScene, updated)
+        audit(AuditAction.LAYOUT_CHANGE, AuditOutcome.SUCCESS)
     }
 
     fun proposeSmartLayout() {
@@ -266,6 +506,7 @@ class LauncherController(context: Context) {
         store.savePositions(activeScene, preview)
         previewPositions = null
         notice = "Layout angewendet – Rückgängig ist verfügbar"
+        audit(AuditAction.LAYOUT_CHANGE, AuditOutcome.SUCCESS)
     }
 
     fun discardLayoutPreview() {
@@ -280,6 +521,7 @@ class LauncherController(context: Context) {
         store.savePositions(activeScene, defaults)
         previewPositions = null
         notice = "Szene auf Standard zurückgesetzt"
+        audit(AuditAction.LAYOUT_CHANGE, AuditOutcome.SUCCESS)
     }
 
     fun undoLayout() {
@@ -291,6 +533,7 @@ class LauncherController(context: Context) {
         canUndoLayout = true
         previewPositions = null
         notice = "Layout-Schritt rückgängig gemacht"
+        audit(AuditAction.LAYOUT_CHANGE, AuditOutcome.SUCCESS)
     }
 
     fun openDrawer(collection: SmartCollection = SmartCollection.ALL) {
@@ -353,6 +596,62 @@ class LauncherController(context: Context) {
 
     fun closePhone() {
         phoneVisible = false
+        selectedContact = null
+    }
+
+    fun selectContact(contact: SelectedContact) {
+        selectedContact = contact
+        phoneVisible = true
+        audit(AuditAction.CONTACT_PICKER, AuditOutcome.SUCCESS)
+    }
+
+    fun consumePickedContact(uri: Uri) {
+        executor.execute {
+            val result = runCatching {
+                val projection = arrayOf(
+                    ContactsContract.Contacts.DISPLAY_NAME_PRIMARY,
+                    ContactsContract.Data.MIMETYPE,
+                    ContactsContract.Data.DATA1,
+                )
+                appContext.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+                    val nameIndex = cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY)
+                    val mimeIndex = cursor.getColumnIndex(ContactsContract.Data.MIMETYPE)
+                    val dataIndex = cursor.getColumnIndex(ContactsContract.Data.DATA1)
+                    var selected: SelectedContact? = null
+                    while (cursor.moveToNext() && selected == null) {
+                        val mime = mimeIndex.takeIf { it >= 0 }?.let(cursor::getString)
+                        val value = dataIndex.takeIf { it >= 0 }?.let(cursor::getString).orEmpty()
+                        if ((mime == null || mime == ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE) &&
+                            PhoneNumberParser.sanitize(value) != null
+                        ) {
+                            selected = SelectedContact(
+                                displayName = nameIndex.takeIf { it >= 0 }?.let(cursor::getString)
+                                    ?.trim().orEmpty().ifBlank { "Ausgewählter Kontakt" },
+                                phoneNumber = value,
+                            )
+                        }
+                    }
+                    selected
+                } ?: error("Kontakt konnte nicht gelesen werden")
+            }
+            mainHandler.post {
+                result.onSuccess { contact ->
+                    if (contact == null) {
+                        audit(AuditAction.CONTACT_PICKER, AuditOutcome.REJECTED)
+                        notice = "Der gewählte Kontakt enthält keine nutzbare Telefonnummer"
+                    } else {
+                        selectContact(contact)
+                    }
+                }.onFailure {
+                    audit(AuditAction.CONTACT_PICKER, AuditOutcome.FAILED)
+                    notice = "Kontakt konnte nicht sicher übernommen werden"
+                }
+            }
+        }
+    }
+
+    fun clearSelectedContact() {
+        selectedContact = null
     }
 
     fun dial(number: String?) {
@@ -364,19 +663,28 @@ class LauncherController(context: Context) {
         systemActions.openDialer(sanitized)
             .onSuccess {
                 phoneVisible = false
+                selectedContact = null
                 notice = "Nummer im System-Telefon geöffnet – du bestätigst den Anruf"
+                audit(AuditAction.DIALER, AuditOutcome.SUCCESS)
             }
-            .onFailure { notice = "Auf diesem Gerät ist kein Telefon-Wähler verfügbar" }
+            .onFailure {
+                notice = "Auf diesem Gerät ist kein Telefon-Wähler verfügbar"
+                audit(AuditAction.DIALER, AuditOutcome.FAILED)
+            }
     }
 
     fun openSystemPanel(panel: SystemPanel) {
         systemActions.openPanel(panel)
             .onSuccess {
+                audit(AuditAction.SYSTEM_PANEL, AuditOutcome.SUCCESS)
                 if (panel == SystemPanel.HOME_SELECTION) {
                     notice = "Hier kannst du jederzeit einen anderen Launcher wählen"
                 }
             }
-            .onFailure { notice = "${panel.title} konnte nicht geöffnet werden" }
+            .onFailure {
+                notice = "${panel.title} konnte nicht geöffnet werden"
+                audit(AuditAction.SYSTEM_PANEL, AuditOutcome.FAILED)
+            }
     }
 
     fun inspectDocument(uri: Uri) {
@@ -387,7 +695,11 @@ class LauncherController(context: Context) {
             val result = runCatching { fileIntelligence.inspect(uri) }
             mainHandler.post {
                 result.onSuccess { fileInsight = it }
-                    .onFailure { notice = "Die Datei konnte nicht sicher gelesen werden" }
+                    .onSuccess { audit(AuditAction.DOCUMENT_INSPECT, AuditOutcome.SUCCESS) }
+                    .onFailure {
+                        notice = "Die Datei konnte nicht sicher gelesen werden"
+                        audit(AuditAction.DOCUMENT_INSPECT, AuditOutcome.FAILED)
+                    }
                 fileLoading = false
             }
         }
@@ -427,12 +739,14 @@ class LauncherController(context: Context) {
         widgetIds = store.widgetIds()
         widgetBoardVisible = true
         notice = "Widget sicher zum Board hinzugefügt"
+        audit(AuditAction.WIDGET_CHANGE, AuditOutcome.SUCCESS)
     }
 
     fun removeWidgetRecord(appWidgetId: Int) {
         store.removeWidgetId(appWidgetId)
         widgetIds = store.widgetIds()
         notice = "Widget entfernt"
+        audit(AuditAction.WIDGET_CHANGE, AuditOutcome.SUCCESS)
     }
 
     fun showAppActions(app: LaunchableApp) {
@@ -570,8 +884,12 @@ class LauncherController(context: Context) {
                 recentPackages = store.recentPackages()
                 hideAppActions()
                 drawerVisible = false
+                audit(AuditAction.APP_SHORTCUT, AuditOutcome.SUCCESS)
             }
-            .onFailure { notice = "${shortcut.label} konnte nicht gestartet werden" }
+            .onFailure {
+                notice = "${shortcut.label} konnte nicht gestartet werden"
+                audit(AuditAction.APP_SHORTCUT, AuditOutcome.FAILED)
+            }
     }
 
     fun openSelectedAppInfo() {
@@ -585,7 +903,9 @@ class LauncherController(context: Context) {
         requestVoice: () -> Unit,
         requestDocument: () -> Unit,
     ) {
-        when (val command = commandPlanner.plan(text)) {
+        val command = commandPlanner.plan(text)
+        if (command !is LauncherCommand.Empty) audit(AuditAction.COMMAND, AuditOutcome.SUCCESS)
+        when (command) {
             LauncherCommand.Empty -> Unit
             LauncherCommand.OpenDrawer -> openDrawer()
             LauncherCommand.StartVoice -> requestVoice()
@@ -609,8 +929,12 @@ class LauncherController(context: Context) {
                 recentPackages = store.recentPackages()
                 drawerVisible = false
                 hideAppActions()
+                audit(AuditAction.APP_LAUNCH, AuditOutcome.SUCCESS)
             }
-            .onFailure { notice = "${app.label} konnte nicht gestartet werden" }
+            .onFailure {
+                notice = "${app.label} konnte nicht gestartet werden"
+                audit(AuditAction.APP_LAUNCH, AuditOutcome.FAILED)
+            }
     }
 
     fun rankedApps(
@@ -740,6 +1064,42 @@ class LauncherController(context: Context) {
         canUndoLayout = true
     }
 
+    private fun reloadWorkspaceState() {
+        activeScene = store.loadScene()
+        homePage = store.loadHomePage()
+        workspacePositions = store.loadPositions()
+        recentPackages = store.recentPackages()
+        pinnedAppKeys = store.pinnedAppKeys()
+        folders = store.folders()
+        folderPreview = null
+        previewPositions = null
+        undoPositions = null
+        canUndoLayout = false
+    }
+
+    private fun audit(action: AuditAction, outcome: AuditOutcome) {
+        auditLog.append(action, outcome)
+        if (auditVisible) auditEvents = auditLog.events()
+    }
+
+    private fun readBounded(input: InputStream, limit: Int): ByteArray {
+        val output = ByteArrayOutputStream(minOf(limit, 64 * 1024))
+        val buffer = ByteArray(16 * 1024)
+        var total = 0
+        try {
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                total += read
+                require(total <= limit) { "Backup-Datei ist zu groß" }
+                output.write(buffer, 0, read)
+            }
+            return output.toByteArray()
+        } finally {
+            buffer.fill(0)
+        }
+    }
+
     private fun appDescriptors(): List<SmartAppDescriptor> = apps.map { it.toSmartDescriptor() }
 
     private fun LaunchableApp.toSmartDescriptor() = SmartAppDescriptor(
@@ -759,5 +1119,6 @@ class LauncherController(context: Context) {
     private companion object {
         const val MAX_PINNED_APPS = 5
         const val DOCK_SIZE = 5
+        const val MAX_BACKUP_ENVELOPE_BYTES = 8 * 1024 * 1024
     }
 }

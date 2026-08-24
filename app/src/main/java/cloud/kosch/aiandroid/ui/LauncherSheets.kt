@@ -31,16 +31,20 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Bluetooth
+import androidx.compose.material.icons.rounded.BusinessCenter
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.CreateNewFolder
+import androidx.compose.material.icons.rounded.ContactPhone
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Phone
@@ -315,6 +319,7 @@ fun OnboardingExperience(
 fun ControlCenterSheet(
     controller: LauncherController,
     requestDocument: () -> Unit,
+    requestContact: () -> Unit,
     requestWidget: () -> Unit,
 ) {
     ModalBottomSheet(
@@ -360,6 +365,27 @@ fun ControlCenterSheet(
                     right = ControlItem("Datei-KI", "Lokal prüfen", Icons.Rounded.FolderOpen) {
                         controller.closeControlCenter()
                         requestDocument()
+                    },
+                )
+            }
+            item {
+                ControlPair(
+                    left = ControlItem("Kontakt", "Einmalige Systemauswahl", Icons.Rounded.ContactPhone) {
+                        controller.closeControlCenter()
+                        requestContact()
+                    },
+                    right = ControlItem("Pro Desk", "Kommandozentrale", Icons.Rounded.BusinessCenter) {
+                        controller.openProDesk()
+                    },
+                )
+            }
+            item {
+                ControlPair(
+                    left = ControlItem("Backup", "Verschlüsselt", Icons.Rounded.Backup) {
+                        controller.openBackup()
+                    },
+                    right = ControlItem("Audit", "Nur Metadaten", Icons.Rounded.History) {
+                        controller.openAudit()
                     },
                 )
             }
@@ -502,8 +528,12 @@ private fun ControlCard(item: ControlItem, modifier: Modifier = Modifier) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PhoneSheet(controller: LauncherController) {
+fun PhoneSheet(controller: LauncherController, requestContact: () -> Unit) {
     var number by remember { mutableStateOf("") }
+    val selectedContact = controller.selectedContact
+    LaunchedEffect(selectedContact) {
+        if (selectedContact != null) number = selectedContact.phoneNumber
+    }
     ModalBottomSheet(
         onDismissRequest = controller::closePhone,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -514,6 +544,19 @@ fun PhoneSheet(controller: LauncherController) {
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
             SheetHeader("Telefon", "Sicher über Android ACTION_DIAL", controller::closePhone)
+            OutlinedButton(onClick = requestContact, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Rounded.ContactPhone, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Kontakt einmalig auswählen")
+            }
+            if (selectedContact != null) {
+                Surface(color = Mint.copy(alpha = 0.10f), shape = RoundedCornerShape(15.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(12.dp)) {
+                        Text(selectedContact.displayName, fontWeight = FontWeight.SemiBold)
+                        Text("Nur für diesen Vorgang übernommen", color = MutedMist, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
             OutlinedTextField(
                 value = number,
                 onValueChange = { number = it.filter { char -> char.isDigit() || char in "+ ()-/" } },
@@ -525,7 +568,7 @@ fun PhoneSheet(controller: LauncherController) {
             )
             Surface(color = Violet.copy(alpha = 0.10f), shape = RoundedCornerShape(16.dp)) {
                 Text(
-                    "KoSch besitzt keine Anrufberechtigung. Der System-Wähler zeigt die Nummer; erst du startest den Anruf. Kontakte werden nicht gelesen.",
+                    "KoSch besitzt keine Anrufberechtigung. Der System-Wähler zeigt die Nummer; erst du startest den Anruf. Es gibt keinen globalen Kontaktzugriff – nur die von dir gewählte Nummer wird temporär übernommen.",
                     modifier = Modifier.padding(13.dp),
                     color = MutedMist,
                     style = MaterialTheme.typography.bodySmall,

@@ -17,6 +17,7 @@ enum class WorkspaceMode {
 }
 
 enum class HomePage(val title: String) {
+    PRO_DESK("Pro Desk"),
     WORKSPACE("Workspace"),
     SMART_SPACE("Smart Space"),
     PEN_SPACE("Pen Space"),

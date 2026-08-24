@@ -132,7 +132,11 @@ fun LauncherRoot(
     requestHomeRole: () -> Unit,
     requestVoiceInput: () -> Unit,
     requestDocument: () -> Unit,
+    requestContact: () -> Unit,
     requestWidget: () -> Unit,
+    requestBackupExport: (String) -> Unit,
+    requestBackupImport: () -> Unit,
+    requestAuditExport: () -> Unit,
     createWidgetView: (Context, Int) -> View?,
     deleteWidget: (Int) -> Unit,
     forgetDocument: () -> Unit,
@@ -150,15 +154,25 @@ fun LauncherRoot(
         }
     }
 
+    LaunchedEffect(controller.commandFocusRequest) {
+        if (controller.commandFocusRequest > 0L) {
+            askFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+
     BackHandler(
         enabled = controller.drawerVisible || controller.providerChooserVisible ||
             controller.contextDetailsVisible || controller.controlCenterVisible ||
             controller.phoneVisible || controller.fileSheetVisible ||
             controller.widgetBoardVisible || controller.appActionsVisible ||
-            controller.folderSheetVisible || controller.faqVisible,
+            controller.folderSheetVisible || controller.faqVisible ||
+            controller.backupVisible || controller.auditVisible,
     ) {
         when {
             controller.faqVisible -> controller.closeFaq()
+            controller.backupVisible -> controller.closeBackup()
+            controller.auditVisible -> controller.closeAudit()
             controller.appActionsVisible -> controller.hideAppActions()
             controller.folderSheetVisible -> controller.closeFolder()
             controller.phoneVisible -> controller.closePhone()
@@ -224,6 +238,8 @@ fun LauncherRoot(
                                     askFocusRequester.requestFocus()
                                     keyboardController?.show()
                                 },
+                                requestDocument = requestDocument,
+                                requestContact = requestContact,
                             )
                             PersistentSmartDock(controller)
                             AskDock(
@@ -254,6 +270,8 @@ fun LauncherRoot(
                                 askFocusRequester.requestFocus()
                                 keyboardController?.show()
                             },
+                            requestDocument = requestDocument,
+                            requestContact = requestContact,
                         )
                         QuickActionsRail(
                             onPhone = controller::openPhone,
@@ -301,11 +319,12 @@ fun LauncherRoot(
         ControlCenterSheet(
             controller = controller,
             requestDocument = requestDocument,
+            requestContact = requestContact,
             requestWidget = requestWidget,
         )
     }
     if (controller.phoneVisible) {
-        PhoneSheet(controller)
+        PhoneSheet(controller, requestContact)
     }
     if (controller.fileSheetVisible) {
         FileIntelligenceSheet(controller, requestDocument, forgetDocument)
@@ -321,6 +340,12 @@ fun LauncherRoot(
     }
     if (controller.faqVisible) {
         FaqSheet(controller)
+    }
+    if (controller.backupVisible) {
+        BackupSheet(controller, requestBackupExport, requestBackupImport)
+    }
+    if (controller.auditVisible) {
+        AuditSheet(controller, requestAuditExport)
     }
     if (controller.onboardingVisible) {
         OnboardingExperience(
@@ -356,8 +381,11 @@ private fun LauncherNavigation(
 private fun ColumnScope.HomeSurface(
     controller: LauncherController,
     onAsk: () -> Unit,
+    requestDocument: () -> Unit,
+    requestContact: () -> Unit,
 ) {
     when (controller.homePage) {
+        HomePage.PRO_DESK -> ProfessionalHubSurface(controller, onAsk, requestDocument, requestContact)
         HomePage.WORKSPACE -> {
             EditToolbar(controller)
             WorkspaceSurface(
