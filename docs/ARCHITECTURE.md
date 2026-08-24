@@ -13,16 +13,16 @@ flowchart TD
     Preview --> Models["optionale lokale / externe Modelle"]
 ```
 
-M2.4 ergänzt belastbare Lifecycle-Grenzen, lokale Personalisierung, einen eng begrenzten Datei-Arbeitsraum, sichere App-Verwaltung, Widget-Reihenfolge/Undo und exportierbare Pen-Vektoren. Generative Modelllaufzeiten sind registrierte, aber noch nicht in den HOME-Prozess geladene Erweiterungen.
+M2.5 ergänzt darauf professionelle Launcher-Parität und korrekte Android-Zielbindung: eigene Ordner, steuerbare Dock-Pins, Work-Profile-Quiet-Mode, profilbezogene App-Aktionen, getrennte Datei-Mutations-/Refresh-Semantik sowie Nachrichten-, Kalender-, Wecker-, Kamera- und Systemnotiz-Gateways. Generative Modelllaufzeiten bleiben registrierte, aber nicht in den HOME-Prozess geladene Erweiterungen.
 
 ## Gegenwärtige Paketgrenzen
 
 | Paket | Verantwortung | Vertrauensniveau |
 |---|---|---|
 | `model` | Workspace-, Professional-, Audit-, Datei-, Shortcut-, Profil-, FAQ-, Stylus- und Ink-Modelle | rein |
-| `data` | App-/Shortcut-/FAQ-Katalog, Workspace-Schema v6, Migration, Pending-Exports, Audit, Dock-/Ordner-/Ink-/Widget-Persistenz | lokal |
+| `data` | App-/Shortcut-/FAQ-Katalog, Workspace-Schema v6, Migration, Pending-Exports, Audit, Collection-Regeln, Dock-/Ordner-/Ink-/Widget-Persistenz | lokal |
 | `ai` | Befehlsplanung, Suche, lokales Nutzungsranking, Datei-Metadatenanalyse, Smart-Dock-/Ordner-Klassifikation, Runtime-/Providerprofile | lokal; keine Netzschicht |
-| `system` | HOME-Rolle, Kontext, Stylus-Monitor, Dialer/Settings/File-Gateways, Dokument-/Tree-Grant-Owner, Badge Listener, Widget Host | Android-Grenze |
+| `system` | HOME-Rolle, Kontext, Stylus-Monitor, Dialer/Message/Calendar/Alarm/Camera/Note/File-Gateways, Work-Profile- und Grant-Grenzen, Badge Listener, Widget Host | Android-Grenze |
 | `security` | portabler Backup-Codec, Endpoint-Policy und ruhender Keystore-Vault | Secret-Grenze |
 | `ui` | Compose-Shell, Onboarding, Sheets, Neural Glass, Bestätigungen | Darstellung |
 | `LauncherViewModel` / `LauncherController` | Lifecycle-Eigentum, explizite Orchestrierung und UI-Zustand | Application Layer |
@@ -33,7 +33,7 @@ Ein Modulsplit folgt, sobald der native Modelladapter oder ein optionaler Netzwe
 
 `MainActivity` bezieht `LauncherController` aus `LauncherViewModel`. Dadurch werden Store, Listener, Widget Host und Single-Thread-Worker bei Rotation, Window Resize oder Fold-Transition nicht dupliziert; `onCleared` schließt sie erst endgültig. Ein ViewModel allein überlebt keinen echten Prozess-Tod.
 
-Für offene `CreateDocument`-Routen trennt M2.4 deshalb Payload und UI-State: `PendingDocumentStore` schreibt Backup, Audit oder SVG atomar und größenbegrenzt in `noBackupFilesDir`; `onSaveInstanceState` hält nur einen zufälligen, typgebundenen Token. Nach einem neuen Prozess wird genau dieses Payload einmal konsumiert, andernfalls verworfen oder nach 24 Stunden bereinigt. Offene Widget-/Kontakt-/Tree-Picker behalten nur die minimal notwendigen IDs/Activity-Result-Zustände. Vollständige OEM-Prozess-Tod-Tests bleiben ein manuelles Gate.
+Für offene `CreateDocument`-Routen trennt KoSch deshalb Payload und UI-State: `PendingDocumentStore` schreibt Backup, Audit oder SVG atomar und größenbegrenzt in `noBackupFilesDir`; `onSaveInstanceState` hält nur einen zufälligen, typgebundenen Token. Nach einem neuen Prozess wird genau dieses Payload einmal konsumiert, andernfalls verworfen oder nach 24 Stunden bereinigt. Offene Widget-/Kontakt-/Tree-Picker behalten nur die minimal notwendigen IDs/Activity-Result-Zustände. Vollständige OEM-Prozess-Tod-Tests bleiben ein manuelles Gate.
 
 ## HOME und Sicherheitsausgang
 
@@ -55,7 +55,9 @@ Ein konservatives `baseline-prof.txt` markiert ausschließlich den nachweislich 
 
 Startbare Activities kommen für jedes zugängliche `LauncherApps.profiles`-Profil aus `LauncherApps.getActivityList`; Apps werden mit `startMainActivity` für den zugehörigen `UserHandle` gestartet. Der stabile App-Schlüssel enthält eine lokale Benutzer-Seriennummer, damit gleichnamige Pakete aus Personal und Work nicht kollidieren. `AppKeyMigration` übersetzt alte `UserHandle.hashCode`-Schlüssel erst nach Laden des realen Katalogs; mehrdeutige Zuordnungen werden nicht geraten. Icons werden über Android gebadgt; Arbeitsprofile erhalten zusätzlich ein sichtbares Label.
 
-Veröffentlichte dynamische, Manifest- und gepinnte Shortcuts werden erst nach langem Druck gelesen und mit `LauncherApps.startShortcut` gestartet. Der Aktionsraum bietet zusätzlich App-Info, Store, Dock/Ordner, lokales Verbergen und Androids sichtbaren Deinstallationsdialog. „Verborgen“ ist eine Launcher-Präferenz, keine Android-Sicherheitsgrenze. Der Launcher liest keine privaten Shortcut-Intents und fordert weder `QUERY_ALL_PACKAGES` noch `ACCESS_HIDDEN_PROFILES` an.
+Veröffentlichte dynamische, Manifest- und gepinnte Shortcuts werden erst nach langem Druck gelesen und mit `LauncherApps.startShortcut` gestartet. Auch ihre Persistenzschlüssel verwenden die stabile User-Seriennummer. Der Aktionsraum bietet zusätzlich profilbezogene App-Info, Store, Dock/Ordner, lokales Verbergen und Androids sichtbaren Deinstallationsdialog mit dem ausgewählten `UserHandle`. „Verborgen“ ist eine Launcher-Präferenz, keine Android-Sicherheitsgrenze.
+
+Für zugängliche Managed Profiles hält `WorkProfileState` UserHandle, Seriennummer und Quiet-Mode-Status. Nur die aktive Standard-Start-App kann `UserManager.requestQuietModeEnabled` regulär anfordern; Android besitzt Authentifizierung und Richtlinien. Pausierte Work-Apps werden markiert und nicht gestartet. Der Launcher liest keine privaten Shortcut-Intents und fordert weder `QUERY_ALL_PACKAGES` noch `ACCESS_HIDDEN_PROFILES` an.
 
 ## Smartpen und Pen Space
 
@@ -73,11 +75,11 @@ flowchart LR
 
 `PressureInkView` akzeptiert ausschließlich Stylus-/Eraser-Werkzeuge und ignoriert Fingerkontakte. Druck verändert die Strichbreite; Stift, Marker, Hardware-/Software-Radierer, Hover, Undo und Clear sind lokale Operationen. Striche werden als normierte Vektorpunkte persistiert, begrenzt auf 100 Striche und 2.048 Punkte je Strich. Sehr lange Eingaben werden gleichmäßig resampled; Anfang und sichtbarer Endpunkt bleiben erhalten. `InkSvgExporter` erzeugt lokal eine portable SVG-Datei über den normalen Android-Zieldialog.
 
-Systemhandschrift in regulären Compose-Textfeldern bleibt eine Android-14+-IME-Funktion. KoSch behauptet weder eigene OCR noch semantisches Verständnis der Ink-Daten. AndroidX Ink ist eine spätere, benchmarkpflichtige Option, keine versteckte Kernabhängigkeit.
+Systemhandschrift in regulären Compose-Textfeldern bleibt eine Android-14+-IME-Funktion. Zusätzlich kann KoSch ab Android 14 `ACTION_CREATE_NOTE` mit `EXTRA_USE_STYLUS_MODE` an die zuständige Notes-App übergeben; fehlt sie, bleibt Pen Space der lokale Fallback. KoSch behauptet weder eigene OCR noch semantisches Verständnis der Ink-Daten. AndroidX Ink ist eine spätere, benchmarkpflichtige Option, keine versteckte Kernabhängigkeit.
 
 ## FAQ und Self-Service
 
-`FaqRegistry` enthält mehr als 50 versionierte, kategorisierte Einträge einschließlich Professional-, Datei-, App-, Backup-, Kontakt-, Audit-, Pen- und Recovery-Themen. Die Suche normalisiert Großschreibung, Diakritika und Trennzeichen vollständig lokal. `LocalCommandPlanner` kann diese Arbeitsbereiche ohne Modell öffnen. Die ausführliche Entwickler-/Betriebsfassung liegt in `docs/FAQ.md`.
+`FaqRegistry` enthält 57 versionierte, kategorisierte Einträge einschließlich Professional-, Datei-, App-, Work-Profile-, Systemnotiz-, Backup-, Kontakt-, Audit-, Pen- und Recovery-Themen. Die Suche normalisiert Großschreibung, Diakritika und Trennzeichen vollständig lokal. `LocalCommandPlanner` kann diese Arbeitsbereiche ohne Modell öffnen. Die ausführliche Entwickler-/Betriebsfassung liegt in `docs/FAQ.md`.
 
 ## Dateien und begrenzter Arbeitsraum
 
@@ -98,9 +100,11 @@ Die Einzeldatei-Route nutzt `ACTION_OPEN_DOCUMENT`. `DocumentGrantManager` besit
 
 Der zusätzliche `WorkspaceTreeManager` besitzt genau eine persistierte READ/WRITE-Freigabe aus `ACTION_OPEN_DOCUMENT_TREE`. Er kann nur den gewählten Baum und dessen Kinder adressieren, listet höchstens 500 direkte Einträge und zeigt Rename/Delete/Create nur bei passenden Provider-Flags. `LocalFileWorkspacePlanner` analysiert ausschließlich sichtbare Metadaten: Kategorien, bekannte Größe, gleichnamige Einträge und größte Dateien. Erstellen und Umbenennen verlangen Vorschau/Bestätigung; nur die letzte Umbenennung hat Undo. Löschen verlangt einen separaten destruktiven Dialog und hat kein vorgetäuschtes KoSch-Undo. Wechsel oder „Vergessen“ löst die persistierte Freigabe.
 
+`FileMutationSemantics` trennt den vom Provider bestätigten Effekt von der anschließenden Verzeichnisaktualisierung. Der Mutationserfolg wird vor jeder veralteten Surface-Token-Abweisung auditiert; dadurch löscht ein geschlossenes Sheet keine eingereichte Aktion. Ein reiner Refreshfehler erhält ein eigenes Audit-Ergebnis und macht die bereits angewendete Mutation nicht rückwirkend zum Fehler. Manuelles Refresh lädt den aktuellen Pfad statt unbemerkt zur Tree-Wurzel zu springen.
+
 ## Telefon und Systemeinstellungen
 
-`SystemActionGateway` kennt nur explizite, dokumentierte Android-Ziele. Telefon verwendet `ACTION_DIAL`, nie `ACTION_CALL`. Die Activity startet eine auf Phone-Daten begrenzte `ACTION_PICK`-Auswahl und setzt auf API 37 den System-Picker-Hinweis; der Controller fragt nur die temporär freigegebene Ergebnis-URI ab. WLAN, Bluetooth, Benachrichtigungen, Hintergrund, Anzeige, Ton, Akku, Datenschutz, Bedienungshilfen, Standard-Apps, Speicher, App-Info und HOME-Auswahl öffnen Systemoberflächen. Fehlt ein spezielles Ziel, folgt ein allgemeiner Settings-Fallback oder ein sichtbarer Fehler.
+`SystemActionGateway` kennt nur explizite, dokumentierte Android-Ziele. Telefon verwendet `ACTION_DIAL`, nie `ACTION_CALL`; Nachrichten verwenden `ACTION_SENDTO` mit `smsto:`. Kalender öffnet die aktuelle Zeit, Wecker nutzt `ACTION_SHOW_ALARMS` mit sichtbarem Fallback, Kamera den System-Camera-Vertrag und Android 14+ die Notes-Übergabe. Die Activity startet eine auf Phone-Daten begrenzte `ACTION_PICK`-Auswahl und setzt auf API 37 den System-Picker-Hinweis; der Controller fragt nur die temporär freigegebene Ergebnis-URI ab. WLAN, Bluetooth, Benachrichtigungen, Hintergrund, Anzeige, Ton, Akku, Datenschutz, Bedienungshilfen, Standard-Apps, Speicher, profilbezogene App-Info und HOME-Auswahl öffnen Systemoberflächen. Fehlt ein spezielles Ziel, folgt ein dokumentierter Fallback oder ein sichtbarer Fehler.
 
 ## Widgets
 
@@ -116,7 +120,7 @@ stateDiagram-v2
     Persisted --> Released: Entfernen
 ```
 
-`WidgetHostController` besitzt eine stabile Host-ID. Erst nach erfolgreicher Bindung wird die Widget-ID im Workspace Store persistiert. Abbruch und Löschen geben IDs frei. Beim Start werden nicht mehr gültige Records entfernt. M2.4 persistiert die Presets Kompakt, Standard und Hoch, meldet Größenoptionen an den Provider und unterstützt eine persistente Board-Reihenfolge mit einem gültigkeitsgeprüften Undo. Freie Platzierung, Stacks und geräteübergreifendes Provider-Restore-Mapping sind noch nicht fertig.
+`WidgetHostController` besitzt eine stabile Host-ID. Erst nach erfolgreicher Bindung wird die Widget-ID im Workspace Store persistiert. Abbruch und Löschen geben IDs frei. Beim Start werden nicht mehr gültige Records entfernt. KoSch persistiert die Presets Kompakt, Standard und Hoch, meldet Größenoptionen an den Provider und unterstützt eine persistente Board-Reihenfolge mit einem gültigkeitsgeprüften Undo. Freie Platzierung, Stacks und geräteübergreifendes Provider-Restore-Mapping sind noch nicht fertig.
 
 Die während Androids Picker/Provider-Konfiguration offene Host-ID wird zusätzlich in `onSaveInstanceState` erhalten. Vollständige Prozess-Tod-, OEM-Provider- und geräteübergreifende Restore-Tests bleiben ein manuelles Gate.
 
@@ -137,7 +141,9 @@ stateDiagram-v2
 
 ## Smart Space, Dock und Ordner
 
-`LocalSmartOrganizer` verarbeitet ausschließlich App-Key, Label, Paketname, lokale Recency, Pinning und aktive Szene. `LocalUsageModel` hält pro App nur begrenzte Startanzahl und letzten Startzeitpunkt (maximal 512 Schlüssel) und kann vollständig zurückgesetzt werden. Der App-Raum bietet Smart, A–Z, Häufig und Zuletzt. Das Dock setzt manuell gepinnte Apps zuerst und ergänzt transparent lokale Signale sowie Szenenkategorien. Verborgene Apps werden aus normalen Sammlungen entfernt, bleiben aber in einer expliziten Verwaltungsansicht erreichbar.
+`LocalSmartOrganizer` verarbeitet ausschließlich App-Key, Label, Paketname, lokale Recency, Pinning und aktive Szene. `LocalUsageModel` hält pro App nur begrenzte Startanzahl und letzten Startzeitpunkt (maximal 512 Schlüssel) und kann vollständig zurückgesetzt werden. Der App-Raum bietet Smart, A–Z, Häufig und Zuletzt. Das Dock setzt manuell gepinnte Apps zuerst, erlaubt deren Links-/Rechts-Reihenfolge und ergänzt transparent lokale Signale sowie Szenenkategorien. Verborgene Apps werden aus normalen Sammlungen entfernt, bleiben aber in einer expliziten Verwaltungsansicht erreichbar.
+
+`WorkspaceCollectionEditor` kapselt eigene Ordner als reine Domänenregel: normalisierte Titel, maximal 12 Ordner, 32 eindeutige Apps je Ordner, idempotentes Add, deterministisches Reorder und Entfernen leerer Ordner. Smart-Vorschläge und manuelle Sammlungen teilen das persistente Modell, bleiben in der Oberfläche jedoch klar gekennzeichnet.
 
 App-Shortcut-Abfragen tragen einen monotonen Request-Token. Wechselt die Auswahl oder schließt sich das Sheet, darf ein verspätetes Ergebnis den Zustand nicht mehr überschreiben.
 
@@ -160,7 +166,7 @@ Positionen sind zwischen `0` und `1` normalisiert. Jede spätere LLM-generierte 
 
 ## KI-Schichten
 
-| Schicht | M2.4 | Verhalten bei Ausfall |
+| Schicht | M2.5 | Verhalten bei Ausfall |
 |---|---:|---|
 | KoSch Local Core | aktiv | HOME-Funktionen bleiben deterministisch |
 | externe lokale App | optional | Projektseite oder sichtbarer Fehler |
@@ -174,4 +180,4 @@ Die Zielabstraktion `LocalModelBackend` erhält später `load`, `stream`, `cance
 
 `SecureCredentialVault` generiert einen nicht exportierbaren AES-256-Schlüssel im Android Keystore und bindet Ciphertexte per GCM-AAD an die Provider-ID. Klartext wird nicht persistiert; übergebene `CharArray`s werden bestmöglich geleert. `ProviderEndpointPolicy` erlaubt Remote-Endpunkte nur per HTTPS und unverschlüsseltes HTTP ausschließlich für explizit aktivierte Loopback-Ziele.
 
-Der Vault ist in M2.4 absichtlich nicht an UI oder Transport gekoppelt. Das lokale Aktionsaudit ist keine Freigabe für Netztransport. Vor Aktivierung direkter APIs fehlen weiter Biometrieoption, Secret-Rotation, Redaction-E2E-Tests, Kontextvorschau, Timeout/Rate Limits und ein separater Netzwerk-Flavour.
+Der Vault ist in M2.5 absichtlich nicht an UI oder Transport gekoppelt. Das lokale Aktionsaudit ist keine Freigabe für Netztransport. Vor Aktivierung direkter APIs fehlen weiter Biometrieoption, Secret-Rotation, Redaction-E2E-Tests, Kontextvorschau, Timeout/Rate Limits und ein separater Netzwerk-Flavour.

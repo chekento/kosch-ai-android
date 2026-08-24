@@ -29,6 +29,7 @@ import cloud.kosch.aiandroid.data.AppCatalog
 import cloud.kosch.aiandroid.data.LocalAuditLog
 import cloud.kosch.aiandroid.data.InkSvgExporter
 import cloud.kosch.aiandroid.data.WorkspaceStore
+import cloud.kosch.aiandroid.data.WorkspaceCollectionEditor
 import cloud.kosch.aiandroid.model.AuditAction
 import cloud.kosch.aiandroid.model.AuditEvent
 import cloud.kosch.aiandroid.model.AuditOutcome
@@ -51,8 +52,11 @@ import cloud.kosch.aiandroid.model.SystemPanel
 import cloud.kosch.aiandroid.model.StylusCapabilities
 import cloud.kosch.aiandroid.model.TilePosition
 import cloud.kosch.aiandroid.model.WorkspaceMode
+import cloud.kosch.aiandroid.model.WorkProfileState
 import cloud.kosch.aiandroid.model.WidgetSizePreset
 import cloud.kosch.aiandroid.system.HomeRoleController
+import cloud.kosch.aiandroid.system.FileMutationCompletion
+import cloud.kosch.aiandroid.system.FileMutationSemantics
 import cloud.kosch.aiandroid.system.LocalContextEngine
 import cloud.kosch.aiandroid.system.NotificationAccess
 import cloud.kosch.aiandroid.system.NotificationBadgeRepository
@@ -67,6 +71,7 @@ import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.UUID
 
 class LauncherController(context: Context) {
     private val appContext = context.applicationContext
@@ -163,6 +168,8 @@ class LauncherController(context: Context) {
         private set
     var folders by mutableStateOf(store.folders())
         private set
+    var workProfiles by mutableStateOf<List<WorkProfileState>>(emptyList())
+        private set
     var folderPreview by mutableStateOf<List<LauncherFolder>?>(null)
         private set
     var folderSheetVisible by mutableStateOf(false)
@@ -241,6 +248,7 @@ class LauncherController(context: Context) {
             emptyMap()
         }
         stylusMonitor.refreshDevices()
+        workProfiles = runCatching { appCatalog.loadWorkProfiles() }.getOrDefault(workProfiles)
     }
 
     fun switchHomePage(page: HomePage) {
@@ -754,6 +762,67 @@ class LauncherController(context: Context) {
             }
     }
 
+    fun message(number: String?) {
+        val sanitized = number?.takeIf(String::isNotBlank)?.let(PhoneNumberParser::sanitize)
+        if (!number.isNullOrBlank() && sanitized == null) {
+            notice = "Bitte gib eine gültige Telefonnummer ein"
+            return
+        }
+        systemActions.openMessageComposer(sanitized)
+            .onSuccess {
+                phoneVisible = false
+                selectedContact = null
+                notice = "Nachricht im System-Composer geöffnet – senden musst du selbst"
+                audit(AuditAction.MESSAGE_COMPOSER, AuditOutcome.SUCCESS)
+            }
+            .onFailure {
+                notice = "Auf diesem Gerät ist kein Nachrichten-Composer verfügbar"
+                audit(AuditAction.MESSAGE_COMPOSER, AuditOutcome.FAILED)
+            }
+    }
+
+    fun openCalendar() = performProfessionalSystemAction(
+        action = AuditAction.CALENDAR,
+        successNotice = "Systemkalender geöffnet",
+        failureNotice = "Auf diesem Gerät ist kein Kalender verfügbar",
+        request = systemActions::openCalendar,
+    )
+
+    fun openAlarms() = performProfessionalSystemAction(
+        action = AuditAction.ALARMS,
+        successNotice = "Systemwecker geöffnet",
+        failureNotice = "Auf diesem Gerät ist keine Wecker-App verfügbar",
+        request = systemActions::openAlarms,
+    )
+
+    fun openCamera() = performProfessionalSystemAction(
+        action = AuditAction.CAMERA,
+        successNotice = "Systemkamera geöffnet",
+        failureNotice = "Auf diesem Gerät ist keine Kamera-App verfügbar",
+        request = systemActions::openCamera,
+    )
+
+    fun createSystemNote() {
+        systemActions.createNote(stylusMode = stylusState.present)
+            .onSuccess {
+                audit(AuditAction.SYSTEM_NOTE, AuditOutcome.SUCCESS)
+                notice = if (stylusState.present) {
+                    "Android-Notiz im Stiftmodus geöffnet"
+                } else {
+                    "Android-Notiz geöffnet"
+                }
+            }
+            .onFailure {
+                audit(AuditAction.SYSTEM_NOTE, AuditOutcome.FAILED)
+                if (stylusState.present) {
+                    switchHomePage(HomePage.PEN_SPACE)
+                    notice = "Keine System-Notiz-App verfügbar – Pen Space bleibt lokal bereit"
+                } else {
+                    notice = "Systemnotizen benötigen Android 14+ und eine kompatible Notiz-App"
+                }
+            }
+    }
+
     fun openSystemPanel(panel: SystemPanel) {
         systemActions.openPanel(panel)
             .onSuccess {
@@ -821,6 +890,16 @@ class LauncherController(context: Context) {
         }
     }
 
+    /** Refreshes the visible directory instead of unexpectedly jumping back to the tree root. */
+    fun refreshFileWorkspace() {
+        val path = fileWorkspacePath
+        if (path.isEmpty()) {
+            loadFileWorkspaceRoot()
+        } else {
+            loadFileWorkspacePath(path)
+        }
+    }
+
     fun closeFileWorkspace() {
         fileWorkspaceRequestToken += 1
         fileWorkspaceVisible = false
@@ -840,6 +919,8 @@ class LauncherController(context: Context) {
                 if (requestToken != fileWorkspaceRequestToken) return@post
                 fileWorkspaceLoading = false
                 result.onSuccess { snapshot ->
+                    fileRenameUndo = null
+                    canUndoFileRename = false
                     applyFileWorkspaceSnapshot(snapshot)
                     audit(AuditAction.FILE_WORKSPACE, AuditOutcome.SUCCESS)
                     notice = "Arbeitsordner lokal geöffnet"
@@ -903,6 +984,7 @@ class LauncherController(context: Context) {
             successNotice = "Ordner erstellt",
         ) {
             workspaceTree.createDirectory(current.uri, name).getOrThrow()
+            FileMutationEffect.None
         }
     }
 
@@ -920,7 +1002,7 @@ class LauncherController(context: Context) {
             successNotice = "${entry.displayName} umbenannt",
         ) {
             val renamedUri = workspaceTree.rename(entry.uri, name).getOrThrow()
-            fileRenameUndo = FileRenameUndo(renamedUri, entry.displayName)
+            FileMutationEffect.SetRenameUndo(FileRenameUndo(renamedUri, entry.displayName))
         }
     }
 
@@ -931,7 +1013,7 @@ class LauncherController(context: Context) {
             successNotice = "Umbenennung rückgängig gemacht",
         ) {
             workspaceTree.rename(undo.renamedUri, undo.originalName).getOrThrow()
-            fileRenameUndo = null
+            FileMutationEffect.ClearRenameUndo
         }
     }
 
@@ -950,7 +1032,7 @@ class LauncherController(context: Context) {
             successNotice = "${entry.displayName} gelöscht – der Anbieter bietet hier kein Undo",
         ) {
             workspaceTree.delete(entry.uri).getOrThrow()
-            if (fileRenameUndo?.renamedUri == entry.uri) fileRenameUndo = null
+            FileMutationEffect.ClearRenameUndoIf(entry.uri)
         }
     }
 
@@ -1059,6 +1141,16 @@ class LauncherController(context: Context) {
         }
     }
 
+    fun moveSelectedPinnedApp(delta: Int) {
+        val app = selectedApp ?: return
+        if (app.key !in pinnedAppKeys) return
+        val updated = WorkspaceCollectionEditor.move(pinnedAppKeys, app.key, delta)
+        if (updated == pinnedAppKeys) return
+        pinnedAppKeys = updated
+        store.savePinnedAppKeys(updated)
+        notice = "${app.label} im Smart Dock verschoben"
+    }
+
     fun isHidden(app: LaunchableApp): Boolean = app.key in hiddenAppKeys
 
     fun toggleSelectedAppHidden() {
@@ -1133,7 +1225,11 @@ class LauncherController(context: Context) {
         } else {
             folders.map { folder ->
                 if (folder.id == existing.id) {
-                    folder.copy(appKeys = (folder.appKeys + app.key).distinct())
+                    folder.copy(
+                        appKeys = (folder.appKeys + app.key)
+                            .distinct()
+                            .take(WorkspaceCollectionEditor.MAX_APPS_PER_FOLDER),
+                    )
                 } else {
                     folder
                 }
@@ -1141,6 +1237,68 @@ class LauncherController(context: Context) {
         }
         store.saveFolders(folders)
         notice = "${app.label} liegt jetzt in ${kind.title}"
+    }
+
+    fun createFolder(title: String, kind: cloud.kosch.aiandroid.model.FolderKind) {
+        if (folders.size >= WorkspaceCollectionEditor.MAX_FOLDERS) {
+            notice = "Maximal ${WorkspaceCollectionEditor.MAX_FOLDERS} Ordner sind vorgesehen"
+            return
+        }
+        val id = "manual-${UUID.randomUUID()}"
+        val updated = WorkspaceCollectionEditor.create(folders, id, title, kind)
+        if (updated == folders) {
+            notice = "Bitte gib einen gültigen Ordnernamen ein"
+            return
+        }
+        folders = updated
+        store.saveFolders(folders)
+        notice = "Ordner ${updated.last().title} erstellt"
+    }
+
+    fun renameFolder(folderId: String, title: String) {
+        val updated = WorkspaceCollectionEditor.rename(folders, folderId, title)
+        if (updated == folders) {
+            notice = "Bitte gib einen gültigen Ordnernamen ein"
+            return
+        }
+        folders = updated
+        store.saveFolders(folders)
+        notice = "Ordner umbenannt"
+    }
+
+    fun addSelectedAppToFolder(folderId: String) {
+        val app = selectedApp ?: return
+        val folder = folders.firstOrNull { it.id == folderId } ?: return
+        val updated = WorkspaceCollectionEditor.addApp(folders, folderId, app.key)
+        folders = updated
+        store.saveFolders(folders)
+        notice = if (app.key in folder.appKeys) {
+            "${app.label} ist bereits in ${folder.title}"
+        } else {
+            "${app.label} zu ${folder.title} hinzugefügt"
+        }
+    }
+
+    fun removeAppFromFolder(folderId: String, appKey: String) {
+        val folder = folders.firstOrNull { it.id == folderId } ?: return
+        val updated = WorkspaceCollectionEditor.removeApp(folders, folderId, appKey)
+        if (updated == folders) return
+        folders = updated
+        store.saveFolders(folders)
+        if (folders.none { it.id == folderId }) {
+            closeFolder()
+            notice = "Leerer Ordner ${folder.title} dauerhaft entfernt"
+        } else {
+            notice = "App aus ${folder.title} entfernt"
+        }
+    }
+
+    fun moveFolderApp(folderId: String, appKey: String, delta: Int) {
+        val updated = WorkspaceCollectionEditor.moveApp(folders, folderId, appKey, delta)
+        if (updated == folders) return
+        folders = updated
+        store.saveFolders(folders)
+        notice = "Reihenfolge im Ordner angepasst"
     }
 
     fun openFolder(folderId: String) {
@@ -1174,7 +1332,35 @@ class LauncherController(context: Context) {
         openSystemPanel(SystemPanel.NOTIFICATION_ACCESS)
     }
 
+    fun toggleWorkProfile(userSerialNumber: Long) {
+        val profile = workProfiles.firstOrNull { it.userSerialNumber == userSerialNumber } ?: return
+        val enableQuietMode = !profile.quietMode
+        appCatalog.requestWorkProfileQuietMode(profile, enableQuietMode)
+            .onSuccess { changedWithoutPendingCredential ->
+                audit(AuditAction.WORK_PROFILE, AuditOutcome.SUCCESS)
+                refreshSystemState()
+                notice = when {
+                    enableQuietMode -> "Arbeitsprofil wird von Android pausiert"
+                    changedWithoutPendingCredential -> "Arbeitsprofil wird von Android aktiviert"
+                    else -> "Android wartet auf deine Gerätebestätigung"
+                }
+            }
+            .onFailure {
+                audit(AuditAction.WORK_PROFILE, AuditOutcome.FAILED)
+                notice = if (isDefaultHome) {
+                    "Arbeitsprofil konnte nicht geändert werden"
+                } else {
+                    "KoSch muss aktive Start-App sein, um das Arbeitsprofil zu pausieren"
+                }
+            }
+    }
+
     fun launch(shortcut: LaunchableShortcut) {
+        if (workProfiles.any { it.userSerialNumber == shortcut.userSerialNumber && it.quietMode }) {
+            notice = "Arbeitsprofil ist pausiert – aktiviere es im Kontrollzentrum"
+            audit(AuditAction.APP_SHORTCUT, AuditOutcome.REJECTED)
+            return
+        }
         runCatching { appCatalog.launch(shortcut) }
             .onSuccess {
                 store.recordRecent(shortcut.packageName)
@@ -1194,7 +1380,7 @@ class LauncherController(context: Context) {
 
     fun openSelectedAppInfo() {
         val app = selectedApp ?: return
-        systemActions.openAppInfo(app.packageName)
+        systemActions.openAppInfo(app.packageName, app.user)
             .onFailure { notice = "App-Info konnte nicht geöffnet werden" }
     }
 
@@ -1210,7 +1396,7 @@ class LauncherController(context: Context) {
             notice = "Die Deinstallation braucht eine ausdrückliche Bestätigung"
             return
         }
-        systemActions.requestUninstall(app.packageName)
+        systemActions.requestUninstall(app.packageName, app.user)
             .onSuccess {
                 hideAppActions()
                 audit(AuditAction.APP_UNINSTALL_REQUEST, AuditOutcome.SUCCESS)
@@ -1245,6 +1431,11 @@ class LauncherController(context: Context) {
             LauncherCommand.OpenProDesk -> openProDesk()
             LauncherCommand.PickContact -> requestContact()
             is LauncherCommand.OpenPhone -> if (command.number == null) openPhone() else dial(command.number)
+            is LauncherCommand.OpenMessage -> message(command.number)
+            LauncherCommand.OpenCalendar -> openCalendar()
+            LauncherCommand.OpenAlarms -> openAlarms()
+            LauncherCommand.OpenCamera -> openCamera()
+            LauncherCommand.CreateSystemNote -> createSystemNote()
             is LauncherCommand.OpenSystemPanel -> openSystemPanel(command.panel)
             is LauncherCommand.SwitchScene -> switchScene(command.scene)
             is LauncherCommand.LaunchApp -> launchBestMatch(command.query)
@@ -1253,6 +1444,11 @@ class LauncherController(context: Context) {
     }
 
     fun launch(app: LaunchableApp) {
+        if (workProfiles.any { it.userSerialNumber == app.userSerialNumber && it.quietMode }) {
+            notice = "Arbeitsprofil ist pausiert – aktiviere es im Kontrollzentrum"
+            audit(AuditAction.APP_LAUNCH, AuditOutcome.REJECTED)
+            return
+        }
         runCatching { appCatalog.launch(app) }
             .onSuccess {
                 store.recordRecent(app.packageName)
@@ -1386,10 +1582,11 @@ class LauncherController(context: Context) {
         if (executor.isShutdown) return
         appsLoading = true
         executor.execute {
-            val loaded = runCatching { appCatalog.loadApps() }
+            val loaded = runCatching { appCatalog.loadApps() to appCatalog.loadWorkProfiles() }
             mainHandler.post {
-                loaded.onSuccess { catalog ->
+                loaded.onSuccess { (catalog, profiles) ->
                     apps = catalog.filterNot { it.packageName == appContext.packageName }
+                    workProfiles = profiles
                     val aliases = apps.flatMap { app ->
                         app.legacyKeys.map { legacy -> legacy to app.key }
                     }.groupBy { it.first }
@@ -1459,36 +1656,90 @@ class LauncherController(context: Context) {
         }
     }
 
-    private fun mutateFileWorkspace(
-        action: AuditAction,
-        successNotice: String,
-        mutation: () -> Unit,
-    ) {
-        val current = fileWorkspacePath.lastOrNull() ?: return
-        if (fileWorkspaceLoading) return
+    private fun loadFileWorkspacePath(path: List<FileWorkspaceEntry>) {
+        val current = path.lastOrNull() ?: return loadFileWorkspaceRoot()
         val requestToken = ++fileWorkspaceRequestToken
         fileWorkspaceLoading = true
         executor.execute {
-            val result = runCatching {
-                mutation()
-                val entries = workspaceTree.listChildren(current.uri).getOrThrow()
-                entries to LocalFileWorkspacePlanner.analyze(entries)
+            val result = workspaceTree.listChildren(current.uri).map { children ->
+                FileWorkspaceSnapshot(
+                    path = path,
+                    entries = children,
+                    summary = LocalFileWorkspacePlanner.analyze(children),
+                )
             }
             mainHandler.post {
                 if (requestToken != fileWorkspaceRequestToken) return@post
                 fileWorkspaceLoading = false
-                result.onSuccess { (entries, summary) ->
-                    fileWorkspaceEntries = entries
-                    fileWorkspaceSummary = summary
-                    canUndoFileRename = fileRenameUndo != null
-                    audit(action, AuditOutcome.SUCCESS)
-                    notice = successNotice
-                }.onFailure {
-                    audit(action, AuditOutcome.FAILED)
-                    notice = it.message ?: "Dateioperation ist fehlgeschlagen"
+                result.onSuccess(::applyFileWorkspaceSnapshot)
+                    .onFailure {
+                        audit(AuditAction.FILE_REFRESH, AuditOutcome.FAILED)
+                        notice = it.message ?: "Aktueller Ordner konnte nicht aktualisiert werden"
+                    }
+            }
+        }
+    }
+
+    private fun mutateFileWorkspace(
+        action: AuditAction,
+        successNotice: String,
+        mutation: () -> FileMutationEffect,
+    ) {
+        val current = fileWorkspacePath.lastOrNull() ?: return
+        if (fileWorkspaceLoading) return
+        val submittedPath = fileWorkspacePath.toList()
+        val requestToken = ++fileWorkspaceRequestToken
+        fileWorkspaceLoading = true
+        executor.execute {
+            val completion = FileMutationSemantics.execute(
+                mutation = mutation,
+                refresh = {
+                val entries = workspaceTree.listChildren(current.uri).getOrThrow()
+                    FileWorkspaceSnapshot(
+                        path = submittedPath,
+                        entries = entries,
+                        summary = LocalFileWorkspacePlanner.analyze(entries),
+                    )
+                },
+            )
+            mainHandler.post {
+                // Audit and mutation-side effects belong to the submitted operation, even when the
+                // sheet was closed or a newer navigation request owns the visible surface now.
+                audit(action, completion.auditOutcome)
+                if (completion is FileMutationCompletion.Applied) {
+                    applyFileMutationEffect(completion.effect)
+                }
+                if (requestToken != fileWorkspaceRequestToken) return@post
+                fileWorkspaceLoading = false
+                when (completion) {
+                    is FileMutationCompletion.Failed -> {
+                        notice = completion.error.message ?: "Dateioperation ist fehlgeschlagen"
+                    }
+
+                    is FileMutationCompletion.Applied -> completion.refresh
+                        .onSuccess {
+                            applyFileWorkspaceSnapshot(it)
+                            notice = successNotice
+                        }
+                        .onFailure {
+                            audit(AuditAction.FILE_REFRESH, AuditOutcome.FAILED)
+                            notice = "$successNotice; die Ansicht konnte nicht aktualisiert werden."
+                        }
                 }
             }
         }
+    }
+
+    private fun applyFileMutationEffect(effect: FileMutationEffect) {
+        when (effect) {
+            FileMutationEffect.None -> Unit
+            FileMutationEffect.ClearRenameUndo -> fileRenameUndo = null
+            is FileMutationEffect.ClearRenameUndoIf -> {
+                if (fileRenameUndo?.renamedUri == effect.uri) fileRenameUndo = null
+            }
+            is FileMutationEffect.SetRenameUndo -> fileRenameUndo = effect.undo
+        }
+        canUndoFileRename = fileRenameUndo != null
     }
 
     private fun workspaceSnapshotRoot(): FileWorkspaceSnapshot {
@@ -1531,6 +1782,23 @@ class LauncherController(context: Context) {
     private fun audit(action: AuditAction, outcome: AuditOutcome) {
         auditLog.append(action, outcome)
         auditEvents = auditLog.events()
+    }
+
+    private fun performProfessionalSystemAction(
+        action: AuditAction,
+        successNotice: String,
+        failureNotice: String,
+        request: () -> Result<Unit>,
+    ) {
+        request()
+            .onSuccess {
+                audit(action, AuditOutcome.SUCCESS)
+                notice = successNotice
+            }
+            .onFailure {
+                audit(action, AuditOutcome.FAILED)
+                notice = failureNotice
+            }
     }
 
     private fun readBounded(input: InputStream, limit: Int): ByteArray {
@@ -1585,4 +1853,11 @@ class LauncherController(context: Context) {
         val renamedUri: Uri,
         val originalName: String,
     )
+
+    private sealed interface FileMutationEffect {
+        data object None : FileMutationEffect
+        data object ClearRenameUndo : FileMutationEffect
+        data class ClearRenameUndoIf(val uri: Uri) : FileMutationEffect
+        data class SetRenameUndo(val undo: FileRenameUndo) : FileMutationEffect
+    }
 }

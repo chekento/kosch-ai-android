@@ -1,9 +1,14 @@
 package cloud.kosch.aiandroid.system
 
+import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.UserHandle
+import android.provider.AlarmClock
+import android.provider.CalendarContract
+import android.provider.MediaStore
 import android.provider.Settings
 import cloud.kosch.aiandroid.model.FileInsight
 import cloud.kosch.aiandroid.model.SystemPanel
@@ -17,6 +22,40 @@ class SystemActionGateway(context: Context) {
             number?.takeIf(String::isNotBlank)?.let { Uri.fromParts("tel", it, null) },
         ),
     )
+
+    fun openMessageComposer(number: String? = null): Result<Unit> = start(
+        Intent(
+            Intent.ACTION_SENDTO,
+            Uri.parse("smsto:${number.orEmpty()}"),
+        ),
+    )
+
+    fun openCalendar(): Result<Unit> {
+        val calendarUri = CalendarContract.CONTENT_URI.buildUpon().appendPath("time")
+            .also { ContentUris.appendId(it, System.currentTimeMillis()) }
+            .build()
+        return start(Intent(Intent.ACTION_VIEW, calendarUri))
+    }
+
+    fun openAlarms(): Result<Unit> = startWithFallback(
+        Intent(AlarmClock.ACTION_SHOW_ALARMS),
+        Intent(AlarmClock.ACTION_SET_ALARM),
+    )
+
+    fun openCamera(): Result<Unit> = start(
+        Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA),
+    )
+
+    fun createNote(stylusMode: Boolean): Result<Unit> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            return Result.failure(UnsupportedOperationException("System notes require Android 14"))
+        }
+        return start(
+            Intent(Intent.ACTION_CREATE_NOTE).apply {
+                putExtra(Intent.EXTRA_USE_STYLUS_MODE, stylusMode)
+            },
+        )
+    }
 
     fun openPanel(panel: SystemPanel): Result<Unit> = when (panel) {
         SystemPanel.WIFI -> startWithFallback(
@@ -92,11 +131,11 @@ class SystemActionGateway(context: Context) {
         )
     }
 
-    fun openAppInfo(packageName: String): Result<Unit> = start(
+    fun openAppInfo(packageName: String, user: UserHandle): Result<Unit> = start(
         Intent(
             Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
             Uri.fromParts("package", packageName, null),
-        ),
+        ).putExtra(Intent.EXTRA_USER, user),
     )
 
     fun openStoreListing(packageName: String): Result<Unit> = startWithFallback(
@@ -104,8 +143,9 @@ class SystemActionGateway(context: Context) {
         Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName")),
     )
 
-    fun requestUninstall(packageName: String): Result<Unit> = start(
-        Intent(Intent.ACTION_DELETE, Uri.fromParts("package", packageName, null)),
+    fun requestUninstall(packageName: String, user: UserHandle): Result<Unit> = start(
+        Intent(Intent.ACTION_DELETE, Uri.fromParts("package", packageName, null))
+            .putExtra(Intent.EXTRA_USER, user),
     )
 
     fun openFile(insight: FileInsight): Result<Unit> = start(

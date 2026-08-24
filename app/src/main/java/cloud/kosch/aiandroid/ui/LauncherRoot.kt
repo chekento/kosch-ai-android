@@ -129,6 +129,7 @@ import cloud.kosch.aiandroid.ui.theme.MutedMist
 import cloud.kosch.aiandroid.ui.theme.RaisedSurface
 import cloud.kosch.aiandroid.ui.theme.Sky
 import cloud.kosch.aiandroid.ui.theme.Violet
+import cloud.kosch.aiandroid.ui.theme.Warm
 import java.util.Locale
 import kotlin.math.roundToInt
 
@@ -233,6 +234,8 @@ fun LauncherRoot(
                             QuickActionsRail(
                                 onPhone = controller::openPhone,
                                 onFiles = requestDocument,
+                                onCalendar = controller::openCalendar,
+                                onCamera = controller::openCamera,
                                 onWidgets = controller::openWidgetBoard,
                                 onControls = controller::openControlCenter,
                                 onPen = (controller::openPenSpace).takeIf { controller.stylusState.present },
@@ -289,6 +292,8 @@ fun LauncherRoot(
                         QuickActionsRail(
                             onPhone = controller::openPhone,
                             onFiles = requestDocument,
+                            onCalendar = controller::openCalendar,
+                            onCamera = controller::openCamera,
                             onWidgets = controller::openWidgetBoard,
                             onControls = controller::openControlCenter,
                             onPen = (controller::openPenSpace).takeIf { controller.stylusState.present },
@@ -412,7 +417,12 @@ private fun ColumnScope.HomeSurface(
         }
 
         HomePage.SMART_SPACE -> SmartHomeSurface(controller)
-        HomePage.PEN_SPACE -> PenSpaceSurface(controller, onAsk, requestInkExport)
+        HomePage.PEN_SPACE -> PenSpaceSurface(
+            controller = controller,
+            onAsk = onAsk,
+            onSystemNote = controller::createSystemNote,
+            onExport = requestInkExport,
+        )
     }
 }
 
@@ -846,6 +856,7 @@ private fun AppDrawerSheet(controller: LauncherController) {
     var query by rememberSaveable { mutableStateOf("") }
     var sortName by rememberSaveable { mutableStateOf(AppDrawerSort.SMART.name) }
     val sort = AppDrawerSort.entries.firstOrNull { it.name == sortName } ?: AppDrawerSort.SMART
+    val pausedProfiles = controller.workProfiles.filter { it.quietMode }.map { it.userSerialNumber }.toSet()
     val visibleApps = remember(
         query,
         sort,
@@ -970,6 +981,7 @@ private fun AppDrawerSheet(controller: LauncherController) {
                                     contentDescription = buildString {
                                         append(app.label)
                                         if (app.profile != AppProfile.PERSONAL) append(", ${app.profile.title}")
+                                        if (app.userSerialNumber in pausedProfiles) append(", Profil pausiert")
                                         append(". Tippen zum Öffnen, lange drücken für App-Aktionen")
                                     }
                                 }
@@ -994,8 +1006,8 @@ private fun AppDrawerSheet(controller: LauncherController) {
                             )
                             if (app.profile != AppProfile.PERSONAL) {
                                 Text(
-                                    text = app.profile.title,
-                                    color = Sky,
+                                    text = if (app.userSerialNumber in pausedProfiles) "Arbeit pausiert" else app.profile.title,
+                                    color = if (app.userSerialNumber in pausedProfiles) Warm else Sky,
                                     style = MaterialTheme.typography.labelSmall,
                                 )
                             }

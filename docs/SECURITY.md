@@ -1,6 +1,6 @@
 # Sicherheit und Datenschutz
 
-## M2.4-Dateninventar
+## M2.5-Dateninventar
 
 KoSch verarbeitet lokal:
 
@@ -22,7 +22,7 @@ Nicht gelesen werden Standort, gesamtes Adressbuch, Kalender, Anrufliste, SMS, Z
 
 ## Berechtigungsbudget
 
-M2.4 deklariert als `uses-permission` nur `ACCESS_NETWORK_STATE`. Damit erkennt die Context Engine, ob ein validiertes Netz existiert. Stylus, einmalige Kontaktauswahl und SAF-Tree-Zugriff benötigen keine zusätzliche gefährliche Manifest-Berechtigung. Es gibt bewusst kein:
+M2.5 deklariert als `uses-permission` nur `ACCESS_NETWORK_STATE`. Damit erkennt die Context Engine, ob ein validiertes Netz existiert. Stylus, einmalige Kontaktauswahl und SAF-Tree-Zugriff benötigen keine zusätzliche gefährliche Manifest-Berechtigung. Es gibt bewusst kein:
 
 - `INTERNET`;
 - `CALL_PHONE` oder Kontakte-/Anruflistenrecht;
@@ -35,9 +35,13 @@ M2.4 deklariert als `uses-permission` nur `ACCESS_NETWORK_STATE`. Damit erkennt 
 
 Die App deklariert einen durch das System gebundenen Notification-Listener-Service, aber keine entsprechende Laufzeitberechtigung. Erst die Person kann ihn in Androids geschützter Einstellungsseite aktivieren; der Core funktioniert ohne ihn. Spracherkennung, Dateiauswahl, Telefon, Widgets und Systemeinstellungen werden als sichtbare Android-Aktivitäten gestartet. Der jeweilige System-/Zielprozess besitzt seine eigenen Datenschutzregeln.
 
+Die CI prüft dieses Budget zweimal: zuerst das Manifest im Quellbaum und nach dem Build zusätzlich die tatsächlich paketierte APK mit `aapt`. Ein transitiv oder durch Manifest-Merging hinzugefügtes `INTERNET`-Recht bricht den Build.
+
 ## Telefon
 
 KoSch verwendet `ACTION_DIAL`. Eine erkannte Nummer wird höchstens normalisiert und im System-Wähler vorbereitet. Der tatsächliche Anruf bleibt eine Benutzeraktion. `ACTION_PICK` wird auf den Phone-Datentyp begrenzt; auf Android 17 fordert KoSch den datenschutzfreundlichen System-Picker explizit an. Es gibt kein `READ_CONTACTS`; die gewählte Nummer wird nicht persistiert oder in das Audit geschrieben. KoSch übernimmt keine Default-Dialer-, `InCallService`- oder Notruffunktion.
+
+Nachrichten verwenden `ACTION_SENDTO` mit `smsto:`. KoSch liest weder SMS noch Nachrichteninhalt und versendet nichts selbst. Kalender, Wecker und Kamera werden ausschließlich geöffnet; KoSch fordert dafür kein Kalender-, Alarm-, Kamera- oder Medienrecht an. Inhalt, Empfänger und finale Aktion bleiben in der zuständigen App.
 
 ## Portables Backup und Restore
 
@@ -64,6 +68,8 @@ Der Datei-Arbeitsraum ist eine getrennte, explizite `ACTION_OPEN_DOCUMENT_TREE`-
 - Zusammenfassung: nur Name, MIME-Kategorie, bekannte Größe und Änderungszeit; kein Inhaltsindex;
 - Vergessen/Wechsel: persistierte URI-Freigabe wird gelöst.
 
+Provider-Mutation und anschließender Refresh sind getrennte Ergebnisse. Eine bestätigte Mutation wird auch dann als Erfolg auditiert, wenn die Oberfläche bereits geschlossen ist oder die neue Verzeichnisliste scheitert. Der Refreshfehler erhält ein eigenes Ereignis; er darf weder den Provider-Effekt zurückdatieren noch ein nicht vorhandenes Undo versprechen. Manuelles Refresh bleibt im aktuellen Verzeichnis.
+
 SAF-Provider können Cloudspeicher abbilden. „Lokal analysiert“ bedeutet daher, dass KoSch keine eigene Cloud/API nutzt; der ausgewählte Provider kann seine Daten nach eigenen Regeln laden. Move/Copy, Rekursion, Volltextsuche, Papierkorbgarantie und Malware-Scan sind nicht implementiert.
 
 ## Lokale Personalisierung und Sichtbarkeit
@@ -82,9 +88,13 @@ Aktuelle Stiftfähigkeiten, Druck, Neigung, Orientierung, Hover, Werkzeug und Ta
 
 Die Persistenz nutzt normalisierte Koordinaten und Schema v6. Eingaben werden auf endliche Werte, Bereichsgrenzen, maximale Punktzahl und maximale Strichzahl reduziert. Der manuelle Workspace-Export übernimmt die Striche erst nach Passphrase-Eingabe; Vision-Modell oder Handschrift-Index benötigen weiterhin eine separate Vorschau, explizite Auswahl, Retention und vollständige Löschung.
 
+Ab Android 14 kann KoSch `ACTION_CREATE_NOTE` an eine kompatible Notes-App senden und bei erkanntem Stift den Stylus-Modus anfordern. KoSch übernimmt keine Notes-Rolle, liest keine Zielnotiz und erhält deren Inhalt nicht zurück. Ohne kompatible Ziel-App fällt die Bedienung auf den lokalen Pen Space zurück.
+
 ## Profile und Private Space
 
-Apps werden mit ihrem Android-`UserHandle` abgefragt und gestartet. Lokale Schlüssel verwenden eine vom System gelieferte Benutzer-Seriennummer, damit gleiche Pakete verschiedener Profile nicht kollidieren. KoSch zeigt Androids gebadgte Icons und umgeht gesperrte Profile nicht.
+Apps und Shortcuts werden mit ihrem Android-`UserHandle` abgefragt und gestartet. Lokale Schlüssel verwenden eine vom System gelieferte Benutzer-Seriennummer, damit gleiche Pakete verschiedener Profile nicht kollidieren. App-Info und Android-Deinstallationsanfrage tragen das ausgewählte Profilziel. KoSch zeigt Androids gebadgte Icons und umgeht gesperrte Profile nicht.
+
+Als aktive Standard-Start-App kann KoSch `UserManager.requestQuietModeEnabled` für ein zugängliches Arbeitsprofil anfordern. Android besitzt Richtlinien, Credential-Dialog und Zustandswechsel. KoSch speichert keine Arbeitsanmeldedaten, startet keine pausierte Work-App und behauptet bei fehlender HOME-Rolle keinen erfolgreichen Wechsel.
 
 `ACCESS_HIDDEN_PROFILES` wird nicht deklariert. Android Private Space bleibt dem System-Launcher überlassen, bis KoSch einen getrennten Container, Hide/Show, Lock/Unlock, Authentifizierungsfluss und Tests gegen Label-, Badge-, Search- und Recency-Leaks vollständig implementiert hat.
 
@@ -98,7 +108,7 @@ PocketPal, ChatterUI und Maid sind optionale Drittprojekte. Die Anzeige ihrer Li
 
 Der ruhende `SecureCredentialVault` nutzt Android Keystore sowie AES-256/GCM. Schlüsselmaterial bleibt nicht exportierbar; Ciphertexte sind per Provider-ID als Associated Data gebunden. `allowBackup=false` verhindert App-Daten-Backup. Der Quellcode enthält keine Provider-Secrets.
 
-M2.4 fordert keine API-Schlüssel an und liest den Vault nicht aus. Vor einem aktiven API-Modul sind zwingend:
+M2.5 fordert keine API-Schlüssel an und liest den Vault nicht aus. Vor einem aktiven API-Modul sind zwingend:
 
 1. getrenntes Netzwerkmodul/Build Flavor;
 2. Kontextvorschau mit Feld-für-Feld-Auswahl;
@@ -121,7 +131,7 @@ M2.4 fordert keine API-Schlüssel an und liest den Vault nicht aus. Vor einem ak
 
 LLM-Ausgaben sind Daten, keine Autorität. Sie dürfen keine Capability direkt erzeugen oder erweitern.
 
-## Bekannte M2.4-Risiken
+## Bekannte M2.5-Risiken
 
 - keine instrumentierten Geräte-/OEM-Tests;
 - Smartpen-Erkennung und Ink-Latenz sind noch nicht gegen ein USI-/S-Pen-/Pixel-Pen-Gerätelabor validiert;

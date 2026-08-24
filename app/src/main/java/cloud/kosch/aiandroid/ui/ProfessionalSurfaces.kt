@@ -26,6 +26,11 @@ import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContactPhone
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Alarm
+import androidx.compose.material.icons.rounded.PhotoCamera
+import androidx.compose.material.icons.rounded.EditNote
+import androidx.compose.material.icons.rounded.Message
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.History
@@ -98,6 +103,7 @@ fun ColumnScope.ProfessionalHubSurface(
     requestContact: () -> Unit,
 ) {
     val workApps = controller.apps.count { it.profile == AppProfile.WORK }
+    val pausedWorkProfiles = controller.workProfiles.count { it.quietMode }
     val actions = listOf(
         ProAction("Command Bar", "Ctrl/⌘ + K", Icons.Rounded.AutoAwesome, onAsk),
         ProAction("Alle Apps", "Ctrl/⌘ + Leertaste", Icons.Rounded.Apps, controller::openDrawer),
@@ -105,6 +111,16 @@ fun ColumnScope.ProfessionalHubSurface(
         ProAction("Dateien", "Begrenzter SAF-Arbeitsraum", Icons.Rounded.Folder, controller::openFileWorkspace),
         ProAction("Kontakt", "Einmalig auswählen", Icons.Rounded.ContactPhone, requestContact),
         ProAction("Telefon", "System-Wähler", Icons.Rounded.Phone, controller::openPhone),
+        ProAction("Nachricht", "System-Composer", Icons.Rounded.Message) { controller.message(null) },
+        ProAction("Kalender", "System-App", Icons.Rounded.CalendarMonth, controller::openCalendar),
+        ProAction("Wecker", "Alarme & Timer", Icons.Rounded.Alarm, controller::openAlarms),
+        ProAction("Kamera", "Direkter Android-Weg", Icons.Rounded.PhotoCamera, controller::openCamera),
+        ProAction(
+            "Systemnotiz",
+            if (controller.stylusState.present) "Smartpen-Modus" else "Android 14+",
+            Icons.Rounded.EditNote,
+            controller::createSystemNote,
+        ),
         ProAction("Widgets", "Android Host Board", Icons.Rounded.Widgets, controller::openWidgetBoard),
         ProAction("Backup", "AES-256-GCM", Icons.Rounded.Backup, controller::openBackup),
         ProAction("Audit", "Nur Metadaten", Icons.Rounded.History, controller::openAudit),
@@ -154,8 +170,8 @@ fun ColumnScope.ProfessionalHubSurface(
                     )
                     ProMetric(
                         title = "ARBEIT",
-                        value = "$workApps Apps",
-                        healthy = true,
+                        value = if (pausedWorkProfiles > 0) "Pausiert" else "$workApps Apps",
+                        healthy = pausedWorkProfiles == 0,
                         modifier = Modifier.weight(1f),
                     )
                     ProMetric(

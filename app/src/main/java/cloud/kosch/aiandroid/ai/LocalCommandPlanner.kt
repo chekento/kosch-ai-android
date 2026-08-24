@@ -20,6 +20,11 @@ sealed interface LauncherCommand {
     data object OpenProDesk : LauncherCommand
     data object PickContact : LauncherCommand
     data class OpenPhone(val number: String?) : LauncherCommand
+    data class OpenMessage(val number: String?) : LauncherCommand
+    data object OpenCalendar : LauncherCommand
+    data object OpenAlarms : LauncherCommand
+    data object OpenCamera : LauncherCommand
+    data object CreateSystemNote : LauncherCommand
     data class OpenSystemPanel(val panel: SystemPanel) : LauncherCommand
     data class SwitchScene(val scene: SceneId) : LauncherCommand
     data class LaunchApp(val query: String) : LauncherCommand
@@ -44,7 +49,12 @@ class LocalCommandPlanner {
         if (normalized in auditCommands) return LauncherCommand.OpenAudit
         if (normalized in proDeskCommands) return LauncherCommand.OpenProDesk
         if (normalized in contactCommands) return LauncherCommand.PickContact
+        if (normalized in calendarCommands) return LauncherCommand.OpenCalendar
+        if (normalized in alarmCommands) return LauncherCommand.OpenAlarms
+        if (normalized in cameraCommands) return LauncherCommand.OpenCamera
+        if (normalized in systemNoteCommands) return LauncherCommand.CreateSystemNote
         systemPanelFrom(normalized)?.let { return LauncherCommand.OpenSystemPanel(it) }
+        messageFrom(raw, normalized)?.let { return it }
         phoneFrom(raw, normalized)?.let { return it }
 
         sceneFrom(normalized)?.let { return LauncherCommand.SwitchScene(it) }
@@ -81,6 +91,14 @@ class LocalCommandPlanner {
         val rawNumber = raw.drop(prefix.length).removeSuffix(" an").trim()
         val number = PhoneNumberParser.sanitize(rawNumber) ?: return LauncherCommand.OpenPhone(null)
         return LauncherCommand.OpenPhone(number)
+    }
+
+    private fun messageFrom(raw: String, normalized: String): LauncherCommand.OpenMessage? {
+        if (normalized in messageCommands) return LauncherCommand.OpenMessage(null)
+        val prefix = messagePrefixes.firstOrNull { normalized.startsWith(it) } ?: return null
+        val rawNumber = raw.drop(prefix.length).trim()
+        val number = PhoneNumberParser.sanitize(rawNumber) ?: return LauncherCommand.OpenMessage(null)
+        return LauncherCommand.OpenMessage(number)
     }
 
     private fun sceneFrom(value: String): SceneId? {
@@ -143,6 +161,24 @@ class LocalCommandPlanner {
         )
         val contactCommands = setOf(
             "kontakt", "kontakte", "kontakt auswahlen", "kontakt wählen", "kontakt waehlen",
+        )
+        val calendarCommands = setOf(
+            "kalender", "kalender offnen", "offne kalender", "calendar", "open calendar",
+        )
+        val alarmCommands = setOf(
+            "wecker", "alarme", "wecker offnen", "offne wecker", "alarm", "alarms",
+        )
+        val cameraCommands = setOf(
+            "kamera", "kamera offnen", "offne kamera", "camera", "open camera",
+        )
+        val systemNoteCommands = setOf(
+            "systemnotiz", "android notiz", "system note", "create note",
+        )
+        val messageCommands = setOf(
+            "nachricht", "nachrichten", "sms", "message", "messages",
+        )
+        val messagePrefixes = listOf(
+            "nachricht an ", "sms an ", "message ",
         )
         val phoneCommands = setOf(
             "telefon", "wahler", "dialer", "anrufen", "phone",

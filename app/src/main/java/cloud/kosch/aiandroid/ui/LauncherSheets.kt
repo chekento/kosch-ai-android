@@ -33,6 +33,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.AccessibilityNew
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Alarm
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
@@ -42,6 +43,8 @@ import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.BatterySaver
 import androidx.compose.material.icons.rounded.BusinessCenter
+import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.PhotoCamera
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
@@ -51,6 +54,7 @@ import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.InsertDriveFile
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.CreateNewFolder
@@ -62,6 +66,7 @@ import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Phone
+import androidx.compose.material.icons.rounded.Message
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material.icons.rounded.Security
@@ -136,6 +141,8 @@ import java.util.Locale
 fun QuickActionsRail(
     onPhone: () -> Unit,
     onFiles: () -> Unit,
+    onCalendar: () -> Unit,
+    onCamera: () -> Unit,
     onWidgets: () -> Unit,
     onControls: () -> Unit,
     onPen: (() -> Unit)?,
@@ -149,6 +156,8 @@ fun QuickActionsRail(
     ) {
         QuickChip("Telefon", Icons.Rounded.Phone, onPhone)
         QuickChip("Datei-KI", Icons.Rounded.FolderOpen, onFiles)
+        QuickChip("Kalender", Icons.Rounded.CalendarMonth, onCalendar)
+        QuickChip("Kamera", Icons.Rounded.PhotoCamera, onCamera)
         QuickChip("Widgets", Icons.Rounded.Widgets, onWidgets)
         onPen?.let { QuickChip("Pen Space", Icons.Rounded.Draw, it) }
         QuickChip("FAQ", Icons.Rounded.HelpOutline, onHelp)
@@ -396,6 +405,57 @@ fun ControlCenterSheet(
                     right = ControlItem("Arbeitsordner", "Sicher verwalten", Icons.Rounded.Storage) {
                         controller.closeControlCenter()
                         controller.openFileWorkspace()
+                    },
+                )
+            }
+            if (controller.workProfiles.isNotEmpty()) {
+                item {
+                    Text("Arbeitsprofile", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+                items(controller.workProfiles, key = { it.userSerialNumber }) { profile ->
+                    Surface(color = RaisedSurface, shape = RoundedCornerShape(18.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Icon(Icons.Rounded.BusinessCenter, contentDescription = null, tint = if (profile.quietMode) Warm else Mint)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Arbeitsprofil", fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    if (profile.quietMode) "Pausiert · Apps, Daten und Meldungen ruhen" else "Aktiv · über Android verwaltet",
+                                    color = MutedMist,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                            OutlinedButton(onClick = { controller.toggleWorkProfile(profile.userSerialNumber) }) {
+                                Text(if (profile.quietMode) "Aktivieren" else "Pausieren")
+                            }
+                        }
+                    }
+                }
+            }
+            item {
+                ControlPair(
+                    left = ControlItem("Kalender", "System-App", Icons.Rounded.CalendarMonth) {
+                        controller.openCalendar()
+                    },
+                    right = ControlItem("Wecker", "Alarme & Timer", Icons.Rounded.Alarm) {
+                        controller.openAlarms()
+                    },
+                )
+            }
+            item {
+                ControlPair(
+                    left = ControlItem("Kamera", "Herstellerunabhängig", Icons.Rounded.PhotoCamera) {
+                        controller.openCamera()
+                    },
+                    right = ControlItem(
+                        "Systemnotiz",
+                        if (controller.stylusState.present) "Stiftmodus anfordern" else "Android 14+",
+                        Icons.Rounded.EditNote,
+                    ) {
+                        controller.createSystemNote()
                     },
                 )
             }
@@ -670,10 +730,23 @@ fun PhoneSheet(controller: LauncherController, requestContact: () -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
-            Button(onClick = { controller.dial(number.trim().ifBlank { null }) }, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Rounded.Phone, contentDescription = null)
-                Spacer(Modifier.width(8.dp))
-                Text(if (number.isBlank()) "Telefon öffnen" else "Im Telefon vorbereiten")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = { controller.dial(number.trim().ifBlank { null }) },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Rounded.Phone, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text(if (number.isBlank()) "Telefon" else "Anruf")
+                }
+                OutlinedButton(
+                    onClick = { controller.message(number.trim().ifBlank { null }) },
+                    modifier = Modifier.weight(1f),
+                ) {
+                    Icon(Icons.Rounded.Message, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Nachricht")
+                }
             }
             Spacer(Modifier.height(22.dp))
         }
@@ -848,7 +921,7 @@ fun FileWorkspaceSheet(
                         )
                     }
                     AssistChip(
-                        onClick = controller::openFileWorkspace,
+                        onClick = controller::refreshFileWorkspace,
                         label = { Text("Aktualisieren") },
                         leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp)) },
                     )
@@ -1229,7 +1302,12 @@ fun AppActionsSheet(controller: LauncherController) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Image(app.icon, contentDescription = null, modifier = Modifier.size(58.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(app.packageName, color = MutedMist, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        "${app.profile.title} · ${app.packageName}",
+                        color = MutedMist,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
                     Text("Langer Druck öffnet diesen sicheren Aktionsraum", style = MaterialTheme.typography.bodySmall)
                 }
             }
@@ -1270,7 +1348,13 @@ fun AppActionsSheet(controller: LauncherController) {
             ) {
                 Icon(Icons.Rounded.DeleteOutline, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
-                Text(if (confirmUninstall) "Mit Android-Deinstallationsdialog fortfahren" else "App deinstallieren …")
+                Text(
+                    if (confirmUninstall) {
+                        "${app.profile.title}-App im Android-Dialog prüfen"
+                    } else {
+                        "App deinstallieren …"
+                    },
+                )
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(onClick = controller::toggleSelectedAppPin, modifier = Modifier.weight(1f)) {
@@ -1282,6 +1366,41 @@ fun AppActionsSheet(controller: LauncherController) {
                     Icon(Icons.Rounded.CreateNewFolder, contentDescription = null)
                     Spacer(Modifier.width(5.dp))
                     Text("In Ordner")
+                }
+            }
+            if (controller.isPinned(app)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = { controller.moveSelectedPinnedApp(-1) },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(Icons.Rounded.ArrowUpward, contentDescription = null)
+                        Spacer(Modifier.width(5.dp))
+                        Text("Dock nach links")
+                    }
+                    OutlinedButton(
+                        onClick = { controller.moveSelectedPinnedApp(1) },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(Icons.Rounded.ArrowDownward, contentDescription = null)
+                        Spacer(Modifier.width(5.dp))
+                        Text("Dock nach rechts")
+                    }
+                }
+            }
+            if (controller.folders.isNotEmpty()) {
+                Text("Zu Sammlung hinzufügen", style = MaterialTheme.typography.labelLarge, color = MutedMist)
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    controller.folders.forEach { folder ->
+                        AssistChip(
+                            onClick = { controller.addSelectedAppToFolder(folder.id) },
+                            label = { Text(folder.title, maxLines = 1) },
+                            leadingIcon = { Text(folder.kind.glyph, color = Mint) },
+                        )
+                    }
                 }
             }
             HorizontalDivider()
