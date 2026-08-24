@@ -38,6 +38,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoAwesome
@@ -51,7 +52,6 @@ import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Undo
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -552,7 +552,7 @@ private fun EditToolbar(controller: LauncherController) {
             enabled = controller.canUndoLayout,
             onClick = controller::undoLayout,
         ) {
-            Icon(Icons.Rounded.Undo, contentDescription = null, modifier = Modifier.size(18.dp))
+            Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(6.dp))
             Text("Rückgängig")
         }
