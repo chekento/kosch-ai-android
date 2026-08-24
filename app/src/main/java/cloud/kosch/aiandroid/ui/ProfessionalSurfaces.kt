@@ -103,6 +103,7 @@ fun ColumnScope.ProfessionalHubSurface(
     requestContact: () -> Unit,
 ) {
     val workApps = controller.apps.count { it.profile == AppProfile.WORK }
+    val pausedWorkProfiles = controller.workProfiles.count { it.quietMode }
     val actions = listOf(
         ProAction("Command Bar", "Ctrl/⌘ + K", Icons.Rounded.AutoAwesome, onAsk),
         ProAction("Alle Apps", "Ctrl/⌘ + Leertaste", Icons.Rounded.Apps, controller::openDrawer),
@@ -169,8 +170,8 @@ fun ColumnScope.ProfessionalHubSurface(
                     )
                     ProMetric(
                         title = "ARBEIT",
-                        value = "$workApps Apps",
-                        healthy = true,
+                        value = if (pausedWorkProfiles > 0) "Pausiert" else "$workApps Apps",
+                        healthy = pausedWorkProfiles == 0,
                         modifier = Modifier.weight(1f),
                     )
                     ProMetric(

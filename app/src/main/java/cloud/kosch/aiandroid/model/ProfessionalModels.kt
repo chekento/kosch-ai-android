@@ -30,6 +30,7 @@ enum class AuditAction(val title: String) {
     APP_SHORTCUT("App-Shortcut gestartet"),
     APP_VISIBILITY("App-Sichtbarkeit geändert"),
     APP_UNINSTALL_REQUEST("Deinstallation angefordert"),
+    WORK_PROFILE("Arbeitsprofil geändert"),
     COMMAND("Lokaler Befehl"),
     DIALER("Telefon-Wähler geöffnet"),
     MESSAGE_COMPOSER("Nachrichten-Composer geöffnet"),

@@ -34,7 +34,7 @@ internal object FileMutationSemantics {
             onSuccess = { effect ->
                 FileMutationCompletion.Applied(effect, runCatching(refresh))
             },
-            onFailure = FileMutationCompletion::Failed,
+            onFailure = { error -> FileMutationCompletion.Failed(error) },
         )
     }
 }

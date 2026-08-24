@@ -22,3 +22,9 @@ data class LaunchableApp(
     /** Keys used before M2.2; retained only long enough to repair persisted user choices. */
     val legacyKeys: Set<String> = emptySet(),
 )
+
+data class WorkProfileState(
+    val user: UserHandle,
+    val userSerialNumber: Long,
+    val quietMode: Boolean,
+)

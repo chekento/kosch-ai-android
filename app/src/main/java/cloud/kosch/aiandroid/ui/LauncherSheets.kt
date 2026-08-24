@@ -408,6 +408,33 @@ fun ControlCenterSheet(
                     },
                 )
             }
+            if (controller.workProfiles.isNotEmpty()) {
+                item {
+                    Text("Arbeitsprofile", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                }
+                items(controller.workProfiles, key = { it.userSerialNumber }) { profile ->
+                    Surface(color = RaisedSurface, shape = RoundedCornerShape(18.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Icon(Icons.Rounded.BusinessCenter, contentDescription = null, tint = if (profile.quietMode) Warm else Mint)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Arbeitsprofil", fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    if (profile.quietMode) "Pausiert · Apps, Daten und Meldungen ruhen" else "Aktiv · über Android verwaltet",
+                                    color = MutedMist,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                            OutlinedButton(onClick = { controller.toggleWorkProfile(profile.userSerialNumber) }) {
+                                Text(if (profile.quietMode) "Aktivieren" else "Pausieren")
+                            }
+                        }
+                    }
+                }
+            }
             item {
                 ControlPair(
                     left = ControlItem("Kalender", "System-App", Icons.Rounded.CalendarMonth) {

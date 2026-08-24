@@ -52,6 +52,7 @@ import cloud.kosch.aiandroid.model.SystemPanel
 import cloud.kosch.aiandroid.model.StylusCapabilities
 import cloud.kosch.aiandroid.model.TilePosition
 import cloud.kosch.aiandroid.model.WorkspaceMode
+import cloud.kosch.aiandroid.model.WorkProfileState
 import cloud.kosch.aiandroid.model.WidgetSizePreset
 import cloud.kosch.aiandroid.system.HomeRoleController
 import cloud.kosch.aiandroid.system.FileMutationCompletion
@@ -167,6 +168,8 @@ class LauncherController(context: Context) {
         private set
     var folders by mutableStateOf(store.folders())
         private set
+    var workProfiles by mutableStateOf<List<WorkProfileState>>(emptyList())
+        private set
     var folderPreview by mutableStateOf<List<LauncherFolder>?>(null)
         private set
     var folderSheetVisible by mutableStateOf(false)
@@ -245,6 +248,7 @@ class LauncherController(context: Context) {
             emptyMap()
         }
         stylusMonitor.refreshDevices()
+        workProfiles = runCatching { appCatalog.loadWorkProfiles() }.getOrDefault(workProfiles)
     }
 
     fun switchHomePage(page: HomePage) {
@@ -1328,6 +1332,29 @@ class LauncherController(context: Context) {
         openSystemPanel(SystemPanel.NOTIFICATION_ACCESS)
     }
 
+    fun toggleWorkProfile(userSerialNumber: Long) {
+        val profile = workProfiles.firstOrNull { it.userSerialNumber == userSerialNumber } ?: return
+        val enableQuietMode = !profile.quietMode
+        appCatalog.requestWorkProfileQuietMode(profile, enableQuietMode)
+            .onSuccess { changedWithoutPendingCredential ->
+                audit(AuditAction.WORK_PROFILE, AuditOutcome.SUCCESS)
+                refreshSystemState()
+                notice = when {
+                    enableQuietMode -> "Arbeitsprofil wird von Android pausiert"
+                    changedWithoutPendingCredential -> "Arbeitsprofil wird von Android aktiviert"
+                    else -> "Android wartet auf deine Gerätebestätigung"
+                }
+            }
+            .onFailure {
+                audit(AuditAction.WORK_PROFILE, AuditOutcome.FAILED)
+                notice = if (isDefaultHome) {
+                    "Arbeitsprofil konnte nicht geändert werden"
+                } else {
+                    "KoSch muss aktive Start-App sein, um das Arbeitsprofil zu pausieren"
+                }
+            }
+    }
+
     fun launch(shortcut: LaunchableShortcut) {
         runCatching { appCatalog.launch(shortcut) }
             .onSuccess {
@@ -1545,10 +1572,11 @@ class LauncherController(context: Context) {
         if (executor.isShutdown) return
         appsLoading = true
         executor.execute {
-            val loaded = runCatching { appCatalog.loadApps() }
+            val loaded = runCatching { appCatalog.loadApps() to appCatalog.loadWorkProfiles() }
             mainHandler.post {
-                loaded.onSuccess { catalog ->
+                loaded.onSuccess { (catalog, profiles) ->
                     apps = catalog.filterNot { it.packageName == appContext.packageName }
+                    workProfiles = profiles
                     val aliases = apps.flatMap { app ->
                         app.legacyKeys.map { legacy -> legacy to app.key }
                     }.groupBy { it.first }

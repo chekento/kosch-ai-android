@@ -17,6 +17,7 @@ import androidx.core.graphics.drawable.toBitmap
 import cloud.kosch.aiandroid.model.LaunchableApp
 import cloud.kosch.aiandroid.model.LaunchableShortcut
 import cloud.kosch.aiandroid.model.AppProfile
+import cloud.kosch.aiandroid.model.WorkProfileState
 import java.util.Locale
 
 class AppCatalog(
@@ -127,6 +128,20 @@ class AppCatalog(
             shortcut.user,
         )
     }
+
+    fun loadWorkProfiles(): List<WorkProfileState> = launcherApps.profiles
+        .filter { profileType(it) == AppProfile.WORK }
+        .map { profile ->
+            WorkProfileState(
+                user = profile,
+                userSerialNumber = userManager.getSerialNumberForUser(profile),
+                quietMode = userManager.isQuietModeEnabled(profile),
+            )
+        }
+
+    /** Android permits this for the foreground default launcher; credentials remain system-owned. */
+    fun requestWorkProfileQuietMode(profile: WorkProfileState, enabled: Boolean): Result<Boolean> =
+        runCatching { userManager.requestQuietModeEnabled(enabled, profile.user) }
 
     private fun Drawable.safeBitmap(): Bitmap = runCatching {
         toBitmap(width = ICON_SIZE_PX, height = ICON_SIZE_PX, config = Bitmap.Config.ARGB_8888)
