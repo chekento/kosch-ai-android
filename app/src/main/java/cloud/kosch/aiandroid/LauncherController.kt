@@ -1356,6 +1356,11 @@ class LauncherController(context: Context) {
     }
 
     fun launch(shortcut: LaunchableShortcut) {
+        if (workProfiles.any { it.userSerialNumber == shortcut.userSerialNumber && it.quietMode }) {
+            notice = "Arbeitsprofil ist pausiert – aktiviere es im Kontrollzentrum"
+            audit(AuditAction.APP_SHORTCUT, AuditOutcome.REJECTED)
+            return
+        }
         runCatching { appCatalog.launch(shortcut) }
             .onSuccess {
                 store.recordRecent(shortcut.packageName)
@@ -1426,7 +1431,7 @@ class LauncherController(context: Context) {
             LauncherCommand.OpenProDesk -> openProDesk()
             LauncherCommand.PickContact -> requestContact()
             is LauncherCommand.OpenPhone -> if (command.number == null) openPhone() else dial(command.number)
-            is LauncherCommand.OpenMessage -> if (command.number == null) openPhone() else message(command.number)
+            is LauncherCommand.OpenMessage -> message(command.number)
             LauncherCommand.OpenCalendar -> openCalendar()
             LauncherCommand.OpenAlarms -> openAlarms()
             LauncherCommand.OpenCamera -> openCamera()
@@ -1439,6 +1444,11 @@ class LauncherController(context: Context) {
     }
 
     fun launch(app: LaunchableApp) {
+        if (workProfiles.any { it.userSerialNumber == app.userSerialNumber && it.quietMode }) {
+            notice = "Arbeitsprofil ist pausiert – aktiviere es im Kontrollzentrum"
+            audit(AuditAction.APP_LAUNCH, AuditOutcome.REJECTED)
+            return
+        }
         runCatching { appCatalog.launch(app) }
             .onSuccess {
                 store.recordRecent(app.packageName)

@@ -1,5 +1,6 @@
 package cloud.kosch.aiandroid.system
 
+import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -29,12 +30,12 @@ class SystemActionGateway(context: Context) {
         ),
     )
 
-    fun openCalendar(): Result<Unit> = start(
-        Intent(
-            Intent.ACTION_VIEW,
-            CalendarContract.CONTENT_URI.buildUpon().appendPath("time").build(),
-        ),
-    )
+    fun openCalendar(): Result<Unit> {
+        val calendarUri = CalendarContract.CONTENT_URI.buildUpon().appendPath("time")
+            .also { ContentUris.appendId(it, System.currentTimeMillis()) }
+            .build()
+        return start(Intent(Intent.ACTION_VIEW, calendarUri))
+    }
 
     fun openAlarms(): Result<Unit> = startWithFallback(
         Intent(AlarmClock.ACTION_SHOW_ALARMS),
