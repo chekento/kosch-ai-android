@@ -11,6 +11,7 @@ import cloud.kosch.aiandroid.model.InkTool
 import cloud.kosch.aiandroid.model.LauncherFolder
 import cloud.kosch.aiandroid.model.SceneId
 import cloud.kosch.aiandroid.model.TilePosition
+import cloud.kosch.aiandroid.model.WidgetSizePreset
 import org.json.JSONArray
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
@@ -89,10 +90,31 @@ class WorkspaceStore(context: Context) {
 
     fun addWidgetId(appWidgetId: Int) {
         saveWidgetIds(widgetIds() + appWidgetId)
+        setWidgetSize(appWidgetId, WidgetSizePreset.STANDARD)
     }
 
     fun removeWidgetId(appWidgetId: Int) {
         saveWidgetIds(widgetIds().filterNot { it == appWidgetId })
+        val updated = widgetSizes().filterKeys { it != appWidgetId }
+        preferences.edit().putString(KEY_WIDGET_SIZES, widgetSizesJson(updated).toString()).apply()
+    }
+
+    fun widgetSizes(): Map<Int, WidgetSizePreset> = runCatching {
+        val root = JSONObject(preferences.getString(KEY_WIDGET_SIZES, "{}"))
+        buildMap {
+            root.keys().forEach { key ->
+                val id = key.toIntOrNull()?.takeIf { it > 0 } ?: return@forEach
+                val preset = runCatching { WidgetSizePreset.valueOf(root.optString(key)) }.getOrNull()
+                    ?: return@forEach
+                put(id, preset)
+            }
+        }
+    }.getOrDefault(emptyMap())
+
+    fun setWidgetSize(appWidgetId: Int, preset: WidgetSizePreset) {
+        require(appWidgetId > 0)
+        val updated = widgetSizes() + (appWidgetId to preset)
+        preferences.edit().putString(KEY_WIDGET_SIZES, widgetSizesJson(updated).toString()).apply()
     }
 
     fun pinnedAppKeys(): List<String> = readStringArray(KEY_PINNED_APPS)
@@ -246,6 +268,10 @@ class WorkspaceStore(context: Context) {
         preferences.edit()
             .putString(KEY_WIDGET_IDS, ids.distinct().joinToString("|"))
             .apply()
+    }
+
+    private fun widgetSizesJson(sizes: Map<Int, WidgetSizePreset>): JSONObject = JSONObject().apply {
+        sizes.toSortedMap().forEach { (id, preset) -> put(id.toString(), preset.name) }
     }
 
     private fun readStringArray(key: String): List<String> = runCatching {
@@ -425,6 +451,10 @@ class WorkspaceStore(context: Context) {
         if (current < 4) {
             editor.putInt(KEY_SCHEMA_VERSION, 4)
         }
+        if (current < 5) {
+            editor.putString(KEY_WIDGET_SIZES, preferences.getString(KEY_WIDGET_SIZES, "{}"))
+            editor.putInt(KEY_SCHEMA_VERSION, 5)
+        }
         editor.apply()
     }
 
@@ -438,12 +468,13 @@ class WorkspaceStore(context: Context) {
         const val KEY_RECENT = "recent_packages"
         const val KEY_ONBOARDING_COMPLETE = "onboarding_complete_v2"
         const val KEY_WIDGET_IDS = "widget_ids_v1"
+        const val KEY_WIDGET_SIZES = "widget_sizes_v5"
         const val KEY_SCHEMA_VERSION = "schema_version"
         const val KEY_PINNED_APPS = "pinned_app_keys_v2"
         const val KEY_FOLDERS = "launcher_folders_v2"
         const val KEY_FOLDERS_INITIALIZED = "launcher_folders_initialized_v3"
         const val KEY_PEN_STROKES = "pen_strokes_v3"
-        const val SCHEMA_VERSION = 4
+        const val SCHEMA_VERSION = 5
         const val MAX_RECENT = 16
         const val MAX_PINNED_APPS = 5
         const val MAX_FOLDERS = 12

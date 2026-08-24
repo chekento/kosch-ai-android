@@ -294,6 +294,15 @@ fun BackupSheet(
                 }
             }
             item {
+                Surface(color = RaisedSurface, shape = RoundedCornerShape(17.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(13.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Exportumfang", fontWeight = FontWeight.SemiBold)
+                        Text("Szene, Home-Seite, Layout, KoSch-Verlauf, Pins, Ordner und Pen-Striche", color = MutedMist, style = MaterialTheme.typography.bodySmall)
+                        Text("Ohne Widgets, Dateifreigaben, Secrets, Benachrichtigungsdaten und Audit", color = Sky, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+            item {
                 OutlinedTextField(
                     value = passphrase,
                     onValueChange = { passphrase = it.take(256) },
@@ -379,7 +388,7 @@ fun BackupSheet(
                 }
                 item {
                     Button(
-                        onClick = controller::applyBackupPreview,
+                        onClick = { controller.applyBackupPreview(restoreAcknowledged) },
                         enabled = restoreAcknowledged && !controller.backupBusy,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
@@ -428,7 +437,7 @@ fun AuditSheet(
                 OutlinedButton(
                     onClick = {
                         if (confirmClear) {
-                            controller.clearAudit()
+                            controller.clearAudit(confirmed = true)
                             confirmClear = false
                         } else {
                             confirmClear = true

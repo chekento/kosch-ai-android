@@ -60,6 +60,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -78,6 +79,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -93,6 +95,7 @@ import cloud.kosch.aiandroid.LauncherController
 import cloud.kosch.aiandroid.ai.LocalRuntimeRegistry
 import cloud.kosch.aiandroid.ai.RuntimeStage
 import cloud.kosch.aiandroid.model.SystemPanel
+import cloud.kosch.aiandroid.model.WidgetSizePreset
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 import cloud.kosch.aiandroid.ui.theme.Ink
 import cloud.kosch.aiandroid.ui.theme.Mint
@@ -678,7 +681,7 @@ private fun InsightBlock(title: String, body: String) {
 fun WidgetBoardSheet(
     controller: LauncherController,
     requestWidget: () -> Unit,
-    createWidgetView: (Context, Int) -> View?,
+    createWidgetView: (Context, Int, WidgetSizePreset) -> View?,
     deleteWidget: (Int) -> Unit,
 ) {
     ModalBottomSheet(
@@ -707,23 +710,38 @@ fun WidgetBoardSheet(
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxSize()) {
                     items(controller.widgetIds, key = { it }) { appWidgetId ->
+                        val preset = controller.widgetSize(appWidgetId)
                         Surface(color = RaisedSurface, shape = RoundedCornerShape(20.dp)) {
                             Column(Modifier.fillMaxWidth().padding(10.dp)) {
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                                Row(
+                                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    WidgetSizePreset.entries.forEach { option ->
+                                        FilterChip(
+                                            selected = preset == option,
+                                            onClick = { controller.setWidgetSize(appWidgetId, option) },
+                                            label = { Text(option.title) },
+                                        )
+                                    }
+                                    Spacer(Modifier.width(8.dp))
                                     IconButton(onClick = { deleteWidget(appWidgetId) }) {
                                         Icon(Icons.Rounded.DeleteOutline, contentDescription = "Widget entfernen")
                                     }
                                 }
-                                AndroidView(
-                                    factory = { context ->
-                                        createWidgetView(context, appWidgetId) ?: TextView(context).apply {
-                                            text = "Widget nicht mehr verfügbar"
-                                            setTextColor(android.graphics.Color.WHITE)
-                                            setPadding(24, 24, 24, 24)
-                                        }
-                                    },
-                                    modifier = Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 420.dp),
-                                )
+                                key(appWidgetId, preset) {
+                                    AndroidView(
+                                        factory = { context ->
+                                            createWidgetView(context, appWidgetId, preset) ?: TextView(context).apply {
+                                                text = "Widget nicht mehr verfügbar"
+                                                setTextColor(android.graphics.Color.WHITE)
+                                                setPadding(24, 24, 24, 24)
+                                            }
+                                        },
+                                        modifier = Modifier.fillMaxWidth().height(preset.boardHeightDp.dp),
+                                    )
+                                }
                             }
                         }
                     }
@@ -810,7 +828,7 @@ fun AppActionsSheet(controller: LauncherController) {
 }
 
 @Composable
-private fun SheetHeader(title: String, subtitle: String, onClose: () -> Unit) {
+fun SheetHeader(title: String, subtitle: String, onClose: () -> Unit) {
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(modifier = Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)

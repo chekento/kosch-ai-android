@@ -115,6 +115,7 @@ import cloud.kosch.aiandroid.model.SceneId
 import cloud.kosch.aiandroid.model.TileAction
 import cloud.kosch.aiandroid.model.TilePosition
 import cloud.kosch.aiandroid.model.WorkspaceMode
+import cloud.kosch.aiandroid.model.WidgetSizePreset
 import cloud.kosch.aiandroid.ui.components.CompanionFace
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 import cloud.kosch.aiandroid.ui.theme.Ink
@@ -137,7 +138,7 @@ fun LauncherRoot(
     requestBackupExport: (String) -> Unit,
     requestBackupImport: () -> Unit,
     requestAuditExport: () -> Unit,
-    createWidgetView: (Context, Int) -> View?,
+    createWidgetView: (Context, Int, WidgetSizePreset) -> View?,
     deleteWidget: (Int) -> Unit,
     forgetDocument: () -> Unit,
 ) {
@@ -247,7 +248,7 @@ fun LauncherRoot(
                                 onTextChange = { askText = it },
                                 focusRequester = askFocusRequester,
                                 onSubmit = {
-                                    controller.submitCommand(askText, requestVoiceInput, requestDocument)
+                                    controller.submitCommand(askText, requestVoiceInput, requestDocument, requestContact)
                                     askText = ""
                                     keyboardController?.hide()
                                 },
@@ -287,7 +288,7 @@ fun LauncherRoot(
                             onTextChange = { askText = it },
                             focusRequester = askFocusRequester,
                             onSubmit = {
-                                controller.submitCommand(askText, requestVoiceInput, requestDocument)
+                                controller.submitCommand(askText, requestVoiceInput, requestDocument, requestContact)
                                 askText = ""
                                 keyboardController?.hide()
                             },

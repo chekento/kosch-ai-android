@@ -45,6 +45,7 @@ import cloud.kosch.aiandroid.model.SystemPanel
 import cloud.kosch.aiandroid.model.StylusCapabilities
 import cloud.kosch.aiandroid.model.TilePosition
 import cloud.kosch.aiandroid.model.WorkspaceMode
+import cloud.kosch.aiandroid.model.WidgetSizePreset
 import cloud.kosch.aiandroid.system.HomeRoleController
 import cloud.kosch.aiandroid.system.LocalContextEngine
 import cloud.kosch.aiandroid.system.NotificationAccess
@@ -52,6 +53,8 @@ import cloud.kosch.aiandroid.system.NotificationBadgeRepository
 import cloud.kosch.aiandroid.system.SystemActionGateway
 import cloud.kosch.aiandroid.system.StylusMonitor
 import cloud.kosch.aiandroid.security.PortableBackupCodec
+import cloud.kosch.aiandroid.security.CapabilityAction
+import cloud.kosch.aiandroid.security.CapabilityPolicy
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.nio.charset.StandardCharsets
@@ -118,6 +121,8 @@ class LauncherController(context: Context) {
         private set
     var widgetIds by mutableStateOf(store.widgetIds())
         private set
+    var widgetSizes by mutableStateOf(store.widgetSizes())
+        private set
     var appActionsVisible by mutableStateOf(false)
         private set
     var selectedApp by mutableStateOf<LaunchableApp?>(null)
@@ -168,6 +173,7 @@ class LauncherController(context: Context) {
     private var undoPositions: Map<SceneId, Map<String, TilePosition>>? = null
     private var stagedBackupEnvelope: String? = null
     private var stagedWorkspacePayload: ByteArray? = null
+    private var backupRequestToken = 0L
     private var shortcutRequestToken = 0L
     private var started = false
     private val badgeListener = NotificationBadgeRepository.Listener { counts ->
@@ -263,6 +269,7 @@ class LauncherController(context: Context) {
     }
 
     fun closeBackup() {
+        backupRequestToken += 1
         backupVisible = false
         backupBusy = false
         backupPreview = null
@@ -280,6 +287,7 @@ class LauncherController(context: Context) {
             passphrase.fill('\u0000')
             return
         }
+        val requestToken = ++backupRequestToken
         backupBusy = true
         executor.execute {
             val result = runCatching {
@@ -292,6 +300,10 @@ class LauncherController(context: Context) {
             }
             passphrase.fill('\u0000')
             mainHandler.post {
+                if (requestToken != backupRequestToken) {
+                    result.getOrNull()?.fill(0)
+                    return@post
+                }
                 backupBusy = false
                 result.onFailure { notice = it.message ?: "Backup konnte nicht vorbereitet werden" }
                 onReady(result)
@@ -301,6 +313,7 @@ class LauncherController(context: Context) {
 
     fun stageEncryptedBackup(uri: Uri) {
         if (backupBusy) return
+        val requestToken = ++backupRequestToken
         backupBusy = true
         backupPreview = null
         stagedWorkspacePayload?.fill(0)
@@ -318,6 +331,7 @@ class LauncherController(context: Context) {
                 }
             }
             mainHandler.post {
+                if (requestToken != backupRequestToken) return@post
                 backupBusy = false
                 result.onSuccess { envelope ->
                     stagedBackupEnvelope = envelope
@@ -338,14 +352,24 @@ class LauncherController(context: Context) {
             passphrase.fill('\u0000')
             return
         }
+        val requestToken = ++backupRequestToken
         backupBusy = true
         executor.execute {
             val result = runCatching {
                 val payload = backupCodec.decrypt(envelope, passphrase)
-                payload to store.previewPortableSnapshot(payload)
+                try {
+                    payload to store.previewPortableSnapshot(payload)
+                } catch (exception: Throwable) {
+                    payload.fill(0)
+                    throw exception
+                }
             }
             passphrase.fill('\u0000')
             mainHandler.post {
+                if (requestToken != backupRequestToken) {
+                    result.getOrNull()?.first?.fill(0)
+                    return@post
+                }
                 backupBusy = false
                 result.onSuccess { (payload, preview) ->
                     stagedWorkspacePayload?.fill(0)
@@ -360,15 +384,20 @@ class LauncherController(context: Context) {
         }
     }
 
-    fun applyBackupPreview() {
+    fun applyBackupPreview(confirmed: Boolean) {
+        if (CapabilityPolicy.rule(CapabilityAction.RESTORE_WORKSPACE).requiresConfirmation && !confirmed) {
+            audit(AuditAction.BACKUP_IMPORT, AuditOutcome.REJECTED)
+            notice = "Restore braucht eine ausdrückliche Bestätigung"
+            return
+        }
         val payload = stagedWorkspacePayload ?: return
         if (backupBusy) return
+        stagedWorkspacePayload = null
         backupBusy = true
         executor.execute {
             val result = runCatching { store.restorePortableSnapshot(payload) }
             payload.fill(0)
             mainHandler.post {
-                stagedWorkspacePayload = null
                 backupBusy = false
                 result.onSuccess {
                     reloadWorkspaceState()
@@ -401,7 +430,11 @@ class LauncherController(context: Context) {
         auditVisible = false
     }
 
-    fun clearAudit() {
+    fun clearAudit(confirmed: Boolean) {
+        if (CapabilityPolicy.rule(CapabilityAction.CLEAR_AUDIT).requiresConfirmation && !confirmed) {
+            notice = "Löschen braucht eine ausdrückliche Bestätigung"
+            return
+        }
         auditLog.clear()
         auditEvents = emptyList()
         notice = "Lokales Audit vollständig gelöscht"
@@ -737,6 +770,7 @@ class LauncherController(context: Context) {
     fun acceptWidget(appWidgetId: Int) {
         store.addWidgetId(appWidgetId)
         widgetIds = store.widgetIds()
+        widgetSizes = store.widgetSizes()
         widgetBoardVisible = true
         notice = "Widget sicher zum Board hinzugefügt"
         audit(AuditAction.WIDGET_CHANGE, AuditOutcome.SUCCESS)
@@ -745,8 +779,20 @@ class LauncherController(context: Context) {
     fun removeWidgetRecord(appWidgetId: Int) {
         store.removeWidgetId(appWidgetId)
         widgetIds = store.widgetIds()
+        widgetSizes = store.widgetSizes()
         notice = "Widget entfernt"
         audit(AuditAction.WIDGET_CHANGE, AuditOutcome.SUCCESS)
+    }
+
+    fun widgetSize(appWidgetId: Int): WidgetSizePreset =
+        widgetSizes[appWidgetId] ?: WidgetSizePreset.STANDARD
+
+    fun setWidgetSize(appWidgetId: Int, preset: WidgetSizePreset) {
+        if (appWidgetId !in widgetIds) return
+        store.setWidgetSize(appWidgetId, preset)
+        widgetSizes = store.widgetSizes()
+        audit(AuditAction.WIDGET_CHANGE, AuditOutcome.SUCCESS)
+        notice = "Widget-Größe: ${preset.title}"
     }
 
     fun showAppActions(app: LaunchableApp) {
@@ -902,6 +948,7 @@ class LauncherController(context: Context) {
         text: String,
         requestVoice: () -> Unit,
         requestDocument: () -> Unit,
+        requestContact: () -> Unit,
     ) {
         val command = commandPlanner.plan(text)
         if (command !is LauncherCommand.Empty) audit(AuditAction.COMMAND, AuditOutcome.SUCCESS)
@@ -914,6 +961,10 @@ class LauncherController(context: Context) {
             LauncherCommand.OpenWidgets -> openWidgetBoard()
             LauncherCommand.OpenFaq -> openFaq()
             LauncherCommand.OpenPenSpace -> openPenSpace()
+            LauncherCommand.OpenBackup -> openBackup()
+            LauncherCommand.OpenAudit -> openAudit()
+            LauncherCommand.OpenProDesk -> openProDesk()
+            LauncherCommand.PickContact -> requestContact()
             is LauncherCommand.OpenPhone -> if (command.number == null) openPhone() else dial(command.number)
             is LauncherCommand.OpenSystemPanel -> openSystemPanel(command.panel)
             is LauncherCommand.SwitchScene -> switchScene(command.scene)

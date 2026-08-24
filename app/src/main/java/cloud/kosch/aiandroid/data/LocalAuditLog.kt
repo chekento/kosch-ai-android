@@ -23,6 +23,7 @@ class LocalAuditLog(context: Context) {
 
     @Synchronized
     fun events(): List<AuditEvent> = runCatching {
+        val cutoff = System.currentTimeMillis() - RETENTION_MILLIS
         val array = JSONArray(preferences.getString(KEY_EVENTS, "[]"))
         buildList {
             repeat(array.length().coerceAtMost(MAX_EVENTS)) { index ->
@@ -34,7 +35,7 @@ class LocalAuditLog(context: Context) {
                     ?: return@repeat
                 add(AuditEvent(timestamp, action, outcome))
             }
-        }
+        }.filter { it.timestampEpochMillis >= cutoff }
     }.getOrDefault(emptyList())
 
     @Synchronized

@@ -5,8 +5,10 @@ import android.appwidget.AppWidgetHostView
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
 import android.view.View
 import android.view.ViewGroup
+import cloud.kosch.aiandroid.model.WidgetSizePreset
 
 class WidgetHostController(context: Context) {
     private val appContext = context.applicationContext
@@ -35,10 +37,17 @@ class WidgetHostController(context: Context) {
 
     fun isValid(appWidgetId: Int): Boolean = manager.getAppWidgetInfo(appWidgetId) != null
 
-    fun createView(context: Context, appWidgetId: Int): View? {
+    fun createView(context: Context, appWidgetId: Int, preset: WidgetSizePreset): View? {
         val info = manager.getAppWidgetInfo(appWidgetId) ?: return null
         return host.createView(context, appWidgetId, info).apply {
             setAppWidget(appWidgetId, info)
+            updateAppWidgetSize(
+                Bundle.EMPTY,
+                preset.minWidthDp,
+                preset.minHeightDp,
+                preset.minWidthDp * 2,
+                preset.minHeightDp * 2,
+            )
             layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT,

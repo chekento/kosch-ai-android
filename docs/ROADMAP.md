@@ -28,7 +28,8 @@ Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn 
 - [x] Registry für llama.cpp, LiteRT-LM und MLC LLM
 - [x] ruhender Android-Keystore-Vault und Endpoint-Policy
 - [x] code-nativer Neural-Glass-Hintergrund
-- [ ] Widget-Resize, freie Platzierung, Restore-Mapping und Undo
+- [x] Widget-Größenpresets und Provider-Size-Update
+- [ ] freie Widget-Platzierung, Stacks, Restore-Mapping und Undo
 - [x] lokale Smart-Ordner, zwei Home-Räume, adaptives App-Dock und Pinning
 - [x] opt-in Notification Dots ohne Inhaltskopie
 - [ ] vollständige Accessibility- und OEM-Gerätetests
@@ -61,16 +62,32 @@ Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn 
 - [x] 7-Launcher-/65-Kategorien-Review, 25×65-Fachmatrix und formatierte XLSX-Benchmarkmappe
 - [x] Unit-Test/Lint/Debug-APK in GitHub Actions grün
 
-## Nächster Lauf – M2.3 Messbare Parität und isoliertes lokales Modell
+## M2.3 – Professional Command Center
+
+- [x] Pro Desk als professioneller Standardbereich für Neuinstallationen
+- [x] Hardware-Tastatur-Shortcuts, Android-Shortcut-Hilfe und Escape-Recovery
+- [x] sichere Einmalkontaktauswahl ohne `READ_CONTACTS`, mit Android-17-System-Picker-Hinweis
+- [x] verschlüsselter Workspace-Export via PBKDF2-HMAC-SHA-256 und AES-256-GCM
+- [x] Restore-Dry-Run, strikte Schema-/Limitvalidierung, zweite Bestätigung und atomarer Commit
+- [x] gerätegebundene Widget-IDs, URI-Grants, Secrets, Notification-Daten und Audit vom Backup ausschließen
+- [x] metadatenarmes lokales Audit mit 90-Tage-/250-Event-Grenze, CSV-Export und vollständigem Löschen
+- [x] Widget-Größenpresets Kompakt/Standard/Hoch persistieren und Provider informieren
+- [x] Professional-Befehle im API-freien Local Command Planner
+- [x] Workspace-Schema v5 und mindestens 40 lokale FAQ-Einträge
+- [x] Unit-Tests für Backup-Roundtrip, falsche Passphrase, Manipulation, Audit-CSV und Shortcut-Routing
+- [ ] CI, Lint und Debug-APK dieses finalen M2.3-Stands grün
+- [ ] M2.3-Konkurrenz-/25-Rollen-Neubewertung und formatierte Arbeitsmappe
+
+## Nächster Lauf – M2.4 Nachweisbare Spitzenreife
 
 - [ ] Migrationstests v1–v3 und vollständiger Prozess-Tod-/State-Restore einschließlich Ink
 - [ ] ViewModel/StateFlow statt Activity-gebundener Controller-Lebensdauer
 - [ ] instrumentierte Tests für HOME, SAF, Widget-Abbruch/-Konfiguration und Stifteingabe auf API 29/33/36/37
 - [ ] TalkBack, Switch Access, Hardwaretastatur, Schrift 200 %, Reduced Motion und Kontrastprüfung
 - [ ] Foldable-Hinge-, Multi-Window-, 320-dp- und Screenshot-Testmatrix
-- [ ] vollständige Widget-Engine: Resize, freie Platzierung, Stacks, Restore-Mapping und Undo
-- [ ] verschlüsselter Workspace-Export/Import mit Dry Run und Profil-/Widget-Konflikten
-- [ ] sicherer Android-17-Kontaktpicker ohne breite Kontakteberechtigung
+- [ ] vollständige Widget-Engine: freie Platzierung, Stacks, Restore-Mapping und Undo
+- [ ] instrumentierte Backup-/Restore-Tests mit Prozess-Tod, falschem Provider und Profil-/App-Konflikten
+- [ ] nativer API-37-Mehrfeld-Contact-Picker nach Upgrade auf compileSdk/targetSdk 37
 - [ ] Pen-Latenz-Benchmark, Historical Events, Geräte-Lab und AndroidX-Ink-Evaluation
 - [ ] `LocalModelBackend` in isolierter Service-/Prozessgrenze
 - [ ] Geräteprobe und optionaler kleiner GGUF-Modell-Pack über llama.cpp
@@ -80,9 +97,9 @@ Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn 
 - [ ] manuelle Ordner/Seiten, Drag/Drop, Dock-Reorder und Icon-Pack-/Gesten-Parität
 - [ ] Notification Dots für Multi-User, Work/Private Profile und OEM-Restart härten
 - [ ] Macrobenchmark-/Baseline-Profile-Budgets für Start, Jank, RSS, Akku, Ink und Badge-Updates
-- [ ] lokales Audit mit Retention, Export und vollständigem Löschen
+- [ ] unabhängiges Privacy-/Security-Review von Backup und Audit
 - [ ] Lokalisierung Deutsch/Englisch, RTL-/Plural-Tests und Diagnoseexport ohne Nutzdaten
-- [ ] Führungs-Gates aus `COMPETITOR_REVIEW_M2_2.md` schließen
+- [ ] 9,5-Gate erst nach Messwerten, Accessibility-/OEM-Lab und geschlossenen Führungs-Gaps neu prüfen
 
 ## M3 – Sichere Agenten und optionale APIs
 

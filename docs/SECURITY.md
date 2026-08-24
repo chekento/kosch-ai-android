@@ -1,6 +1,6 @@
 # Sicherheit und Datenschutz
 
-## M2.2-Dateninventar
+## M2.3-Dateninventar
 
 KoSch verarbeitet lokal:
 
@@ -9,15 +9,18 @@ KoSch verarbeitet lokal:
 - Szene, Home-Raum, Kartenpositionen, Dock-Pins, lokale Ordner, Widget-Host-IDs und zuletzt über KoSch gestartete profilgebundene App-Schlüssel;
 - lokal gezeichnete Pen-Space-Vektorstriche mit Werkzeug, normalisiertem `x/y`, Druck und Neigung; begrenzt auf 100 Striche und 2.048 Punkte je Strich;
 - nach ausdrücklicher Android-Auswahl: URI-Metadaten und bei erkannten Textformaten höchstens 4.096 Zeichen Textpräfix;
+- nach einmaliger Android-Kontaktauswahl: Anzeigename und eine gewählte Telefonnummer ausschließlich im flüchtigen Telefon-Sheet;
+- lokales Audit aus Zeitpunkt, festem Aktionstyp und Ergebnis, begrenzt auf 250 Ereignisse und 90 Tage;
+- bei manuellem Backup: ein versionierter Workspace-Snapshot und sein verschlüsselter Export-Envelope;
 - Text, den die Person in `⌘ Ask` eingibt oder aus der gestarteten Spracherkennungs-Activity übernimmt.
 
 Nach separatem Android-Opt-in werden für Notification Dots ausschließlich Paketnamen und Anzahlen aktiver, nicht laufender Meldungen verarbeitet. Nicht kopiert oder gespeichert werden Notification-Titel, Text, Personen, Extras, Aktionen oder RemoteViews.
 
-Nicht gelesen werden Standort, Kontakte, Kalender, Anrufliste, SMS, Zwischenablage, Fotosammlung, permanenter Mikrofonstream oder Bildschirm. Aus einer gewählten Binärdatei werden keine vermeintlichen Textinhalte extrahiert. Namen, Vendor-/Product-ID und Seriennummer erkannter Eingabegeräte werden nicht im Workspace gespeichert.
+Nicht gelesen werden Standort, gesamtes Adressbuch, Kalender, Anrufliste, SMS, Zwischenablage, Fotosammlung, permanenter Mikrofonstream oder Bildschirm. Aus einer gewählten Binärdatei werden keine vermeintlichen Textinhalte extrahiert. Namen, Vendor-/Product-ID und Seriennummer erkannter Eingabegeräte werden nicht im Workspace gespeichert.
 
 ## Berechtigungsbudget
 
-M2.2 deklariert als `uses-permission` nur `ACCESS_NETWORK_STATE`. Damit erkennt die Context Engine, ob ein validiertes Netz existiert. Stylus-Erkennung über `InputManager` benötigt keine zusätzliche gefährliche Berechtigung. Es gibt bewusst kein:
+M2.3 deklariert als `uses-permission` nur `ACCESS_NETWORK_STATE`. Damit erkennt die Context Engine, ob ein validiertes Netz existiert. Stylus- und einmalige Kontaktauswahl benötigen keine zusätzliche gefährliche Berechtigung. Es gibt bewusst kein:
 
 - `INTERNET`;
 - `CALL_PHONE` oder Kontakte-/Anruflistenrecht;
@@ -32,11 +35,21 @@ Die App deklariert einen durch das System gebundenen Notification-Listener-Servi
 
 ## Telefon
 
-KoSch verwendet `ACTION_DIAL`. Eine erkannte Nummer wird höchstens normalisiert und im System-Wähler vorbereitet. Der tatsächliche Anruf bleibt eine Benutzeraktion. KoSch übernimmt keine Default-Dialer-, `InCallService`- oder Notruffunktion und behauptet dies auch nicht.
+KoSch verwendet `ACTION_DIAL`. Eine erkannte Nummer wird höchstens normalisiert und im System-Wähler vorbereitet. Der tatsächliche Anruf bleibt eine Benutzeraktion. `ACTION_PICK` wird auf den Phone-Datentyp begrenzt; auf Android 17 fordert KoSch den datenschutzfreundlichen System-Picker explizit an. Es gibt kein `READ_CONTACTS`; die gewählte Nummer wird nicht persistiert oder in das Audit geschrieben. KoSch übernimmt keine Default-Dialer-, `InCallService`- oder Notruffunktion.
+
+## Portables Backup und Restore
+
+Der Workspace-Snapshot ist größenbegrenzt und versioniert. `PortableBackupCodec` verwendet PBKDF2-HMAC-SHA-256 mit 210.000 Iterationen, zufälligem 16-Byte-Salt und einen 256-Bit-Schlüssel für `AES/GCM/NoPadding` mit zufälliger 12-Byte-Nonce und 128-Bit-Tag. Formatversion und Iterationszahl sind GCM-AAD. Die Passphrase wird nicht gespeichert; verarbeitbare `CharArray`-/Byte-Puffer werden bestmöglich überschrieben.
+
+Vor dem Restore werden Authentizität, Format, Version, Zeitgrenze, Payload-Größe, Listenlimits, Enum-Werte, Stringlängen, endliche normalisierte Positionen und Stiftwerte geprüft. Die Oberfläche zeigt einen Dry Run und verlangt eine zweite Bestätigung. Erst dann folgt ein synchroner, einzelner Preferences-Commit. Widget-Host-IDs, URI-Grants, Secrets, Notification-Daten und Audit sind ausgeschlossen. Eine zwischenzeitlich geschlossene Backup-Fläche invalidiert laufende Prepare-/Preview-Ergebnisse über einen Request-Token.
+
+## Lokales Audit
+
+`LocalAuditLog` besitzt absichtlich kein Freitextfeld. Ein Event enthält nur Millisekunden-Zeitpunkt, `AuditAction` und `AuditOutcome`. So können Prompts, Kontaktwerte, Nummern, Dateinamen, Pfade und Benachrichtigungsinhalte nicht über eine frei beschreibbare Detailspalte einsickern. Die Liste ist auf 250 Einträge beziehungsweise 90 Tage begrenzt, kann als dreispaltige CSV über SAF exportiert und vollständig gelöscht werden. Sie ist vom Workspace-Backup getrennt.
 
 ## Dateien
 
-Das Storage Access Framework gibt nur die vom Nutzer gewählte URI frei. Der Zugriff ist read-only. M2.2 verwaltet höchstens eine langfristige Freigabe, löst den vorherigen Zugriff nach erfolgreicher neuer Wahl und bietet „Dateizugriff vergessen“. Die lokale Analyse ist begrenzt und fehlertolerant; es gibt keine Lösch-, Rename-, Move- oder Upload-Aktion. Ein vorgeschlagener Dateiname ist nur Text in einer Vorschau.
+Das Storage Access Framework gibt nur die vom Nutzer gewählte URI frei. Der Zugriff ist read-only. M2.3 verwaltet höchstens eine langfristige Freigabe, löst den vorherigen Zugriff nach erfolgreicher neuer Wahl und bietet „Dateizugriff vergessen“. Die lokale Analyse ist begrenzt und fehlertolerant; es gibt keine Lösch-, Rename-, Move- oder Upload-Aktion. Ein vorgeschlagener Dateiname ist nur Text in einer Vorschau.
 
 ## Notification Dots
 
@@ -46,7 +59,7 @@ Der opt-in Listener hält nur ein flüchtiges `packageName → count`-Abbild. La
 
 Aktuelle Stiftfähigkeiten, Druck, Neigung, Orientierung, Hover, Werkzeug und Tastenstatus leben im Prozesszustand. Persistiert wird nur die bewusst auf Pen Space erzeugte, begrenzte Vektorgrafik. Die Zeichenfläche akzeptiert ausschließlich Stylus-/Eraser-Werkzeuge; Fingerereignisse werden verworfen. Es gibt weder Cloud-Upload noch OCR, Handschriftprofil, biometrische Identifikation oder semantische Analyse der Striche.
 
-Die Persistenz nutzt normalisierte Koordinaten und Schema v3. Eingaben werden auf endliche Werte, Bereichsgrenzen, maximale Punktzahl und maximale Strichzahl reduziert. Ein späterer Export, Vision-Modell oder Handschrift-Index benötigt eine separate Vorschau, explizite Auswahl, Retention und vollständige Löschung.
+Die Persistenz nutzt normalisierte Koordinaten und Schema v5. Eingaben werden auf endliche Werte, Bereichsgrenzen, maximale Punktzahl und maximale Strichzahl reduziert. Der manuelle Workspace-Export übernimmt die Striche erst nach Passphrase-Eingabe; Vision-Modell oder Handschrift-Index benötigen weiterhin eine separate Vorschau, explizite Auswahl, Retention und vollständige Löschung.
 
 ## Profile und Private Space
 
@@ -64,7 +77,7 @@ PocketPal, ChatterUI und Maid sind optionale Drittprojekte. Die Anzeige ihrer Li
 
 Der ruhende `SecureCredentialVault` nutzt Android Keystore sowie AES-256/GCM. Schlüsselmaterial bleibt nicht exportierbar; Ciphertexte sind per Provider-ID als Associated Data gebunden. `allowBackup=false` verhindert App-Daten-Backup. Der Quellcode enthält keine Provider-Secrets.
 
-M2.2 fordert keine Schlüssel an und liest den Vault nicht aus. Vor einem aktiven API-Modul sind zwingend:
+M2.3 fordert keine API-Schlüssel an und liest den Vault nicht aus. Vor einem aktiven API-Modul sind zwingend:
 
 1. getrenntes Netzwerkmodul/Build Flavor;
 2. Kontextvorschau mit Feld-für-Feld-Auswahl;
@@ -87,17 +100,18 @@ M2.2 fordert keine Schlüssel an und liest den Vault nicht aus. Vor einem aktive
 
 LLM-Ausgaben sind Daten, keine Autorität. Sie dürfen keine Capability direkt erzeugen oder erweitern.
 
-## Bekannte M2.2-Risiken
+## Bekannte M2.3-Risiken
 
 - keine instrumentierten Geräte-/OEM-Tests;
 - Smartpen-Erkennung und Ink-Latenz sind noch nicht gegen ein USI-/S-Pen-/Pixel-Pen-Gerätelabor validiert;
 - eigene `PressureInkView` nutzt noch keine Historical-/Coalesced-Event-Optimierung und keinen gemessenen Latenz-Budget-Gate;
-- Widget-Restore und Größenänderung noch unvollständig;
+- Widget-Größenpresets sind implementiert; freie Platzierung, Stacks, Undo und geräteübergreifendes Provider-Restore-Mapping bleiben unvollständig;
 - Dateianalyse ist heuristisch und erkennt keine Schadsoftware;
 - externe Share-Ziele können Text anders behandeln als erwartet;
 - Voice hängt vom installierten Android-Spracherkenner ab und ist nicht garantiert offline;
 - Vault-Sicherheitscode ist vorbereitet, aber noch nicht durch End-to-End-Key-Rotation oder Hardware-Attestation validiert;
 - keine Security-Audit- oder Penetration-Test-Freigabe;
+- Backup-Kryptografie ist unit-getestet, aber noch nicht unabhängig auditiert oder über Prozess-Tod/OEM-Dateiprovider instrumentiert getestet;
 - Notification-Dot-Semantik ist noch nicht gegen alle Work-/Private-Profile-Zustände und OEM-Service-Killer geprüft;
 - Smart Dock/Ordner nutzen transparente String-Heuristiken und lernen noch kein persönliches Modell.
 

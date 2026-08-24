@@ -48,7 +48,7 @@ class MainActivity : ComponentActivity() {
         if (spoken.isNullOrBlank()) {
             controller.postNotice("Keine Spracheingabe übernommen")
         } else {
-            controller.submitCommand(spoken, ::requestVoiceInput, ::requestDocument)
+            controller.submitCommand(spoken, ::requestVoiceInput, ::requestDocument, ::requestContact)
         }
     }
 
@@ -222,6 +222,7 @@ class MainActivity : ComponentActivity() {
             isMetaPressed = event.isMetaPressed,
             isShiftPressed = event.isShiftPressed,
         ) ?: return super.dispatchKeyShortcutEvent(event)
+        controller.closeTopSurface()
         when (shortcut) {
             ProfessionalShortcut.COMMAND -> controller.requestCommandFocus()
             ProfessionalShortcut.APPS -> controller.openDrawer()

@@ -14,6 +14,10 @@ sealed interface LauncherCommand {
     data object OpenWidgets : LauncherCommand
     data object OpenFaq : LauncherCommand
     data object OpenPenSpace : LauncherCommand
+    data object OpenBackup : LauncherCommand
+    data object OpenAudit : LauncherCommand
+    data object OpenProDesk : LauncherCommand
+    data object PickContact : LauncherCommand
     data class OpenPhone(val number: String?) : LauncherCommand
     data class OpenSystemPanel(val panel: SystemPanel) : LauncherCommand
     data class SwitchScene(val scene: SceneId) : LauncherCommand
@@ -34,6 +38,10 @@ class LocalCommandPlanner {
         if (normalized in widgetCommands) return LauncherCommand.OpenWidgets
         if (normalized in faqCommands) return LauncherCommand.OpenFaq
         if (normalized in penCommands) return LauncherCommand.OpenPenSpace
+        if (normalized in backupCommands) return LauncherCommand.OpenBackup
+        if (normalized in auditCommands) return LauncherCommand.OpenAudit
+        if (normalized in proDeskCommands) return LauncherCommand.OpenProDesk
+        if (normalized in contactCommands) return LauncherCommand.PickContact
         systemPanelFrom(normalized)?.let { return LauncherCommand.OpenSystemPanel(it) }
         phoneFrom(raw, normalized)?.let { return it }
 
@@ -110,6 +118,18 @@ class LocalCommandPlanner {
         )
         val penCommands = setOf(
             "pen space", "penspace", "stift", "smartpen", "notiz", "zeichnen",
+        )
+        val backupCommands = setOf(
+            "backup", "sicherung", "workspace sichern", "backup exportieren", "backup importieren",
+        )
+        val auditCommands = setOf(
+            "audit", "audit log", "aktionsverlauf", "sicherheitsverlauf",
+        )
+        val proDeskCommands = setOf(
+            "pro desk", "prodesk", "kommandozentrale", "professional dashboard",
+        )
+        val contactCommands = setOf(
+            "kontakt", "kontakte", "kontakt auswahlen", "kontakt wählen", "kontakt waehlen",
         )
         val phoneCommands = setOf(
             "telefon", "wahler", "dialer", "anrufen", "phone",

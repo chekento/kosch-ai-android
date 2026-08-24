@@ -72,4 +72,12 @@ class LocalCommandPlannerTest {
     fun `pen command opens the local pen workspace`() {
         assertEquals(LauncherCommand.OpenPenSpace, planner.plan("Pen Space"))
     }
+
+    @Test
+    fun `professional commands remain deterministic and local`() {
+        assertEquals(LauncherCommand.OpenProDesk, planner.plan("Pro Desk"))
+        assertEquals(LauncherCommand.OpenBackup, planner.plan("Workspace sichern"))
+        assertEquals(LauncherCommand.OpenAudit, planner.plan("Sicherheitsverlauf"))
+        assertEquals(LauncherCommand.PickContact, planner.plan("Kontakt auswählen"))
+    }
 }
