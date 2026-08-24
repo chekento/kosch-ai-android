@@ -80,4 +80,12 @@ class LocalCommandPlannerTest {
         assertEquals(LauncherCommand.OpenAudit, planner.plan("Sicherheitsverlauf"))
         assertEquals(LauncherCommand.PickContact, planner.plan("Kontakt auswählen"))
     }
+
+    @Test
+    fun `professional Android settings remain explicit system routes`() {
+        assertEquals(LauncherCommand.OpenSystemPanel(SystemPanel.WALLPAPER), planner.plan("Hintergrundbild"))
+        assertEquals(LauncherCommand.OpenSystemPanel(SystemPanel.ACCESSIBILITY), planner.plan("Barrierefreiheit"))
+        assertEquals(LauncherCommand.OpenSystemPanel(SystemPanel.DEFAULT_APPS), planner.plan("Standard Apps"))
+        assertEquals(LauncherCommand.OpenSystemPanel(SystemPanel.STORAGE), planner.plan("Speicher"))
+    }
 }

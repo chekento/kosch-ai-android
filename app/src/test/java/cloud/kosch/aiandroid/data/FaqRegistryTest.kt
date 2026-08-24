@@ -8,7 +8,7 @@ import org.junit.Test
 class FaqRegistryTest {
     @Test
     fun `faq covers the launcher safety and pen surface broadly`() {
-        assertTrue(FaqRegistry.entries.size >= 40)
+        assertTrue(FaqRegistry.entries.size >= 50)
         assertTrue(FaqRegistry.entries.any { it.id == "escape" })
         assertTrue(FaqRegistry.entries.any { it.id == "pen-space" })
         assertTrue(FaqRegistry.entries.any { it.id == "private-space" })
@@ -16,6 +16,9 @@ class FaqRegistryTest {
         assertTrue(FaqRegistry.entries.any { it.id == "audit" })
         assertTrue(FaqRegistry.entries.any { it.id == "m2-3-rating" })
         assertTrue(FaqRegistry.entries.any { it.id == "quality-gates" })
+        assertTrue(FaqRegistry.entries.any { it.id == "process-recovery" })
+        assertTrue(FaqRegistry.entries.any { it.id == "pen-svg" })
+        assertTrue(FaqRegistry.entries.any { it.id == "local-learning" })
     }
 
     @Test

@@ -166,6 +166,26 @@ fun ColumnScope.ProfessionalHubSurface(
             }
 
             item {
+                Surface(color = Sky.copy(alpha = 0.09f), shape = RoundedCornerShape(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(13.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = Sky)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Adaptive Local Core", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "${controller.appUsageSignals.size} lokale Nutzungssignale · ${controller.hiddenAppKeys.size} verborgene Apps · jederzeit löschbar",
+                                color = MutedMist,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
+                }
+            }
+
+            item {
                 Text("Werkzeuge", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             }
             items(actions.chunked(2)) { pair ->
@@ -297,7 +317,7 @@ fun BackupSheet(
                 Surface(color = RaisedSurface, shape = RoundedCornerShape(17.dp)) {
                     Column(Modifier.fillMaxWidth().padding(13.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Exportumfang", fontWeight = FontWeight.SemiBold)
-                        Text("Szene, Home-Seite, Layout, KoSch-Verlauf, Pins, Ordner und Pen-Striche", color = MutedMist, style = MaterialTheme.typography.bodySmall)
+                        Text("Szene, Home-Seite, Layout, Verlauf, Pins, verborgene Apps, lokale Lernsignale, Ordner und Pen-Striche", color = MutedMist, style = MaterialTheme.typography.bodySmall)
                         Text("Ohne Widgets, Dateifreigaben, Secrets, Benachrichtigungsdaten und Audit", color = Sky, style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -375,7 +395,7 @@ fun BackupSheet(
                                 Spacer(Modifier.width(8.dp))
                                 Text("Backup validiert", fontWeight = FontWeight.SemiBold)
                             }
-                            Text("${preview.scene.title} · ${preview.homePage.title} · ${preview.folderCount} Ordner · ${preview.pinnedCount} Pins · ${preview.inkStrokeCount} Stiftstriche")
+                            Text("${preview.scene.title} · ${preview.homePage.title} · ${preview.folderCount} Ordner · ${preview.pinnedCount} Pins · ${preview.hiddenCount} verborgen · ${preview.usageSignalCount} Lernsignale · ${preview.inkStrokeCount} Stiftstriche")
                             preview.skippedItems.forEach { Text("• $it", color = MutedMist, style = MaterialTheme.typography.bodySmall) }
                         }
                     }

@@ -18,6 +18,7 @@ import cloud.kosch.aiandroid.ai.LocalAppClassifier
 import cloud.kosch.aiandroid.ai.LocalCommandPlanner
 import cloud.kosch.aiandroid.ai.LocalFileIntelligenceEngine
 import cloud.kosch.aiandroid.ai.LocalSmartOrganizer
+import cloud.kosch.aiandroid.ai.LocalUsageModel
 import cloud.kosch.aiandroid.ai.PhoneNumberParser
 import cloud.kosch.aiandroid.ai.SearchDocument
 import cloud.kosch.aiandroid.ai.SearchRanker
@@ -25,10 +26,12 @@ import cloud.kosch.aiandroid.ai.SmartAppDescriptor
 import cloud.kosch.aiandroid.ai.SmartCollection
 import cloud.kosch.aiandroid.data.AppCatalog
 import cloud.kosch.aiandroid.data.LocalAuditLog
+import cloud.kosch.aiandroid.data.InkSvgExporter
 import cloud.kosch.aiandroid.data.WorkspaceStore
 import cloud.kosch.aiandroid.model.AuditAction
 import cloud.kosch.aiandroid.model.AuditEvent
 import cloud.kosch.aiandroid.model.AuditOutcome
+import cloud.kosch.aiandroid.model.AppUsageSignal
 import cloud.kosch.aiandroid.model.BackupPreview
 import cloud.kosch.aiandroid.model.ContextSnapshot
 import cloud.kosch.aiandroid.model.DefaultWorkspace
@@ -137,6 +140,10 @@ class LauncherController(context: Context) {
         private set
     var pinnedAppKeys by mutableStateOf(store.pinnedAppKeys())
         private set
+    var hiddenAppKeys by mutableStateOf(store.hiddenAppKeys())
+        private set
+    var appUsageSignals by mutableStateOf(store.appUsageSignals())
+        private set
     var folders by mutableStateOf(store.folders())
         private set
     var folderPreview by mutableStateOf<List<LauncherFolder>?>(null)
@@ -169,8 +176,11 @@ class LauncherController(context: Context) {
         private set
     var commandFocusRequest by mutableStateOf(0L)
         private set
+    var canUndoWidgetOrder by mutableStateOf(false)
+        private set
 
     private var undoPositions: Map<SceneId, Map<String, TilePosition>>? = null
+    private var undoWidgetOrder: List<Int>? = null
     private var stagedBackupEnvelope: String? = null
     private var stagedWorkspacePayload: ByteArray? = null
     private var backupRequestToken = 0L
@@ -251,6 +261,13 @@ class LauncherController(context: Context) {
     fun saveInkStrokes(strokes: List<InkStroke>) {
         store.saveInkStrokes(strokes)
         audit(AuditAction.PEN_SAVE, AuditOutcome.SUCCESS)
+    }
+
+    fun inkSvg(): ByteArray = InkSvgExporter.export(store.inkStrokes())
+
+    fun recordInkExport(success: Boolean) {
+        audit(AuditAction.PEN_EXPORT, if (success) AuditOutcome.SUCCESS else AuditOutcome.FAILED)
+        notice = if (success) "Pen Space als SVG gespeichert" else "Pen-SVG wurde nicht gespeichert"
     }
 
     fun openFaq() {
@@ -438,6 +455,17 @@ class LauncherController(context: Context) {
         auditLog.clear()
         auditEvents = emptyList()
         notice = "Lokales Audit vollständig gelöscht"
+    }
+
+    fun clearPersonalization(confirmed: Boolean) {
+        if (CapabilityPolicy.rule(CapabilityAction.RESET_PERSONALIZATION).requiresConfirmation && !confirmed) {
+            notice = "Das Zurücksetzen der lokalen Lernsignale braucht eine Bestätigung"
+            return
+        }
+        store.clearAppUsage()
+        appUsageSignals = emptyMap()
+        audit(AuditAction.PERSONALIZATION_RESET, AuditOutcome.SUCCESS)
+        notice = "Lokale Lernsignale vollständig zurückgesetzt"
     }
 
     fun auditCsv(): ByteArray = auditLog.exportCsv()
@@ -784,6 +812,32 @@ class LauncherController(context: Context) {
         audit(AuditAction.WIDGET_CHANGE, AuditOutcome.SUCCESS)
     }
 
+    fun moveWidget(appWidgetId: Int, delta: Int) {
+        val from = widgetIds.indexOf(appWidgetId)
+        if (from < 0 || widgetIds.isEmpty()) return
+        val to = (from + delta).coerceIn(0, widgetIds.lastIndex)
+        if (from == to) return
+        undoWidgetOrder = widgetIds.toList()
+        widgetIds = widgetIds.toMutableList().apply {
+            add(to, removeAt(from))
+        }
+        store.saveWidgetOrder(widgetIds)
+        canUndoWidgetOrder = true
+        audit(AuditAction.WIDGET_CHANGE, AuditOutcome.SUCCESS)
+        notice = "Widget-Reihenfolge angepasst"
+    }
+
+    fun undoWidgetOrder() {
+        val previous = undoWidgetOrder ?: return
+        val current = widgetIds
+        widgetIds = previous.filter(widgetIds::contains) + widgetIds.filterNot(previous::contains)
+        store.saveWidgetOrder(widgetIds)
+        undoWidgetOrder = current
+        canUndoWidgetOrder = true
+        audit(AuditAction.WIDGET_CHANGE, AuditOutcome.SUCCESS)
+        notice = "Widget-Reihenfolge rückgängig gemacht"
+    }
+
     fun widgetSize(appWidgetId: Int): WidgetSizePreset =
         widgetSizes[appWidgetId] ?: WidgetSizePreset.STANDARD
 
@@ -838,12 +892,42 @@ class LauncherController(context: Context) {
         }
     }
 
+    fun isHidden(app: LaunchableApp): Boolean = app.key in hiddenAppKeys
+
+    fun toggleSelectedAppHidden() {
+        val app = selectedApp ?: return
+        val hiding = app.key !in hiddenAppKeys
+        hiddenAppKeys = if (hiding) {
+            (hiddenAppKeys + app.key).distinct()
+        } else {
+            hiddenAppKeys.filterNot { it == app.key }
+        }
+        if (hiding && app.key in pinnedAppKeys) {
+            pinnedAppKeys = pinnedAppKeys.filterNot { it == app.key }
+            store.savePinnedAppKeys(pinnedAppKeys)
+        }
+        store.saveHiddenAppKeys(hiddenAppKeys)
+        audit(AuditAction.APP_VISIBILITY, AuditOutcome.SUCCESS)
+        hideAppActions()
+        notice = if (hiding) {
+            "${app.label} verborgen – erreichbar über Apps → Verborgen"
+        } else {
+            "${app.label} wieder eingeblendet"
+        }
+    }
+
     fun smartDockApps(): List<LaunchableApp> {
-        val byKey = apps.associateBy(LaunchableApp::key)
+        val visibleApps = apps.filterNot { it.key in hiddenAppKeys }
+        val byKey = visibleApps.associateBy(LaunchableApp::key)
         return LocalSmartOrganizer.smartDockKeys(
-            apps = appDescriptors(),
+            apps = visibleApps.map { it.toSmartDescriptor() },
             pinnedKeys = pinnedAppKeys,
             recentPackages = recentPackages,
+            usageKeys = LocalUsageModel.rankKeys(
+                visibleApps.map(LaunchableApp::key),
+                appUsageSignals,
+                System.currentTimeMillis(),
+            ).filter(appUsageSignals::containsKey),
             scene = activeScene,
             limit = DOCK_SIZE,
         ).mapNotNull(byKey::get)
@@ -908,7 +992,7 @@ class LauncherController(context: Context) {
 
     fun folderApps(folder: LauncherFolder): List<LaunchableApp> {
         val byKey = apps.associateBy(LaunchableApp::key)
-        return folder.appKeys.mapNotNull(byKey::get)
+        return folder.appKeys.mapNotNull(byKey::get).filterNot { it.key in hiddenAppKeys }
     }
 
     fun removeFolder(folderId: String) {
@@ -928,6 +1012,9 @@ class LauncherController(context: Context) {
             .onSuccess {
                 store.recordRecent(shortcut.packageName)
                 recentPackages = store.recentPackages()
+                selectedApp?.takeIf { it.packageName == shortcut.packageName }?.let { app ->
+                    appUsageSignals = store.recordAppUsage(app.key)
+                }
                 hideAppActions()
                 drawerVisible = false
                 audit(AuditAction.APP_SHORTCUT, AuditOutcome.SUCCESS)
@@ -942,6 +1029,30 @@ class LauncherController(context: Context) {
         val app = selectedApp ?: return
         systemActions.openAppInfo(app.packageName)
             .onFailure { notice = "App-Info konnte nicht geöffnet werden" }
+    }
+
+    fun openSelectedAppStore() {
+        val app = selectedApp ?: return
+        systemActions.openStoreListing(app.packageName)
+            .onFailure { notice = "Store-Seite konnte nicht geöffnet werden" }
+    }
+
+    fun requestSelectedAppUninstall(confirmed: Boolean) {
+        val app = selectedApp ?: return
+        if (CapabilityPolicy.rule(CapabilityAction.REQUEST_UNINSTALL).requiresConfirmation && !confirmed) {
+            notice = "Die Deinstallation braucht eine ausdrückliche Bestätigung"
+            return
+        }
+        systemActions.requestUninstall(app.packageName)
+            .onSuccess {
+                hideAppActions()
+                audit(AuditAction.APP_UNINSTALL_REQUEST, AuditOutcome.SUCCESS)
+                notice = "Android prüft und bestätigt die Deinstallation"
+            }
+            .onFailure {
+                audit(AuditAction.APP_UNINSTALL_REQUEST, AuditOutcome.FAILED)
+                notice = "Deinstallationsdialog konnte nicht geöffnet werden"
+            }
     }
 
     fun submitCommand(
@@ -978,6 +1089,7 @@ class LauncherController(context: Context) {
             .onSuccess {
                 store.recordRecent(app.packageName)
                 recentPackages = store.recentPackages()
+                appUsageSignals = store.recordAppUsage(app.key)
                 drawerVisible = false
                 hideAppActions()
                 audit(AuditAction.APP_LAUNCH, AuditOutcome.SUCCESS)
@@ -993,9 +1105,15 @@ class LauncherController(context: Context) {
         collection: SmartCollection,
     ): List<LaunchableApp> {
         val providerPackages = AiProviderRegistry.installedProviderPackages(apps)
-        val filtered = apps.filter { app ->
+        val visibilityFiltered = if (collection == SmartCollection.HIDDEN) {
+            apps.filter { it.key in hiddenAppKeys }
+        } else {
+            apps.filterNot { it.key in hiddenAppKeys }
+        }
+        val effectiveCollection = if (collection == SmartCollection.HIDDEN) SmartCollection.ALL else collection
+        val filtered = visibilityFiltered.filter { app ->
             LocalAppClassifier.belongsTo(
-                collection = collection,
+                collection = effectiveCollection,
                 label = app.label,
                 packageName = app.packageName,
                 recentPackages = recentPackages,
@@ -1013,11 +1131,18 @@ class LauncherController(context: Context) {
                 )
             },
         ).mapNotNull { byKey[it.id] }
-        return if (collection == SmartCollection.RECENT && query.isBlank()) {
-            ranked.sortedBy { recentPackages.indexOf(it.packageName).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE }
-        } else {
-            ranked
+        if (collection == SmartCollection.RECENT && query.isBlank()) {
+            return ranked.sortedBy {
+                recentPackages.indexOf(it.packageName).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE
+            }
         }
+        if (query.isNotBlank()) return ranked
+        val byRankedKey = ranked.associateBy(LaunchableApp::key)
+        return LocalUsageModel.rankKeys(
+            ranked.map(LaunchableApp::key),
+            appUsageSignals,
+            System.currentTimeMillis(),
+        ).mapNotNull(byRankedKey::get)
     }
 
     fun installedProviderApp(provider: AiProviderProfile): LaunchableApp? =
@@ -1097,6 +1222,18 @@ class LauncherController(context: Context) {
             mainHandler.post {
                 loaded.onSuccess { catalog ->
                     apps = catalog.filterNot { it.packageName == appContext.packageName }
+                    val aliases = apps.flatMap { app ->
+                        app.legacyKeys.map { legacy -> legacy to app.key }
+                    }.groupBy { it.first }
+                        .mapNotNull { (legacy, candidates) ->
+                            candidates.map { it.second }.distinct().singleOrNull()?.let { legacy to it }
+                        }.toMap()
+                    if (store.migrateLegacyAppKeys(aliases)) {
+                        pinnedAppKeys = store.pinnedAppKeys()
+                        hiddenAppKeys = store.hiddenAppKeys()
+                        appUsageSignals = store.appUsageSignals()
+                        folders = store.folders()
+                    }
                     if (!store.areFoldersInitialized() && apps.isNotEmpty()) {
                         folders = LocalSmartOrganizer.proposeFolders(appDescriptors())
                         store.saveFolders(folders)
@@ -1121,6 +1258,8 @@ class LauncherController(context: Context) {
         workspacePositions = store.loadPositions()
         recentPackages = store.recentPackages()
         pinnedAppKeys = store.pinnedAppKeys()
+        hiddenAppKeys = store.hiddenAppKeys()
+        appUsageSignals = store.appUsageSignals()
         folders = store.folders()
         folderPreview = null
         previewPositions = null
@@ -1151,7 +1290,9 @@ class LauncherController(context: Context) {
         }
     }
 
-    private fun appDescriptors(): List<SmartAppDescriptor> = apps.map { it.toSmartDescriptor() }
+    private fun appDescriptors(): List<SmartAppDescriptor> = apps
+        .filterNot { it.key in hiddenAppKeys }
+        .map { it.toSmartDescriptor() }
 
     private fun LaunchableApp.toSmartDescriptor() = SmartAppDescriptor(
         key = key,

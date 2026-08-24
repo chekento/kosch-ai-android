@@ -12,8 +12,8 @@ android {
         applicationId = "cloud.kosch.aiandroid"
         minSdk = 29
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.2.3-alpha01"
+        versionCode = 6
+        versionName = "0.2.4-alpha01"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true
@@ -57,6 +57,7 @@ kotlin {
 
 dependencies {
     implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.activity.ktx)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.foundation)
     implementation(libs.androidx.compose.material3)

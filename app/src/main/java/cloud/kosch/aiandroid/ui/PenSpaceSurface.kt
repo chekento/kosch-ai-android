@@ -31,6 +31,7 @@ import androidx.compose.material.icons.rounded.BorderColor
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Draw
+import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -52,6 +53,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import cloud.kosch.aiandroid.LauncherController
+import cloud.kosch.aiandroid.data.InkStrokeNormalizer
 import cloud.kosch.aiandroid.model.InkPoint
 import cloud.kosch.aiandroid.model.InkStroke
 import cloud.kosch.aiandroid.model.InkTool
@@ -69,6 +71,7 @@ import kotlin.math.hypot
 fun ColumnScope.PenSpaceSurface(
     controller: LauncherController,
     onAsk: () -> Unit,
+    onExport: () -> Unit,
 ) {
     var selectedTool by remember { mutableStateOf(InkTool.PEN) }
     var inkView by remember { mutableStateOf<PressureInkView?>(null) }
@@ -161,6 +164,11 @@ fun ColumnScope.PenSpaceSurface(
                     onClick = onAsk,
                     label = { Text("An Ask") },
                     leadingIcon = { Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                )
+                AssistChip(
+                    onClick = onExport,
+                    label = { Text("SVG Export") },
+                    leadingIcon = { Icon(Icons.Rounded.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 )
             }
 
@@ -262,7 +270,7 @@ class PressureInkView @JvmOverloads constructor(
 
     fun setInitialStrokes(value: List<InkStroke>) {
         if (strokes.isNotEmpty()) return
-        strokes += value.deepCopy()
+        strokes += InkStrokeNormalizer.normalize(value).deepCopy()
         invalidate()
     }
 
@@ -363,7 +371,7 @@ class PressureInkView @JvmOverloads constructor(
                 if (!erasing) {
                     val target = activePoints.orEmpty().toMutableList()
                     target += event.point(index)
-                    if (target.isNotEmpty()) strokes += InkStroke(selectedTool, target)
+                    InkStrokeNormalizer.normalizeStroke(InkStroke(selectedTool, target))?.let(strokes::add)
                     activePoints = null
                 }
                 if (!erasing || eraserChanged) notifyChanged()
@@ -486,6 +494,11 @@ class PressureInkView @JvmOverloads constructor(
     }
 
     private fun notifyChanged() {
+        val normalized = InkStrokeNormalizer.normalize(strokes)
+        if (normalized != strokes) {
+            strokes.clear()
+            strokes += normalized
+        }
         onInkChanged(strokes.deepCopy())
     }
 

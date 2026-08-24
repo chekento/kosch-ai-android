@@ -60,6 +60,14 @@ class LocalCommandPlanner {
         "bluetooth", "bluetooth einstellungen" -> SystemPanel.BLUETOOTH
         "benachrichtigungen", "notification settings" -> SystemPanel.NOTIFICATIONS
         "benachrichtigungspunkte", "notification dots", "app punkte" -> SystemPanel.NOTIFICATION_ACCESS
+        "hintergrund", "hintergrundbild", "wallpaper" -> SystemPanel.WALLPAPER
+        "anzeige", "display", "bildschirm" -> SystemPanel.DISPLAY
+        "ton", "sound", "lautstarke", "lautstärke" -> SystemPanel.SOUND
+        "akku", "batterie", "battery" -> SystemPanel.BATTERY
+        "datenschutz", "privacy" -> SystemPanel.PRIVACY
+        "bedienungshilfen", "barrierefreiheit", "accessibility" -> SystemPanel.ACCESSIBILITY
+        "standard apps", "standard-apps", "default apps" -> SystemPanel.DEFAULT_APPS
+        "speicher", "storage" -> SystemPanel.STORAGE
         "android einstellungen", "systemeinstellungen", "settings" -> SystemPanel.ANDROID_SETTINGS
         "home auswahl", "launcher auswahl", "start app auswahl", "standard launcher" -> SystemPanel.HOME_SELECTION
         else -> null

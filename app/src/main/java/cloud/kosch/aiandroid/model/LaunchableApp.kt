@@ -19,4 +19,6 @@ data class LaunchableApp(
     val userSerialNumber: Long,
     val profile: AppProfile,
     val icon: ImageBitmap,
+    /** Keys used before M2.2; retained only long enough to repair persisted user choices. */
+    val legacyKeys: Set<String> = emptySet(),
 )

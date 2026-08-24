@@ -138,6 +138,7 @@ fun LauncherRoot(
     requestBackupExport: (String) -> Unit,
     requestBackupImport: () -> Unit,
     requestAuditExport: () -> Unit,
+    requestInkExport: () -> Unit,
     createWidgetView: (Context, Int, WidgetSizePreset) -> View?,
     deleteWidget: (Int) -> Unit,
     forgetDocument: () -> Unit,
@@ -241,6 +242,7 @@ fun LauncherRoot(
                                 },
                                 requestDocument = requestDocument,
                                 requestContact = requestContact,
+                                requestInkExport = requestInkExport,
                             )
                             PersistentSmartDock(controller)
                             AskDock(
@@ -273,6 +275,7 @@ fun LauncherRoot(
                             },
                             requestDocument = requestDocument,
                             requestContact = requestContact,
+                            requestInkExport = requestInkExport,
                         )
                         QuickActionsRail(
                             onPhone = controller::openPhone,
@@ -384,6 +387,7 @@ private fun ColumnScope.HomeSurface(
     onAsk: () -> Unit,
     requestDocument: () -> Unit,
     requestContact: () -> Unit,
+    requestInkExport: () -> Unit,
 ) {
     when (controller.homePage) {
         HomePage.PRO_DESK -> ProfessionalHubSurface(controller, onAsk, requestDocument, requestContact)
@@ -396,7 +400,7 @@ private fun ColumnScope.HomeSurface(
         }
 
         HomePage.SMART_SPACE -> SmartHomeSurface(controller)
-        HomePage.PEN_SPACE -> PenSpaceSurface(controller, onAsk)
+        HomePage.PEN_SPACE -> PenSpaceSurface(controller, onAsk, requestInkExport)
     }
 }
 
@@ -833,6 +837,8 @@ private fun AppDrawerSheet(controller: LauncherController) {
         controller.apps,
         controller.drawerCollection,
         controller.recentPackages,
+        controller.hiddenAppKeys,
+        controller.appUsageSignals,
     ) {
         controller.rankedApps(query, controller.drawerCollection)
     }

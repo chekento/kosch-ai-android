@@ -23,21 +23,29 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.rounded.AccessibilityNew
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Bluetooth
+import androidx.compose.material.icons.rounded.BatterySaver
 import androidx.compose.material.icons.rounded.BusinessCenter
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Draw
+import androidx.compose.material.icons.rounded.DisplaySettings
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.ContactPhone
@@ -49,11 +57,18 @@ import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Phone
 import androidx.compose.material.icons.rounded.PushPin
+import androidx.compose.material.icons.rounded.PrivacyTip
 import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material.icons.rounded.Settings
+import androidx.compose.material.icons.rounded.Storage
+import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material.icons.rounded.Wifi
+import androidx.compose.material.icons.rounded.VolumeUp
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material.icons.rounded.Wallpaper
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -96,6 +111,7 @@ import cloud.kosch.aiandroid.ai.LocalRuntimeRegistry
 import cloud.kosch.aiandroid.ai.RuntimeStage
 import cloud.kosch.aiandroid.model.SystemPanel
 import cloud.kosch.aiandroid.model.WidgetSizePreset
+import cloud.kosch.aiandroid.ai.SmartCollection
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 import cloud.kosch.aiandroid.ui.theme.Ink
 import cloud.kosch.aiandroid.ui.theme.Mint
@@ -325,6 +341,7 @@ fun ControlCenterSheet(
     requestContact: () -> Unit,
     requestWidget: () -> Unit,
 ) {
+    var confirmPersonalizationReset by remember { mutableStateOf(false) }
     ModalBottomSheet(
         onDismissRequest = controller::closeControlCenter,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -373,12 +390,76 @@ fun ControlCenterSheet(
             }
             item {
                 ControlPair(
+                    left = ControlItem(
+                        "Verborgene Apps",
+                        "${controller.hiddenAppKeys.size} lokal ausgeblendet",
+                        Icons.Rounded.VisibilityOff,
+                    ) {
+                        controller.closeControlCenter()
+                        controller.openDrawer(SmartCollection.HIDDEN)
+                    },
+                    right = ControlItem(
+                        "Lokales Lernen",
+                        if (confirmPersonalizationReset) "Noch einmal tippen: löschen" else "${controller.appUsageSignals.size} Metadaten-Signale",
+                        Icons.Rounded.AutoAwesome,
+                    ) {
+                        if (confirmPersonalizationReset) {
+                            controller.clearPersonalization(confirmed = true)
+                            confirmPersonalizationReset = false
+                        } else {
+                            confirmPersonalizationReset = true
+                        }
+                    },
+                )
+            }
+            item {
+                ControlPair(
                     left = ControlItem("Kontakt", "Einmalige Systemauswahl", Icons.Rounded.ContactPhone) {
                         controller.closeControlCenter()
                         requestContact()
                     },
                     right = ControlItem("Pro Desk", "Kommandozentrale", Icons.Rounded.BusinessCenter) {
                         controller.openProDesk()
+                    },
+                )
+            }
+            item {
+                ControlPair(
+                    left = ControlItem("Hintergrund", "Android-Auswahl", Icons.Rounded.Wallpaper) {
+                        controller.openSystemPanel(SystemPanel.WALLPAPER)
+                    },
+                    right = ControlItem("Anzeige", "Display & Skalierung", Icons.Rounded.DisplaySettings) {
+                        controller.openSystemPanel(SystemPanel.DISPLAY)
+                    },
+                )
+            }
+            item {
+                ControlPair(
+                    left = ControlItem("Ton", "Audio & Vibration", Icons.Rounded.VolumeUp) {
+                        controller.openSystemPanel(SystemPanel.SOUND)
+                    },
+                    right = ControlItem("Akku", "Energieoptionen", Icons.Rounded.BatterySaver) {
+                        controller.openSystemPanel(SystemPanel.BATTERY)
+                    },
+                )
+            }
+            item {
+                ControlPair(
+                    left = ControlItem("Datenschutz", "Android Privacy", Icons.Rounded.PrivacyTip) {
+                        controller.openSystemPanel(SystemPanel.PRIVACY)
+                    },
+                    right = ControlItem("Bedienung", "Accessibility", Icons.Rounded.AccessibilityNew) {
+                        controller.openSystemPanel(SystemPanel.ACCESSIBILITY)
+                    },
+                )
+            }
+            item {
+                ControlPair(
+                    left = ControlItem("Standard-Apps", "Android-Zuordnung", Icons.Rounded.Apps) {
+                        controller.openSystemPanel(SystemPanel.DEFAULT_APPS)
+                    },
+                    right = ControlItem("Speicher", "Gerätespeicher", Icons.Rounded.Storage) {
+                        controller.openSystemPanel(SystemPanel.STORAGE)
                     },
                 )
             }
@@ -693,11 +774,19 @@ fun WidgetBoardSheet(
             modifier = Modifier.fillMaxWidth().fillMaxHeight(0.94f).padding(horizontal = 18.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            SheetHeader("Widget Board", "Echte Android-Widgets · persistente Host-IDs", controller::closeWidgetBoard)
-            Button(onClick = requestWidget, modifier = Modifier.fillMaxWidth()) {
-                Icon(Icons.Rounded.Add, contentDescription = null)
-                Spacer(Modifier.width(7.dp))
-                Text("Widget hinzufügen")
+            SheetHeader("Widget Board", "Echte Android-Widgets · Größe, Reihenfolge und Undo", controller::closeWidgetBoard)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = requestWidget, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Rounded.Add, contentDescription = null)
+                    Spacer(Modifier.width(7.dp))
+                    Text("Widget hinzufügen")
+                }
+                OutlinedButton(
+                    onClick = controller::undoWidgetOrder,
+                    enabled = controller.canUndoWidgetOrder,
+                ) {
+                    Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "Widget-Reihenfolge rückgängig")
+                }
             }
             if (controller.widgetIds.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -709,7 +798,7 @@ fun WidgetBoardSheet(
                 }
             } else {
                 LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxSize()) {
-                    items(controller.widgetIds, key = { it }) { appWidgetId ->
+                    itemsIndexed(controller.widgetIds, key = { _, id -> id }) { index, appWidgetId ->
                         val preset = controller.widgetSize(appWidgetId)
                         Surface(color = RaisedSurface, shape = RoundedCornerShape(20.dp)) {
                             Column(Modifier.fillMaxWidth().padding(10.dp)) {
@@ -726,6 +815,18 @@ fun WidgetBoardSheet(
                                         )
                                     }
                                     Spacer(Modifier.width(8.dp))
+                                    IconButton(
+                                        onClick = { controller.moveWidget(appWidgetId, -1) },
+                                        enabled = index > 0,
+                                    ) {
+                                        Icon(Icons.Rounded.ArrowUpward, contentDescription = "Widget nach oben")
+                                    }
+                                    IconButton(
+                                        onClick = { controller.moveWidget(appWidgetId, 1) },
+                                        enabled = index < controller.widgetIds.lastIndex,
+                                    ) {
+                                        Icon(Icons.Rounded.ArrowDownward, contentDescription = "Widget nach unten")
+                                    }
                                     IconButton(onClick = { deleteWidget(appWidgetId) }) {
                                         Icon(Icons.Rounded.DeleteOutline, contentDescription = "Widget entfernen")
                                     }
@@ -756,6 +857,7 @@ fun WidgetBoardSheet(
 @Composable
 fun AppActionsSheet(controller: LauncherController) {
     val app = controller.selectedApp ?: return
+    var confirmUninstall by remember(app.key) { mutableStateOf(false) }
     ModalBottomSheet(
         onDismissRequest = controller::hideAppActions,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -782,6 +884,35 @@ fun AppActionsSheet(controller: LauncherController) {
                     Spacer(Modifier.width(5.dp))
                     Text("App-Info")
                 }
+            }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                OutlinedButton(onClick = controller::openSelectedAppStore, modifier = Modifier.weight(1f)) {
+                    Icon(Icons.Rounded.Storefront, contentDescription = null)
+                    Spacer(Modifier.width(5.dp))
+                    Text("Store")
+                }
+                OutlinedButton(onClick = controller::toggleSelectedAppHidden, modifier = Modifier.weight(1f)) {
+                    Icon(
+                        if (controller.isHidden(app)) Icons.Rounded.Visibility else Icons.Rounded.VisibilityOff,
+                        contentDescription = null,
+                    )
+                    Spacer(Modifier.width(5.dp))
+                    Text(if (controller.isHidden(app)) "Einblenden" else "Verbergen")
+                }
+            }
+            TextButton(
+                onClick = {
+                    if (confirmUninstall) {
+                        controller.requestSelectedAppUninstall(confirmed = true)
+                    } else {
+                        confirmUninstall = true
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Rounded.DeleteOutline, contentDescription = null)
+                Spacer(Modifier.width(6.dp))
+                Text(if (confirmUninstall) "Mit Android-Deinstallationsdialog fortfahren" else "App deinstallieren …")
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 OutlinedButton(onClick = controller::toggleSelectedAppPin, modifier = Modifier.weight(1f)) {
