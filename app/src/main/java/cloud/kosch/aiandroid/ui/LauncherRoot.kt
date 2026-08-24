@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -109,6 +108,7 @@ import cloud.kosch.aiandroid.ai.AiProviderKind
 import cloud.kosch.aiandroid.ai.AiProviderRegistry
 import cloud.kosch.aiandroid.ai.SmartCollection
 import cloud.kosch.aiandroid.model.ContextSnapshot
+import cloud.kosch.aiandroid.model.AppProfile
 import cloud.kosch.aiandroid.model.HomePage
 import cloud.kosch.aiandroid.model.PositionedTile
 import cloud.kosch.aiandroid.model.SceneId
@@ -155,9 +155,10 @@ fun LauncherRoot(
             controller.contextDetailsVisible || controller.controlCenterVisible ||
             controller.phoneVisible || controller.fileSheetVisible ||
             controller.widgetBoardVisible || controller.appActionsVisible ||
-            controller.folderSheetVisible,
+            controller.folderSheetVisible || controller.faqVisible,
     ) {
         when {
+            controller.faqVisible -> controller.closeFaq()
             controller.appActionsVisible -> controller.hideAppActions()
             controller.folderSheetVisible -> controller.closeFolder()
             controller.phoneVisible -> controller.closePhone()
@@ -180,55 +181,99 @@ fun LauncherRoot(
                 .background(Ink),
         ) {
             NeuralGlassBackground(Modifier.fillMaxSize())
-            Column(
+            BoxWithConstraints(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(contentPadding)
-                    .systemBarsPadding()
                     .padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                LauncherHeader(
-                    controller = controller,
-                    requestHomeRole = requestHomeRole,
-                )
-                HomePageSelector(controller)
-                SceneSelector(
-                    activeScene = controller.activeScene,
-                    suggestedScene = controller.contextSnapshot.suggestedScene,
-                    onSceneSelected = controller::switchScene,
-                    onUseSuggestion = controller::useSuggestedScene,
-                )
-                if (controller.homePage == HomePage.WORKSPACE) {
-                    EditToolbar(controller)
-                    WorkspaceSurface(
-                        controller = controller,
-                        onAsk = {
-                            askFocusRequester.requestFocus()
-                            keyboardController?.show()
-                        },
-                    )
+                val wide = maxWidth >= 840.dp || (maxWidth >= 720.dp && maxWidth > maxHeight)
+                val spacing = if (maxHeight < 700.dp) 7.dp else 10.dp
+                if (wide) {
+                    Row(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    ) {
+                        Column(
+                            modifier = Modifier.width(if (maxWidth >= 1_000.dp) 340.dp else 292.dp),
+                            verticalArrangement = Arrangement.spacedBy(spacing),
+                        ) {
+                            LauncherNavigation(
+                                controller = controller,
+                                requestHomeRole = requestHomeRole,
+                            )
+                            QuickActionsRail(
+                                onPhone = controller::openPhone,
+                                onFiles = requestDocument,
+                                onWidgets = controller::openWidgetBoard,
+                                onControls = controller::openControlCenter,
+                                onPen = (controller::openPenSpace).takeIf { controller.stylusState.present },
+                                onHelp = controller::openFaq,
+                            )
+                        }
+                        Column(
+                            modifier = Modifier.weight(1f),
+                            verticalArrangement = Arrangement.spacedBy(spacing),
+                        ) {
+                            HomeSurface(
+                                controller = controller,
+                                onAsk = {
+                                    askFocusRequester.requestFocus()
+                                    keyboardController?.show()
+                                },
+                            )
+                            PersistentSmartDock(controller)
+                            AskDock(
+                                text = askText,
+                                onTextChange = { askText = it },
+                                focusRequester = askFocusRequester,
+                                onSubmit = {
+                                    controller.submitCommand(askText, requestVoiceInput, requestDocument)
+                                    askText = ""
+                                    keyboardController?.hide()
+                                },
+                                requestVoiceInput = requestVoiceInput,
+                            )
+                        }
+                    }
                 } else {
-                    SmartHomeSurface(controller)
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        verticalArrangement = Arrangement.spacedBy(spacing),
+                    ) {
+                        LauncherNavigation(
+                            controller = controller,
+                            requestHomeRole = requestHomeRole,
+                        )
+                        HomeSurface(
+                            controller = controller,
+                            onAsk = {
+                                askFocusRequester.requestFocus()
+                                keyboardController?.show()
+                            },
+                        )
+                        QuickActionsRail(
+                            onPhone = controller::openPhone,
+                            onFiles = requestDocument,
+                            onWidgets = controller::openWidgetBoard,
+                            onControls = controller::openControlCenter,
+                            onPen = (controller::openPenSpace).takeIf { controller.stylusState.present },
+                            onHelp = controller::openFaq,
+                        )
+                        PersistentSmartDock(controller)
+                        AskDock(
+                            text = askText,
+                            onTextChange = { askText = it },
+                            focusRequester = askFocusRequester,
+                            onSubmit = {
+                                controller.submitCommand(askText, requestVoiceInput, requestDocument)
+                                askText = ""
+                                keyboardController?.hide()
+                            },
+                            requestVoiceInput = requestVoiceInput,
+                        )
+                    }
                 }
-                QuickActionsRail(
-                    onPhone = controller::openPhone,
-                    onFiles = requestDocument,
-                    onWidgets = controller::openWidgetBoard,
-                    onControls = controller::openControlCenter,
-                )
-                PersistentSmartDock(controller)
-                AskDock(
-                    text = askText,
-                    onTextChange = { askText = it },
-                    focusRequester = askFocusRequester,
-                    onSubmit = {
-                        controller.submitCommand(askText, requestVoiceInput, requestDocument)
-                        askText = ""
-                        keyboardController?.hide()
-                    },
-                    requestVoiceInput = requestVoiceInput,
-                )
             }
         }
     }
@@ -271,11 +316,55 @@ fun LauncherRoot(
     if (controller.folderSheetVisible) {
         FolderSheet(controller)
     }
+    if (controller.faqVisible) {
+        FaqSheet(controller)
+    }
     if (controller.onboardingVisible) {
         OnboardingExperience(
             controller = controller,
             requestHomeRole = requestHomeRole,
         )
+    }
+}
+
+@Composable
+private fun LauncherNavigation(
+    controller: LauncherController,
+    requestHomeRole: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+        LauncherHeader(
+            controller = controller,
+            requestHomeRole = requestHomeRole,
+        )
+        HomePageSelector(controller)
+        if (controller.homePage != HomePage.PEN_SPACE) {
+            SceneSelector(
+                activeScene = controller.activeScene,
+                suggestedScene = controller.contextSnapshot.suggestedScene,
+                onSceneSelected = controller::switchScene,
+                onUseSuggestion = controller::useSuggestedScene,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ColumnScope.HomeSurface(
+    controller: LauncherController,
+    onAsk: () -> Unit,
+) {
+    when (controller.homePage) {
+        HomePage.WORKSPACE -> {
+            EditToolbar(controller)
+            WorkspaceSurface(
+                controller = controller,
+                onAsk = onAsk,
+            )
+        }
+
+        HomePage.SMART_SPACE -> SmartHomeSurface(controller)
+        HomePage.PEN_SPACE -> PenSpaceSurface(controller, onAsk)
     }
 }
 
@@ -807,6 +896,13 @@ private fun AppDrawerSheet(controller: LauncherController) {
                                 overflow = TextOverflow.Ellipsis,
                                 style = MaterialTheme.typography.labelMedium,
                             )
+                            if (app.profile != AppProfile.PERSONAL) {
+                                Text(
+                                    text = app.profile.title,
+                                    color = Sky,
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                            }
                         }
                     }
                 }

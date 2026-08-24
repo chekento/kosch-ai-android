@@ -8,12 +8,15 @@ import android.content.res.Resources
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
 import android.os.Handler
+import android.os.Build
 import android.os.Process
 import android.os.UserHandle
+import android.os.UserManager
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.graphics.drawable.toBitmap
 import cloud.kosch.aiandroid.model.LaunchableApp
 import cloud.kosch.aiandroid.model.LaunchableShortcut
+import cloud.kosch.aiandroid.model.AppProfile
 import java.util.Locale
 
 class AppCatalog(
@@ -22,6 +25,7 @@ class AppCatalog(
     private val onCatalogChanged: () -> Unit,
 ) {
     private val launcherApps = context.getSystemService(LauncherApps::class.java)
+    private val userManager = context.getSystemService(UserManager::class.java)
     private var listening = false
 
     private val callback = object : LauncherApps.Callback() {
@@ -53,21 +57,28 @@ class AppCatalog(
         listening = false
     }
 
-    fun loadApps(): List<LaunchableApp> = launcherApps
-        .getActivityList(null, Process.myUserHandle())
-        .mapNotNull { activity ->
-            runCatching {
-                val component = activity.componentName
-                LaunchableApp(
-                    key = "${activity.user.hashCode()}:${component.flattenToShortString()}",
-                    label = activity.label?.toString()?.ifBlank { component.packageName }
-                        ?: component.packageName,
-                    packageName = component.packageName,
-                    componentName = component,
-                    user = activity.user,
-                    icon = activity.getBadgedIcon(0).safeBitmap().asImageBitmap(),
-                )
-            }.getOrNull()
+    fun loadApps(): List<LaunchableApp> = launcherApps.profiles
+        .flatMap { profile ->
+            val serial = userManager.getSerialNumberForUser(profile)
+            val profileType = profileType(profile)
+            runCatching { launcherApps.getActivityList(null, profile) }
+                .getOrDefault(emptyList())
+                .mapNotNull { activity ->
+                    runCatching {
+                        val component = activity.componentName
+                        LaunchableApp(
+                            key = "$serial:${component.flattenToShortString()}",
+                            label = activity.label?.toString()?.ifBlank { component.packageName }
+                                ?: component.packageName,
+                            packageName = component.packageName,
+                            componentName = component,
+                            user = activity.user,
+                            userSerialNumber = serial,
+                            profile = profileType,
+                            icon = activity.getBadgedIcon(0).safeBitmap().asImageBitmap(),
+                        )
+                    }.getOrNull()
+                }
         }
         .sortedBy { it.label.lowercase(Locale.getDefault()) }
 
@@ -119,6 +130,18 @@ class AppCatalog(
         toBitmap(width = ICON_SIZE_PX, height = ICON_SIZE_PX, config = Bitmap.Config.ARGB_8888)
     }.getOrElse {
         Bitmap.createBitmap(ICON_SIZE_PX, ICON_SIZE_PX, Bitmap.Config.ARGB_8888)
+    }
+
+    private fun profileType(user: UserHandle): AppProfile {
+        if (user == Process.myUserHandle()) return AppProfile.PERSONAL
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+            val userType = runCatching { launcherApps.getLauncherUserInfo(user)?.userType }.getOrNull()
+            return when (userType) {
+                UserManager.USER_TYPE_PROFILE_MANAGED -> AppProfile.WORK
+                else -> AppProfile.OTHER
+            }
+        }
+        return AppProfile.WORK
     }
 
     private companion object {

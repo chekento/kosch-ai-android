@@ -4,6 +4,9 @@ import android.content.Context
 import cloud.kosch.aiandroid.model.DefaultWorkspace
 import cloud.kosch.aiandroid.model.FolderKind
 import cloud.kosch.aiandroid.model.HomePage
+import cloud.kosch.aiandroid.model.InkPoint
+import cloud.kosch.aiandroid.model.InkStroke
+import cloud.kosch.aiandroid.model.InkTool
 import cloud.kosch.aiandroid.model.LauncherFolder
 import cloud.kosch.aiandroid.model.SceneId
 import cloud.kosch.aiandroid.model.TilePosition
@@ -96,6 +99,56 @@ class WorkspaceStore(context: Context) {
         writeStringArray(KEY_PINNED_APPS, keys.distinct().take(MAX_PINNED_APPS))
     }
 
+    fun inkStrokes(): List<InkStroke> = runCatching {
+        val strokes = JSONArray(preferences.getString(KEY_PEN_STROKES, "[]"))
+        buildList {
+            repeat(strokes.length().coerceAtMost(MAX_INK_STROKES)) strokeLoop@{ strokeIndex ->
+                val strokeJson = strokes.optJSONObject(strokeIndex) ?: return@strokeLoop
+                val tool = runCatching {
+                    InkTool.valueOf(strokeJson.optString("tool", InkTool.PEN.name))
+                }.getOrDefault(InkTool.PEN)
+                val pointsJson = strokeJson.optJSONArray("points") ?: JSONArray()
+                val points = buildList {
+                    repeat(pointsJson.length().coerceAtMost(MAX_POINTS_PER_STROKE)) pointLoop@{ pointIndex ->
+                        val point = pointsJson.optJSONArray(pointIndex) ?: return@pointLoop
+                        if (point.length() < 2) return@pointLoop
+                        add(
+                            InkPoint(
+                                x = point.optDouble(0, 0.0).toFloat().coerceIn(0f, 1f),
+                                y = point.optDouble(1, 0.0).toFloat().coerceIn(0f, 1f),
+                                pressure = point.optDouble(2, 0.5).toFloat().coerceIn(0f, 1f),
+                                tiltRadians = point.optDouble(3, 0.0).toFloat(),
+                            ),
+                        )
+                    }
+                }
+                if (points.isNotEmpty()) add(InkStroke(tool, points))
+            }
+        }
+    }.getOrDefault(emptyList())
+
+    fun saveInkStrokes(strokes: List<InkStroke>) {
+        val strokesJson = JSONArray()
+        strokes.takeLast(MAX_INK_STROKES).forEach { stroke ->
+            val pointsJson = JSONArray()
+            stroke.points.take(MAX_POINTS_PER_STROKE).forEach { point ->
+                pointsJson.put(
+                    JSONArray()
+                        .put(point.x.toDouble())
+                        .put(point.y.toDouble())
+                        .put(point.pressure.toDouble())
+                        .put(point.tiltRadians.toDouble()),
+                )
+            }
+            strokesJson.put(
+                JSONObject()
+                    .put("tool", stroke.tool.name)
+                    .put("points", pointsJson),
+            )
+        }
+        preferences.edit().putString(KEY_PEN_STROKES, strokesJson.toString()).apply()
+    }
+
     fun folders(): List<LauncherFolder> = runCatching {
         val array = JSONArray(preferences.getString(KEY_FOLDERS, "[]"))
         buildList {
@@ -124,6 +177,8 @@ class WorkspaceStore(context: Context) {
         }
     }.getOrDefault(emptyList())
 
+    fun areFoldersInitialized(): Boolean = preferences.getBoolean(KEY_FOLDERS_INITIALIZED, false)
+
     fun saveFolders(folders: List<LauncherFolder>) {
         val array = JSONArray()
         folders.distinctBy(LauncherFolder::id).take(MAX_FOLDERS).forEach { folder ->
@@ -136,7 +191,10 @@ class WorkspaceStore(context: Context) {
                     .put("appKeys", JSONArray(folder.appKeys.distinct().take(MAX_FOLDER_APPS))),
             )
         }
-        preferences.edit().putString(KEY_FOLDERS, array.toString()).apply()
+        preferences.edit()
+            .putString(KEY_FOLDERS, array.toString())
+            .putBoolean(KEY_FOLDERS_INITIALIZED, true)
+            .apply()
     }
 
     private fun saveWidgetIds(ids: List<Int>) {
@@ -173,6 +231,11 @@ class WorkspaceStore(context: Context) {
             editor.putString(KEY_FOLDERS, preferences.getString(KEY_FOLDERS, "[]"))
             editor.putInt(KEY_SCHEMA_VERSION, 2)
         }
+        if (current < 3) {
+            editor.putString(KEY_PEN_STROKES, preferences.getString(KEY_PEN_STROKES, "[]"))
+            editor.putBoolean(KEY_FOLDERS_INITIALIZED, preferences.contains(KEY_FOLDERS))
+            editor.putInt(KEY_SCHEMA_VERSION, 3)
+        }
         editor.apply()
     }
 
@@ -189,10 +252,14 @@ class WorkspaceStore(context: Context) {
         const val KEY_SCHEMA_VERSION = "schema_version"
         const val KEY_PINNED_APPS = "pinned_app_keys_v2"
         const val KEY_FOLDERS = "launcher_folders_v2"
-        const val SCHEMA_VERSION = 2
+        const val KEY_FOLDERS_INITIALIZED = "launcher_folders_initialized_v3"
+        const val KEY_PEN_STROKES = "pen_strokes_v3"
+        const val SCHEMA_VERSION = 3
         const val MAX_RECENT = 16
-        const val MAX_PINNED_APPS = 8
+        const val MAX_PINNED_APPS = 5
         const val MAX_FOLDERS = 12
         const val MAX_FOLDER_APPS = 32
+        const val MAX_INK_STROKES = 100
+        const val MAX_POINTS_PER_STROKE = 2_048
     }
 }

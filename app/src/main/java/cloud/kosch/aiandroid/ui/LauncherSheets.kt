@@ -35,9 +35,11 @@ import androidx.compose.material.icons.rounded.Bluetooth
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.HelpOutline
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Notifications
 import androidx.compose.material.icons.rounded.OpenInNew
@@ -66,6 +68,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -101,6 +104,8 @@ fun QuickActionsRail(
     onFiles: () -> Unit,
     onWidgets: () -> Unit,
     onControls: () -> Unit,
+    onPen: (() -> Unit)?,
+    onHelp: () -> Unit,
 ) {
     Row(
         modifier = Modifier
@@ -111,6 +116,8 @@ fun QuickActionsRail(
         QuickChip("Telefon", Icons.Rounded.Phone, onPhone)
         QuickChip("Datei-KI", Icons.Rounded.FolderOpen, onFiles)
         QuickChip("Widgets", Icons.Rounded.Widgets, onWidgets)
+        onPen?.let { QuickChip("Pen Space", Icons.Rounded.Draw, it) }
+        QuickChip("FAQ", Icons.Rounded.HelpOutline, onHelp)
         QuickChip("Kontrollzentrum", Icons.Rounded.Tune, onControls)
     }
 }
@@ -137,39 +144,51 @@ fun OnboardingExperience(
     controller: LauncherController,
     requestHomeRole: () -> Unit,
 ) {
-    val pages = remember {
-        listOf(
-            OnboardingPage(
+    val pages = remember(controller.stylusState.present) {
+        buildList {
+            add(OnboardingPage(
                 eyebrow = "DEIN ANDROID · NEU GEDACHT",
                 title = "Ein Launcher, der zuerst funktioniert.",
                 body = "KoSch startet Apps, ordnet Szenen und versteht Systembefehle vollständig lokal. Ein Konto oder API-Schlüssel ist nicht nötig.",
                 icon = Icons.Rounded.AutoAwesome,
                 bullets = listOf("Local Core sofort aktiv", "Keine versteckte Cloud", "Freier Workspace statt starrem Raster"),
-            ),
-            OnboardingPage(
+            ))
+            add(OnboardingPage(
                 eyebrow = "ECHTE HOME-APP",
                 title = "Mache KoSch zu deinem Startbildschirm.",
                 body = "Android zeigt die geschützte Systemauswahl. Du kannst KoSch testen, überspringen oder später jederzeit wieder wechseln.",
                 icon = Icons.Rounded.Home,
                 bullets = listOf("Android entscheidet die Rolle", "Keine Tricks mit Zurück-Tasten", "Notausgang immer im Kontrollzentrum"),
-            ),
-            OnboardingPage(
+            ))
+            add(OnboardingPage(
                 eyebrow = "PRIVATE BY DESIGN",
                 title = "KI sitzt darunter – nicht über dir.",
                 body = "Dateien werden nur nach deiner Auswahl lokal und begrenzt gelesen. Telefonate, Einstellungen und externe KI-Ziele bleiben sichtbare Android-Aktionen.",
                 icon = Icons.Rounded.Security,
                 bullets = listOf("SAF statt Vollspeicherzugriff", "System-Dialer statt Anrufrecht", "Vorschau vor Übergabe oder Änderung"),
-            ),
-            OnboardingPage(
+            ))
+            if (controller.stylusState.present) {
+                add(OnboardingPage(
+                    eyebrow = "SMARTPEN ERKANNT",
+                    title = "Dein Stift bekommt einen eigenen Raum.",
+                    body = "Pen Space reagiert auf Druck, Neigung, Hover und Radierer, sofern dein Gerät diese Werte über Android meldet. Striche bleiben lokal und werden automatisch gespeichert.",
+                    icon = Icons.Rounded.Draw,
+                    bullets = listOf("Druckempfindliche Vektortinte", "Fingerkontakte werden beim Zeichnen ignoriert", "Stift, Marker, Radierer und Undo"),
+                ))
+            }
+            add(OnboardingPage(
                 eyebrow = "BEREIT",
                 title = "Sprich mit dem ganzen Startbildschirm.",
                 body = "Tippe oder sage zum Beispiel „Öffne Kamera“, „Wähle 030…“, „Datei analysieren“, „WLAN“ oder „Szene Work“.",
                 icon = Icons.Rounded.Check,
                 bullets = listOf("Smart Dock und lokale Ordner", "App-Shortcuts und Widgets", "Open-Source-KI als bewusste Option"),
-            ),
-        )
+            ))
+        }
     }
     var page by remember { mutableIntStateOf(0) }
+    LaunchedEffect(pages.size) {
+        if (page > pages.lastIndex) page = pages.lastIndex
+    }
     val current = pages[page]
 
     Dialog(
@@ -341,6 +360,20 @@ fun ControlCenterSheet(
                     right = ControlItem("Datei-KI", "Lokal prüfen", Icons.Rounded.FolderOpen) {
                         controller.closeControlCenter()
                         requestDocument()
+                    },
+                )
+            }
+            item {
+                ControlPair(
+                    left = ControlItem(
+                        "Pen Space",
+                        if (controller.stylusState.present) controller.stylusState.capabilitySummary else "Kein Stift erkannt",
+                        Icons.Rounded.Draw,
+                    ) {
+                        controller.openPenSpace()
+                    },
+                    right = ControlItem("FAQ & Hilfe", "Lokal durchsuchbar", Icons.Rounded.HelpOutline) {
+                        controller.openFaq()
                     },
                 )
             }

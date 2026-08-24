@@ -19,6 +19,7 @@ enum class WorkspaceMode {
 enum class HomePage(val title: String) {
     WORKSPACE("Workspace"),
     SMART_SPACE("Smart Space"),
+    PEN_SPACE("Pen Space"),
 }
 
 enum class FolderKind(val title: String, val glyph: String) {

@@ -1,9 +1,12 @@
 package cloud.kosch.aiandroid.ui.theme
 
+import android.os.Build
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 
 val Ink = Color(0xFF071018)
 val DeepSurface = Color(0xFF0E1A24)
@@ -37,11 +40,18 @@ private val LauncherColorScheme = darkColorScheme(
 )
 
 @Composable
-fun KoSchLauncherTheme(content: @Composable () -> Unit) {
+fun KoSchLauncherTheme(
+    dynamicColor: Boolean = true,
+    content: @Composable () -> Unit,
+) {
+    val colorScheme = if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        dynamicDarkColorScheme(LocalContext.current)
+    } else {
+        LauncherColorScheme
+    }
     MaterialTheme(
-        colorScheme = LauncherColorScheme,
+        colorScheme = colorScheme,
         typography = MaterialTheme.typography,
         content = content,
     )
 }
-

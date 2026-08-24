@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.view.MotionEvent
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -29,10 +30,12 @@ import cloud.kosch.aiandroid.model.LaunchableApp
 import cloud.kosch.aiandroid.model.LaunchableShortcut
 import cloud.kosch.aiandroid.model.FileInsight
 import cloud.kosch.aiandroid.model.HomePage
+import cloud.kosch.aiandroid.model.InkStroke
 import cloud.kosch.aiandroid.model.LauncherFolder
 import cloud.kosch.aiandroid.model.PositionedTile
 import cloud.kosch.aiandroid.model.SceneId
 import cloud.kosch.aiandroid.model.SystemPanel
+import cloud.kosch.aiandroid.model.StylusCapabilities
 import cloud.kosch.aiandroid.model.TilePosition
 import cloud.kosch.aiandroid.model.WorkspaceMode
 import cloud.kosch.aiandroid.system.HomeRoleController
@@ -40,6 +43,7 @@ import cloud.kosch.aiandroid.system.LocalContextEngine
 import cloud.kosch.aiandroid.system.NotificationAccess
 import cloud.kosch.aiandroid.system.NotificationBadgeRepository
 import cloud.kosch.aiandroid.system.SystemActionGateway
+import cloud.kosch.aiandroid.system.StylusMonitor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
@@ -53,6 +57,7 @@ class LauncherController(context: Context) {
     private val fileIntelligence = LocalFileIntelligenceEngine(appContext.contentResolver)
     private val systemActions = SystemActionGateway(appContext)
     private val appCatalog = AppCatalog(appContext, mainHandler, ::refreshApps)
+    private val stylusMonitor = StylusMonitor(appContext, mainHandler, ::onStylusChanged)
 
     var apps by mutableStateOf<List<LaunchableApp>>(emptyList())
         private set
@@ -126,6 +131,10 @@ class LauncherController(context: Context) {
         private set
     var notificationAccessGranted by mutableStateOf(NotificationAccess.isGranted(appContext))
         private set
+    var stylusState by mutableStateOf(StylusCapabilities())
+        private set
+    var faqVisible by mutableStateOf(false)
+        private set
 
     private var undoPositions: Map<SceneId, Map<String, TilePosition>>? = null
     private var shortcutRequestToken = 0L
@@ -138,6 +147,7 @@ class LauncherController(context: Context) {
         if (started) return
         started = true
         appCatalog.startListening()
+        stylusMonitor.start()
         NotificationBadgeRepository.addListener(badgeListener)
         refreshApps()
         refreshSystemState()
@@ -146,6 +156,7 @@ class LauncherController(context: Context) {
     fun close() {
         if (!started) return
         NotificationBadgeRepository.removeListener(badgeListener)
+        stylusMonitor.stop()
         appCatalog.stopListening()
         executor.shutdownNow()
         started = false
@@ -160,11 +171,44 @@ class LauncherController(context: Context) {
         } else {
             emptyMap()
         }
+        stylusMonitor.refreshDevices()
     }
 
     fun switchHomePage(page: HomePage) {
+        if (page == HomePage.PEN_SPACE && !stylusState.present) {
+            notice = "Pen Space wird eingeblendet, sobald Android einen Zeichenstift erkennt"
+            return
+        }
         homePage = page
         store.saveHomePage(page)
+    }
+
+    fun openPenSpace() {
+        controlCenterVisible = false
+        if (stylusState.present) {
+            switchHomePage(HomePage.PEN_SPACE)
+        } else {
+            notice = "Kein Android-kompatibler Zeichenstift erkannt"
+        }
+    }
+
+    fun observeInputEvent(event: MotionEvent) {
+        stylusMonitor.observe(event)
+    }
+
+    fun loadInkStrokes(): List<InkStroke> = store.inkStrokes()
+
+    fun saveInkStrokes(strokes: List<InkStroke>) {
+        store.saveInkStrokes(strokes)
+    }
+
+    fun openFaq() {
+        controlCenterVisible = false
+        faqVisible = true
+    }
+
+    fun closeFaq() {
+        faqVisible = false
     }
 
     fun selectWorkspaceMode(mode: WorkspaceMode) {
@@ -548,6 +592,8 @@ class LauncherController(context: Context) {
             LauncherCommand.OpenFiles -> requestDocument()
             LauncherCommand.OpenControls -> openControlCenter()
             LauncherCommand.OpenWidgets -> openWidgetBoard()
+            LauncherCommand.OpenFaq -> openFaq()
+            LauncherCommand.OpenPenSpace -> openPenSpace()
             is LauncherCommand.OpenPhone -> if (command.number == null) openPhone() else dial(command.number)
             is LauncherCommand.OpenSystemPanel -> openSystemPanel(command.panel)
             is LauncherCommand.SwitchScene -> switchScene(command.scene)
@@ -676,7 +722,7 @@ class LauncherController(context: Context) {
             mainHandler.post {
                 loaded.onSuccess { catalog ->
                     apps = catalog.filterNot { it.packageName == appContext.packageName }
-                    if (folders.isEmpty() && apps.isNotEmpty()) {
+                    if (!store.areFoldersInitialized() && apps.isNotEmpty()) {
                         folders = LocalSmartOrganizer.proposeFolders(appDescriptors())
                         store.saveFolders(folders)
                     }
@@ -702,8 +748,16 @@ class LauncherController(context: Context) {
         packageName = packageName,
     )
 
+    private fun onStylusChanged(capabilities: StylusCapabilities) {
+        val appeared = capabilities.present && !stylusState.present
+        stylusState = capabilities
+        if (appeared && started) {
+            notice = "Smartpen erkannt – Pen Space ist jetzt verfügbar"
+        }
+    }
+
     private companion object {
-        const val MAX_PINNED_APPS = 8
+        const val MAX_PINNED_APPS = 5
         const val DOCK_SIZE = 5
     }
 }
