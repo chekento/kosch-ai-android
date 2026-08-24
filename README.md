@@ -4,7 +4,7 @@ KoSch ist ein nativer, KI-zentrierter Android-Launcher: eine belastbare HOME-She
 
 LCARS gehört bewusst nicht zum Kern. Themes werden später deklarative, austauschbare Programme; LCARS kann eines davon sein, ohne Architektur oder Bedienung festzulegen.
 
-## Aktueller Stand: M2.3 Professional Command Center (Draft)
+## Aktueller Stand: M2.3 Professional Command Center
 
 - professionelle vierstufige Ersteinrichtung mit klarer Datenschutz- und Sicherheitskommunikation;
 - echte HOME-Rolle und ein dauerhaft erreichbarer **Sicherheitsausgang** in Androids Start-App-Auswahl;
@@ -40,7 +40,7 @@ LCARS gehört bewusst nicht zum Kern. Themes werden später deklarative, austaus
 - versioniertes Persistenzschema v5, Widget-Pending-Restore sowie Race-Schutz für App-Shortcuts und Backup-Vorschauen;
 - Unit-Tests, Android Lint und reproduzierbarer Debug-APK-Build in GitHub Actions.
 
-Der letzte abgeschlossene M2.2-Vergleich liegt bei **7,0/10 allgemein** und **6,8/10 im Mittel von 25 simulierten Fachperspektiven**. M2.3 wird erst nach grüner CI und erneuter Quellen-/Featureprüfung bewertet. Ein Wert über 9,5 wird nicht vorab behauptet: Dafür fehlen weiterhin gemessene Performance, Accessibility-/OEM-Lab, vollständige Widget-Parität und Produktionsfreigabe.
+Der abgeschlossene M2.3-Vergleich über 75 Kategorien liegt bei **7,6/10 allgemein** und **7,4/10 im Mittel von 25 simulierten Fachperspektiven**. KoSch erreicht damit Rang 2 hinter Pixel/Android 17, aber ausdrücklich nicht das Ziel über 9,5. Dafür fehlen weiterhin gemessene Performance, Accessibility-/OEM-Lab, vollständige Widget-Parität, Lokalisierung und Produktionsfreigabe.
 
 ## Was „lokale KI“ in M2.3 exakt bedeutet
 
@@ -55,7 +55,7 @@ Direkte Cloud-APIs sind in M2.3 absichtlich nicht aktiv. Die App besitzt kein ei
 Voraussetzungen: JDK 17, Android SDK 36 und Android Studio mit AGP-8.13-Unterstützung.
 
 ```bash
-./gradlew testDebugUnitTest lintDebug assembleDebug
+./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease
 ```
 
 Die APK liegt danach unter `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions veröffentlicht bei erfolgreichen Läufen zusätzlich das Artefakt `kosch-ai-launcher-debug`.
@@ -77,7 +77,8 @@ Telefon, Dateien, Spracheingabe, Widgets und externe KI-Ziele öffnen jeweils si
 - [KI-Usecases und Open-Source-Routen](docs/AI_USE_CASES.md)
 - [Sicherheit und Datenschutz](docs/SECURITY.md)
 - [Roadmap](docs/ROADMAP.md)
-- [Strenges M2.2-Konkurrenzreview](docs/COMPETITOR_REVIEW_M2_2.md), [7 Launcher × 65 Kategorien](docs/launcher_comparison_m2_2.csv), [25×65-Fachmatrix](docs/expert_scores_m2_2.csv) und [formatierte Benchmark-Arbeitsmappe](docs/launcher_benchmark_m2_2.xlsx)
+- [Strenges M2.3-Konkurrenzreview](docs/COMPETITOR_REVIEW_M2_3.md), [7 Launcher × 75 Kategorien](docs/launcher_comparison_m2_3.csv), [25×75-Fachmatrix](docs/expert_scores_m2_3.csv) und [formatierte Benchmark-Arbeitsmappe](docs/launcher_benchmark_m2_3.xlsx)
+- [Historisches M2.2-Review](docs/COMPETITOR_REVIEW_M2_2.md)
 - [Historisches M2.1-Review](docs/COMPETITOR_REVIEW_M2_1.md)
 - [Historisches M2-Review](docs/EXPERT_REVIEW_M2.md)
 

@@ -4,6 +4,8 @@ Stand: 24. August 2026
 
 Ein Zielwert über 9,5 ist kein Designlabel, sondern ein Release-Gate. Diese Datei trennt bereits automatisierte Nachweise von offenen Geräte- und Produktprüfungen.
 
+Der M2.3-CI-Lauf #23 erfüllt alle automatisierten Repository-Gates. Die strenge Neubewertung erreicht 7,6 allgemein und 7,4 im Mittel der 25 simulierten Fachperspektiven. Alle manuellen Beta-Gates bleiben offen; das 9,5-Gate ist daher nicht erfüllt.
+
 ## Automatisierte Repository-Gates
 
 | Gate | Kriterium | Nachweis |

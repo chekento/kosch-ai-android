@@ -75,8 +75,8 @@ Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn 
 - [x] Professional-Befehle im API-freien Local Command Planner
 - [x] Workspace-Schema v5 und mindestens 40 lokale FAQ-Einträge
 - [x] Unit-Tests für Backup-Roundtrip, falsche Passphrase, Manipulation, Audit-CSV und Shortcut-Routing
-- [ ] CI, Lint und Debug-APK dieses finalen M2.3-Stands grün
-- [ ] M2.3-Konkurrenz-/25-Rollen-Neubewertung und formatierte Arbeitsmappe
+- [x] CI, Lint, Debug-/Release-Build und Debug-APK-Artefakt dieses finalen M2.3-Stands grün
+- [x] M2.3-Konkurrenz-/25-Rollen-Neubewertung in 75 Kategorien und formatierte Arbeitsmappe
 
 ## Nächster Lauf – M2.4 Nachweisbare Spitzenreife
 

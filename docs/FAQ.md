@@ -232,7 +232,7 @@ In **EDIT** auf **Zurücksetzen** tippen oder für den letzten angewendeten Vors
 
 ### Wie lösche ich alle lokalen Daten?
 
-Bis eine granulare Datenverwaltung existiert, über Android **App-Info → Speicher und Cache → Speicherinhalt löschen** beziehungsweise Deinstallation. Zuvor sollte ein anderer Standard-Launcher gewählt werden. Ein verschlüsselter selektiver Export ist für M2.3 geplant.
+Bis eine granulare Datenverwaltung existiert, über Android **App-Info → Speicher und Cache → Speicherinhalt löschen** beziehungsweise Deinstallation. Zuvor sollte ein anderer Standard-Launcher gewählt werden. Der verschlüsselte Workspace-Export sichert ausgewählte Workspace-Daten, ist aber kein vollständiges Geräteabbild.
 
 ## Entwicklung, Prüfung und Benchmark
 
@@ -241,23 +241,27 @@ Bis eine granulare Datenverwaltung existiert, über Android **App-Info → Speic
 Mit JDK 17, Android SDK 36 und AGP 8.13:
 
 ```bash
-./gradlew testDebugUnitTest lintDebug assembleDebug
+./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease
 ```
 
 Die Debug-APK entsteht unter `app/build/outputs/apk/debug/app-debug.apk`; GitHub Actions veröffentlicht `kosch-ai-launcher-debug`.
 
 ### Was prüft die CI?
 
-Unit-Tests einschließlich FAQ-Registry und Command Planner, Android Lint sowie `assembleDebug`. Der grüne Lauf beweist Buildbarkeit dieses Quellstands, ersetzt aber keine instrumentierten Geräte-, Eingabe-, Accessibility-, Performance- oder OEM-Tests.
+Unit-Tests einschließlich Backup-, Tamper-, Audit-, Capability-, Keyboard-, Kontrast-, FAQ- und Planner-Prüfungen, Android Lint, Manifest-Permission-Budget, nichtleeres Baseline-Profil sowie Debug- und minifizierten Release-Build. Der grüne Lauf #23 beweist Buildbarkeit dieses Quellstands, ersetzt aber keine instrumentierten Geräte-, Eingabe-, Accessibility-, Performance- oder OEM-Tests.
 
-### Wie wurde M2.2 mit anderen Launchern verglichen?
+### Wie wurde M2.3 mit anderen Launchern verglichen?
 
-Die strenge Matrix bewertet KoSch, Pixel/Android 17 als Systemreferenz sowie Nova, Niagara, Smart Launcher, Microsoft Launcher und Lawnchair in 65 Kategorien von 0,1 bis 10,0. Zusätzlich werden 25 reproduzierbare Fachperspektiven mit je 65 KoSch-Einzelwerten simuliert. Das sind keine tatsächlich befragten Personen und kein identischer Sieben-Geräte-Labortest.
+Die strenge Matrix bewertet KoSch, Pixel/Android 17 als Systemreferenz sowie Nova, Niagara, Smart Launcher, Microsoft Launcher und Lawnchair in 75 Kategorien von 0,1 bis 10,0. Zusätzlich werden 25 reproduzierbare Fachperspektiven mit je 75 KoSch-Einzelwerten simuliert. Das sind keine tatsächlich befragten Personen und kein identischer Sieben-Geräte-Labortest.
+
+### Hat M2.3 die gewünschte Wertung über 9,5 erreicht?
+
+Nein. Der belegbare Stand erreicht 7,6 allgemein und 7,4 im Rollenmittel. Das ist Rang 2 der breiten Matrix, aber kein Produktionsbeweis. Eine Wertung über 9,5 ist erst zulässig, wenn alle manuellen Geräte-, Accessibility-, Recovery-, Performance- und Security-Gates bestanden sind, keine Kategorie unter 8,5 liegt und die kritischen Qualitätsbereiche jeweils mindestens 9,5 erreichen.
 
 ### Wo liegen die vollständigen Bewertungsdaten?
 
-In `COMPETITOR_REVIEW_M2_2.md`, den drei M2.2-CSV-Dateien und der formatierten `launcher_benchmark_m2_2.xlsx` mit Summary, Vergleich, Expertenmatrizen und Quellen.
+In `COMPETITOR_REVIEW_M2_3.md`, den drei M2.3-CSV-Dateien und der formatierten `launcher_benchmark_m2_3.xlsx` mit Summary, 75-Kategorien-Vergleich, Expertenmatrizen, Evidenzplan und Quellen.
 
 ### Was ist das nächste professionelle Ziel?
 
-M2.3 priorisiert instrumentierte HOME-/SAF-/Widget-/Prozess-Tod-Tests, Macrobenchmarks mit Budgets, vollständige Widget-Engine, verschlüsseltes Backup/Restore, Accessibility- und OEM-Lab, sichere Kontakte über Android 17s Picker sowie erst danach ein isoliertes lokales LLM und einen validierten Capability Planner.
+M2.4 priorisiert instrumentierte HOME-/SAF-/Widget-/Prozess-Tod-Tests, Macrobenchmarks mit Budgets, vollständige Widget-Engine, Accessibility- und OEM-Lab, vollständige Deutsch-/Englisch-Lokalisierung, sichere Personalisierung und erst danach ein isoliertes lokales LLM. Der Evidenzplan liegt zusätzlich als eigenes Blatt in der M2.3-Arbeitsmappe.

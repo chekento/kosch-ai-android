@@ -14,6 +14,8 @@ class FaqRegistryTest {
         assertTrue(FaqRegistry.entries.any { it.id == "private-space" })
         assertTrue(FaqRegistry.entries.any { it.id == "secure-backup" })
         assertTrue(FaqRegistry.entries.any { it.id == "audit" })
+        assertTrue(FaqRegistry.entries.any { it.id == "m2-3-rating" })
+        assertTrue(FaqRegistry.entries.any { it.id == "quality-gates" })
     }
 
     @Test
