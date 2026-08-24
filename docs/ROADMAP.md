@@ -45,23 +45,44 @@ Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn 
 - [x] Reduced-Motion-Fallback
 - [x] 7-Launcher-/60-Kategorien- und 25-Rollen-Review
 
-## Nächster Lauf – M2.2 Messbare Reife und lokales Modell
+## M2.2 – Adaptive Pen Space
 
-- [ ] Migrationstests und vollständiger Prozess-Tod-/State-Restore
+- [x] adaptive kompakte/geteilte Shell für breite, Landscape-, Tablet- und Foldable-Fenster
+- [x] Material-You-Dynamic-Color auf Android 12+ bei erhaltener kontrastreicher Fallback-Palette
+- [x] generische Smartpen-Erkennung über `InputManager` mit Live-Gerätewechsel
+- [x] Druck, Neigung, Orientierung, Hover, Stylus-/Eraser-Werkzeug und Stifttasten erfassen
+- [x] zusätzlicher Pen Space mit Stift, Marker, Radierer, Hover, Undo, Clear und lokalem Autosave
+- [x] Workspace-Schema v3 mit begrenzten, normalisierten Vektorstrichen
+- [x] Fingerkontakte auf Pen Space ignorieren; Android-IME-Handschrift ehrlich als Systemfähigkeit behandeln
+- [x] profilbewusster App-Katalog mit stabilen User-Schlüsseln, Work-Labels und gebadgten Icons
+- [x] `ACCESS_HIDDEN_PROFILES` bis zum vollständigen Private-Space-Container bewusst nicht anfordern
+- [x] 32 Einträge umfassende lokale, kategorisierte und durchsuchbare In-App-FAQ
+- [x] FAQ und Pen Space im Local Command Planner und Kontrollzentrum verankern
+- [x] 7-Launcher-/65-Kategorien-Review, 25×65-Fachmatrix und formatierte XLSX-Benchmarkmappe
+- [x] Unit-Test/Lint/Debug-APK in GitHub Actions grün
+
+## Nächster Lauf – M2.3 Messbare Parität und isoliertes lokales Modell
+
+- [ ] Migrationstests v1–v3 und vollständiger Prozess-Tod-/State-Restore einschließlich Ink
 - [ ] ViewModel/StateFlow statt Activity-gebundener Controller-Lebensdauer
-- [ ] instrumentierte Tests für HOME, SAF, Widget-Abbruch und Konfiguration
-- [ ] TalkBack, Switch Access, Schrift 200 %, Reduced Motion und Kontrastprüfung
-- [ ] Foldable/Tablet-/Landscape-Layouts
+- [ ] instrumentierte Tests für HOME, SAF, Widget-Abbruch/-Konfiguration und Stifteingabe auf API 29/33/36/37
+- [ ] TalkBack, Switch Access, Hardwaretastatur, Schrift 200 %, Reduced Motion und Kontrastprüfung
+- [ ] Foldable-Hinge-, Multi-Window-, 320-dp- und Screenshot-Testmatrix
+- [ ] vollständige Widget-Engine: Resize, freie Platzierung, Stacks, Restore-Mapping und Undo
+- [ ] verschlüsselter Workspace-Export/Import mit Dry Run und Profil-/Widget-Konflikten
+- [ ] sicherer Android-17-Kontaktpicker ohne breite Kontakteberechtigung
+- [ ] Pen-Latenz-Benchmark, Historical Events, Geräte-Lab und AndroidX-Ink-Evaluation
 - [ ] `LocalModelBackend` in isolierter Service-/Prozessgrenze
 - [ ] Geräteprobe und optionaler kleiner GGUF-Modell-Pack über llama.cpp
 - [ ] Modellimport per SAF, Lizenzanzeige, Hashprüfung, Load/Cancel/Unload
 - [ ] lokale Zusammenfassung und strukturierte Befehle mit Schema-Validator
 - [ ] lokaler Embedding-Index für Apps, Shortcuts und explizit gewählte Dateien
-- [ ] manuelle Ordner/Seiten, Drag/Drop, Dock-Reorder, Widget-Stacks und Export/Import
+- [ ] manuelle Ordner/Seiten, Drag/Drop, Dock-Reorder und Icon-Pack-/Gesten-Parität
 - [ ] Notification Dots für Multi-User, Work/Private Profile und OEM-Restart härten
-- [ ] Macrobenchmark-/Baseline-Profile-Budgets für Start, Jank, RSS, Akku und Badge-Updates
+- [ ] Macrobenchmark-/Baseline-Profile-Budgets für Start, Jank, RSS, Akku, Ink und Badge-Updates
 - [ ] lokales Audit mit Retention, Export und vollständigem Löschen
-- [ ] Expert-Review-Gaps aus `COMPETITOR_REVIEW_M2_1.md` schließen
+- [ ] Lokalisierung Deutsch/Englisch, RTL-/Plural-Tests und Diagnoseexport ohne Nutzdaten
+- [ ] Führungs-Gates aus `COMPETITOR_REVIEW_M2_2.md` schließen
 
 ## M3 – Sichere Agenten und optionale APIs
 

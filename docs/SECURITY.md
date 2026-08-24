@@ -1,28 +1,30 @@
 # Sicherheit und Datenschutz
 
-## M2.1-Dateninventar
+## M2.2-Dateninventar
 
 KoSch verarbeitet lokal:
 
 - Uhrzeit, Akkustand/Ladestatus, validierte Netzverfügbarkeit und aktive persönliche Audioausgänge;
-- installierte startbare Launcher-Activities und von Apps veröffentlichte Shortcuts;
-- Szene, Home-Raum, Kartenpositionen, Dock-Pins, lokale Ordner, Widget-Host-IDs und zuletzt über KoSch gestartete Paketnamen;
+- installierte startbare Launcher-Activities, ihre über Android zugängliche Profilzugehörigkeit und von Apps veröffentlichte Shortcuts;
+- Szene, Home-Raum, Kartenpositionen, Dock-Pins, lokale Ordner, Widget-Host-IDs und zuletzt über KoSch gestartete profilgebundene App-Schlüssel;
+- lokal gezeichnete Pen-Space-Vektorstriche mit Werkzeug, normalisiertem `x/y`, Druck und Neigung; begrenzt auf 100 Striche und 2.048 Punkte je Strich;
 - nach ausdrücklicher Android-Auswahl: URI-Metadaten und bei erkannten Textformaten höchstens 4.096 Zeichen Textpräfix;
 - Text, den die Person in `⌘ Ask` eingibt oder aus der gestarteten Spracherkennungs-Activity übernimmt.
 
 Nach separatem Android-Opt-in werden für Notification Dots ausschließlich Paketnamen und Anzahlen aktiver, nicht laufender Meldungen verarbeitet. Nicht kopiert oder gespeichert werden Notification-Titel, Text, Personen, Extras, Aktionen oder RemoteViews.
 
-Nicht gelesen werden Standort, Kontakte, Kalender, Anrufliste, SMS, Zwischenablage, Fotosammlung, permanenter Mikrofonstream oder Bildschirm. Aus einer gewählten Binärdatei werden keine vermeintlichen Textinhalte extrahiert.
+Nicht gelesen werden Standort, Kontakte, Kalender, Anrufliste, SMS, Zwischenablage, Fotosammlung, permanenter Mikrofonstream oder Bildschirm. Aus einer gewählten Binärdatei werden keine vermeintlichen Textinhalte extrahiert. Namen, Vendor-/Product-ID und Seriennummer erkannter Eingabegeräte werden nicht im Workspace gespeichert.
 
 ## Berechtigungsbudget
 
-M2.1 deklariert als `uses-permission` nur `ACCESS_NETWORK_STATE`. Damit erkennt die Context Engine, ob ein validiertes Netz existiert. Es gibt bewusst kein:
+M2.2 deklariert als `uses-permission` nur `ACCESS_NETWORK_STATE`. Damit erkennt die Context Engine, ob ein validiertes Netz existiert. Stylus-Erkennung über `InputManager` benötigt keine zusätzliche gefährliche Berechtigung. Es gibt bewusst kein:
 
 - `INTERNET`;
 - `CALL_PHONE` oder Kontakte-/Anruflistenrecht;
 - `READ_MEDIA_*` oder `MANAGE_EXTERNAL_STORAGE`;
 - `QUERY_ALL_PACKAGES`;
 - Accessibility Service;
+- `ACCESS_HIDDEN_PROFILES`;
 - standardmäßig erteilten Benachrichtigungszugriff;
 - Standort-/Kalender-/Mikrofonrecht.
 
@@ -34,11 +36,23 @@ KoSch verwendet `ACTION_DIAL`. Eine erkannte Nummer wird höchstens normalisiert
 
 ## Dateien
 
-Das Storage Access Framework gibt nur die vom Nutzer gewählte URI frei. Der Zugriff ist read-only. M2.1 verwaltet höchstens eine langfristige Freigabe, löst den vorherigen Zugriff nach erfolgreicher neuer Wahl und bietet „Dateizugriff vergessen“. Die lokale Analyse ist begrenzt und fehlertolerant; es gibt keine Lösch-, Rename-, Move- oder Upload-Aktion. Ein vorgeschlagener Dateiname ist nur Text in einer Vorschau.
+Das Storage Access Framework gibt nur die vom Nutzer gewählte URI frei. Der Zugriff ist read-only. M2.2 verwaltet höchstens eine langfristige Freigabe, löst den vorherigen Zugriff nach erfolgreicher neuer Wahl und bietet „Dateizugriff vergessen“. Die lokale Analyse ist begrenzt und fehlertolerant; es gibt keine Lösch-, Rename-, Move- oder Upload-Aktion. Ein vorgeschlagener Dateiname ist nur Text in einer Vorschau.
 
 ## Notification Dots
 
 Der opt-in Listener hält nur ein flüchtiges `packageName → count`-Abbild. Laufende Meldungen und Gruppenzusammenfassungen werden ausgeschlossen; `NotificationListenerService.Ranking.canShowBadge()` respektiert die Badge-Entscheidung von Android und Kanal. Benachrichtigungsinhalte dürfen auch für spätere KI-Triage nicht implizit freigeschaltet werden.
+
+## Smartpen und Ink-Daten
+
+Aktuelle Stiftfähigkeiten, Druck, Neigung, Orientierung, Hover, Werkzeug und Tastenstatus leben im Prozesszustand. Persistiert wird nur die bewusst auf Pen Space erzeugte, begrenzte Vektorgrafik. Die Zeichenfläche akzeptiert ausschließlich Stylus-/Eraser-Werkzeuge; Fingerereignisse werden verworfen. Es gibt weder Cloud-Upload noch OCR, Handschriftprofil, biometrische Identifikation oder semantische Analyse der Striche.
+
+Die Persistenz nutzt normalisierte Koordinaten und Schema v3. Eingaben werden auf endliche Werte, Bereichsgrenzen, maximale Punktzahl und maximale Strichzahl reduziert. Ein späterer Export, Vision-Modell oder Handschrift-Index benötigt eine separate Vorschau, explizite Auswahl, Retention und vollständige Löschung.
+
+## Profile und Private Space
+
+Apps werden mit ihrem Android-`UserHandle` abgefragt und gestartet. Lokale Schlüssel verwenden eine vom System gelieferte Benutzer-Seriennummer, damit gleiche Pakete verschiedener Profile nicht kollidieren. KoSch zeigt Androids gebadgte Icons und umgeht gesperrte Profile nicht.
+
+`ACCESS_HIDDEN_PROFILES` wird nicht deklariert. Android Private Space bleibt dem System-Launcher überlassen, bis KoSch einen getrennten Container, Hide/Show, Lock/Unlock, Authentifizierungsfluss und Tests gegen Label-, Badge-, Search- und Recency-Leaks vollständig implementiert hat.
 
 ## Externe KI-Übergaben
 
@@ -50,7 +64,7 @@ PocketPal, ChatterUI und Maid sind optionale Drittprojekte. Die Anzeige ihrer Li
 
 Der ruhende `SecureCredentialVault` nutzt Android Keystore sowie AES-256/GCM. Schlüsselmaterial bleibt nicht exportierbar; Ciphertexte sind per Provider-ID als Associated Data gebunden. `allowBackup=false` verhindert App-Daten-Backup. Der Quellcode enthält keine Provider-Secrets.
 
-M2 fordert keine Schlüssel an und liest den Vault nicht aus. Vor einem aktiven API-Modul sind zwingend:
+M2.2 fordert keine Schlüssel an und liest den Vault nicht aus. Vor einem aktiven API-Modul sind zwingend:
 
 1. getrenntes Netzwerkmodul/Build Flavor;
 2. Kontextvorschau mit Feld-für-Feld-Auswahl;
@@ -73,16 +87,18 @@ M2 fordert keine Schlüssel an und liest den Vault nicht aus. Vor einem aktiven 
 
 LLM-Ausgaben sind Daten, keine Autorität. Sie dürfen keine Capability direkt erzeugen oder erweitern.
 
-## Bekannte M2.1-Risiken
+## Bekannte M2.2-Risiken
 
 - keine instrumentierten Geräte-/OEM-Tests;
+- Smartpen-Erkennung und Ink-Latenz sind noch nicht gegen ein USI-/S-Pen-/Pixel-Pen-Gerätelabor validiert;
+- eigene `PressureInkView` nutzt noch keine Historical-/Coalesced-Event-Optimierung und keinen gemessenen Latenz-Budget-Gate;
 - Widget-Restore und Größenänderung noch unvollständig;
 - Dateianalyse ist heuristisch und erkennt keine Schadsoftware;
 - externe Share-Ziele können Text anders behandeln als erwartet;
 - Voice hängt vom installierten Android-Spracherkenner ab und ist nicht garantiert offline;
 - Vault-Sicherheitscode ist vorbereitet, aber noch nicht durch End-to-End-Key-Rotation oder Hardware-Attestation validiert;
 - keine Security-Audit- oder Penetration-Test-Freigabe;
-- Notification-Dot-Semantik ist noch nicht gegen Work/Private Profile und alle OEM-Service-Killer geprüft;
+- Notification-Dot-Semantik ist noch nicht gegen alle Work-/Private-Profile-Zustände und OEM-Service-Killer geprüft;
 - Smart Dock/Ordner nutzen transparente String-Heuristiken und lernen noch kein persönliches Modell.
 
 Der Launcher ist daher Alpha-Software und sollte zunächst auf Emulator/Zweitgerät getestet werden.
