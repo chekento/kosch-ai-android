@@ -1130,7 +1130,7 @@ class LauncherController(context: Context) {
 
     private fun audit(action: AuditAction, outcome: AuditOutcome) {
         auditLog.append(action, outcome)
-        if (auditVisible) auditEvents = auditLog.events()
+        auditEvents = auditLog.events()
     }
 
     private fun readBounded(input: InputStream, limit: Int): ByteArray {

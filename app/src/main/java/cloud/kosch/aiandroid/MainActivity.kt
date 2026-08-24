@@ -212,16 +212,16 @@ class MainActivity : ComponentActivity() {
         return super.dispatchGenericMotionEvent(event)
     }
 
-    override fun dispatchKeyShortcutEvent(event: KeyEvent): Boolean {
+    override fun onKeyShortcut(keyCode: Int, event: KeyEvent): Boolean {
         if (!::controller.isInitialized || controller.onboardingVisible) {
-            return super.dispatchKeyShortcutEvent(event)
+            return super.onKeyShortcut(keyCode, event)
         }
         val shortcut = ProfessionalShortcutResolver.resolve(
-            keyCode = event.keyCode,
+            keyCode = keyCode,
             isCtrlPressed = event.isCtrlPressed,
             isMetaPressed = event.isMetaPressed,
             isShiftPressed = event.isShiftPressed,
-        ) ?: return super.dispatchKeyShortcutEvent(event)
+        ) ?: return super.onKeyShortcut(keyCode, event)
         controller.closeTopSurface()
         when (shortcut) {
             ProfessionalShortcut.COMMAND -> controller.requestCommandFocus()
@@ -237,13 +237,11 @@ class MainActivity : ComponentActivity() {
         return true
     }
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (::controller.isInitialized && event.action == KeyEvent.ACTION_UP &&
-            event.keyCode == KeyEvent.KEYCODE_ESCAPE && controller.closeTopSurface()
-        ) {
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (::controller.isInitialized && keyCode == KeyEvent.KEYCODE_ESCAPE && controller.closeTopSurface()) {
             return true
         }
-        return super.dispatchKeyEvent(event)
+        return super.onKeyUp(keyCode, event)
     }
 
     override fun onProvideKeyboardShortcuts(
