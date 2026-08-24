@@ -89,4 +89,14 @@ class LocalCommandPlannerTest {
         assertEquals(LauncherCommand.OpenSystemPanel(SystemPanel.DEFAULT_APPS), planner.plan("Standard Apps"))
         assertEquals(LauncherCommand.OpenSystemPanel(SystemPanel.STORAGE), planner.plan("Speicher"))
     }
+
+    @Test
+    fun `professional app independent actions use system routes`() {
+        assertEquals(LauncherCommand.OpenCalendar, planner.plan("Kalender"))
+        assertEquals(LauncherCommand.OpenAlarms, planner.plan("Öffne Wecker"))
+        assertEquals(LauncherCommand.OpenCamera, planner.plan("Öffne Kamera"))
+        assertEquals(LauncherCommand.CreateSystemNote, planner.plan("Systemnotiz"))
+        assertEquals(LauncherCommand.OpenMessage(null), planner.plan("SMS"))
+        assertEquals(LauncherCommand.OpenMessage("+4930123456"), planner.plan("Nachricht an +49 30 123456"))
+    }
 }

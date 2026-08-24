@@ -61,9 +61,10 @@ data class LaunchableShortcut(
     val packageName: String,
     val label: String,
     val user: UserHandle,
+    val userSerialNumber: Long,
     val icon: ImageBitmap?,
 ) {
-    val key: String = "${user.hashCode()}:$packageName:$id"
+    val key: String = "$userSerialNumber:$packageName:$id"
 }
 
 data class WidgetRecord(

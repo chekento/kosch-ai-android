@@ -22,15 +22,21 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.BusinessCenter
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Draw
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -42,11 +48,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -57,8 +68,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import cloud.kosch.aiandroid.LauncherController
+import cloud.kosch.aiandroid.data.WorkspaceCollectionEditor
 import cloud.kosch.aiandroid.model.HomePage
+import cloud.kosch.aiandroid.model.FolderKind
 import cloud.kosch.aiandroid.model.LaunchableApp
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 import cloud.kosch.aiandroid.ui.theme.Mint
@@ -106,6 +120,9 @@ fun HomePageSelector(controller: LauncherController) {
 @Composable
 fun ColumnScope.SmartHomeSurface(controller: LauncherController) {
     val visibleFolders = controller.folderPreview ?: controller.folders
+    var createFolderVisible by remember { mutableStateOf(false) }
+    var folderTitle by remember { mutableStateOf("") }
+    var folderKind by remember { mutableStateOf(FolderKind.OTHER) }
     Surface(
         modifier = Modifier.weight(1f).fillMaxWidth(),
         color = DeepSurface.copy(alpha = 0.94f),
@@ -124,10 +141,17 @@ fun ColumnScope.SmartHomeSurface(controller: LauncherController) {
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
-                OutlinedButton(onClick = controller::proposeSmartFolders) {
-                    Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(17.dp))
-                    Spacer(Modifier.width(5.dp))
-                    Text("Ordnen")
+                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    TextButton(onClick = { createFolderVisible = true }) {
+                        Icon(Icons.Rounded.Add, contentDescription = null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Neu")
+                    }
+                    OutlinedButton(onClick = controller::proposeSmartFolders) {
+                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(17.dp))
+                        Spacer(Modifier.width(5.dp))
+                        Text("Ordnen")
+                    }
                 }
             }
 
@@ -180,9 +204,63 @@ fun ColumnScope.SmartHomeSurface(controller: LauncherController) {
                                 }
                                 Column {
                                     Text(folder.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text("Lokale Smart-Sammlung", color = MutedMist, style = MaterialTheme.typography.labelSmall)
+                                    Text(
+                                        if (folder.generatedLocally) "Lokale Smart-Sammlung" else "Eigene Sammlung",
+                                        color = MutedMist,
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (createFolderVisible) {
+        Dialog(onDismissRequest = { createFolderVisible = false }) {
+            Surface(color = DeepSurface, shape = RoundedCornerShape(26.dp)) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(13.dp),
+                ) {
+                    Text("Eigene Sammlung", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text("Name und Typ bleiben ausschließlich lokal.", color = MutedMist)
+                    OutlinedTextField(
+                        value = folderTitle,
+                        onValueChange = { folderTitle = it.take(WorkspaceCollectionEditor.MAX_TITLE_LENGTH) },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Ordnername") },
+                        singleLine = true,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    ) {
+                        FolderKind.entries.forEach { kind ->
+                            FilterChip(
+                                selected = folderKind == kind,
+                                onClick = { folderKind = kind },
+                                label = { Text("${kind.glyph} ${kind.title}") },
+                            )
+                        }
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        TextButton(onClick = { createFolderVisible = false }, modifier = Modifier.weight(1f)) {
+                            Text("Abbrechen")
+                        }
+                        Button(
+                            onClick = {
+                                controller.createFolder(folderTitle, folderKind)
+                                folderTitle = ""
+                                folderKind = FolderKind.OTHER
+                                createFolderVisible = false
+                            },
+                            enabled = WorkspaceCollectionEditor.normalizedTitle(folderTitle) != null,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text("Erstellen")
                         }
                     }
                 }
@@ -288,6 +366,9 @@ private fun DockApp(
 fun FolderSheet(controller: LauncherController) {
     val folder = controller.selectedFolder() ?: return
     val apps = controller.folderApps(folder)
+    var managing by remember(folder.id) { mutableStateOf(false) }
+    var titleDraft by remember(folder.id, folder.title) { mutableStateOf(folder.title) }
+    var confirmDelete by remember(folder.id) { mutableStateOf(false) }
     ModalBottomSheet(
         onDismissRequest = controller::closeFolder,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
@@ -302,13 +383,84 @@ fun FolderSheet(controller: LauncherController) {
                 Spacer(Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(folder.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                    Text("${apps.size} Apps · lokal klassifiziert", color = MutedMist)
+                    Text(
+                        "${apps.size} Apps · ${if (folder.generatedLocally) "lokal klassifiziert" else "eigene Sammlung"}",
+                        color = MutedMist,
+                    )
                 }
-                IconButton(onClick = { controller.removeFolder(folder.id) }) {
-                    Icon(Icons.Rounded.DeleteOutline, contentDescription = "Ordner entfernen")
+                IconButton(onClick = { managing = !managing }) {
+                    Icon(Icons.Rounded.Edit, contentDescription = if (managing) "Bearbeitung schließen" else "Ordner bearbeiten")
                 }
             }
-            if (apps.isEmpty()) {
+            if (managing) {
+                OutlinedTextField(
+                    value = titleDraft,
+                    onValueChange = { titleDraft = it.take(WorkspaceCollectionEditor.MAX_TITLE_LENGTH) },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Ordnername") },
+                    trailingIcon = {
+                        TextButton(
+                            onClick = { controller.renameFolder(folder.id, titleDraft) },
+                            enabled = WorkspaceCollectionEditor.normalizedTitle(titleDraft) != null && titleDraft.trim() != folder.title,
+                        ) { Text("Speichern") }
+                    },
+                    singleLine = true,
+                )
+                Text(
+                    "Mit den Pfeilen bestimmst du die Reihenfolge. Entfernst du die letzte App, wird der leere Ordner dauerhaft gelöscht.",
+                    color = MutedMist,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                if (apps.isNotEmpty()) {
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        itemsIndexed(apps, key = { _, app -> app.key }) { index, app ->
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = RaisedSurface),
+                                shape = RoundedCornerShape(18.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    Image(app.icon, contentDescription = null, modifier = Modifier.size(40.dp))
+                                    Text(app.label, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    IconButton(
+                                        onClick = { controller.moveFolderApp(folder.id, app.key, -1) },
+                                        enabled = index > 0,
+                                    ) {
+                                        Icon(Icons.Rounded.ArrowUpward, contentDescription = "${app.label} nach oben")
+                                    }
+                                    IconButton(
+                                        onClick = { controller.moveFolderApp(folder.id, app.key, 1) },
+                                        enabled = index < apps.lastIndex,
+                                    ) {
+                                        Icon(Icons.Rounded.ArrowDownward, contentDescription = "${app.label} nach unten")
+                                    }
+                                    IconButton(onClick = { controller.removeAppFromFolder(folder.id, app.key) }) {
+                                        Icon(Icons.Rounded.DeleteOutline, contentDescription = "${app.label} aus Ordner entfernen")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+                OutlinedButton(
+                    onClick = {
+                        if (confirmDelete) controller.removeFolder(folder.id) else confirmDelete = true
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Icon(Icons.Rounded.DeleteOutline, contentDescription = null)
+                    Spacer(Modifier.width(7.dp))
+                    Text(if (confirmDelete) "Ordner wirklich entfernen" else "Ordner entfernen …")
+                }
+            } else if (apps.isEmpty()) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     Text("Keine installierten Apps in dieser Sammlung", color = MutedMist)
                 }

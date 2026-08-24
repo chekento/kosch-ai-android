@@ -109,6 +109,7 @@ class AppCatalog(
                     packageName = shortcut.`package`,
                     label = shortcut.shortLabel?.toString()?.ifBlank { shortcut.id } ?: shortcut.id,
                     user = app.user,
+                    userSerialNumber = app.userSerialNumber,
                     icon = launcherApps.getShortcutBadgedIconDrawable(
                         shortcut,
                         Resources.getSystem().displayMetrics.densityDpi,

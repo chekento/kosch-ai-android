@@ -233,6 +233,8 @@ fun LauncherRoot(
                             QuickActionsRail(
                                 onPhone = controller::openPhone,
                                 onFiles = requestDocument,
+                                onCalendar = controller::openCalendar,
+                                onCamera = controller::openCamera,
                                 onWidgets = controller::openWidgetBoard,
                                 onControls = controller::openControlCenter,
                                 onPen = (controller::openPenSpace).takeIf { controller.stylusState.present },
@@ -289,6 +291,8 @@ fun LauncherRoot(
                         QuickActionsRail(
                             onPhone = controller::openPhone,
                             onFiles = requestDocument,
+                            onCalendar = controller::openCalendar,
+                            onCamera = controller::openCamera,
                             onWidgets = controller::openWidgetBoard,
                             onControls = controller::openControlCenter,
                             onPen = (controller::openPenSpace).takeIf { controller.stylusState.present },
@@ -412,7 +416,12 @@ private fun ColumnScope.HomeSurface(
         }
 
         HomePage.SMART_SPACE -> SmartHomeSurface(controller)
-        HomePage.PEN_SPACE -> PenSpaceSurface(controller, onAsk, requestInkExport)
+        HomePage.PEN_SPACE -> PenSpaceSurface(
+            controller = controller,
+            onAsk = onAsk,
+            onSystemNote = controller::createSystemNote,
+            onExport = requestInkExport,
+        )
     }
 }
 

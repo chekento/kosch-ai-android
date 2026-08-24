@@ -35,6 +35,7 @@ import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material.icons.rounded.FileDownload
+import androidx.compose.material.icons.rounded.EditNote
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -75,6 +76,7 @@ import kotlin.math.hypot
 fun ColumnScope.PenSpaceSurface(
     controller: LauncherController,
     onAsk: () -> Unit,
+    onSystemNote: () -> Unit,
     onExport: () -> Unit,
 ) {
     var selectedTool by remember { mutableStateOf(InkTool.PEN) }
@@ -168,6 +170,11 @@ fun ColumnScope.PenSpaceSurface(
                     onClick = onAsk,
                     label = { Text("An Ask") },
                     leadingIcon = { Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                )
+                AssistChip(
+                    onClick = onSystemNote,
+                    label = { Text("Systemnotiz") },
+                    leadingIcon = { Icon(Icons.Rounded.EditNote, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 )
                 AssistChip(
                     onClick = onExport,
