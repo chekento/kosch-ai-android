@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContactPhone
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Lock
@@ -101,6 +102,7 @@ fun ColumnScope.ProfessionalHubSurface(
         ProAction("Command Bar", "Ctrl/⌘ + K", Icons.Rounded.AutoAwesome, onAsk),
         ProAction("Alle Apps", "Ctrl/⌘ + Leertaste", Icons.Rounded.Apps, controller::openDrawer),
         ProAction("Datei-KI", "Gezielte SAF-Auswahl", Icons.Rounded.FolderOpen, requestDocument),
+        ProAction("Dateien", "Begrenzter SAF-Arbeitsraum", Icons.Rounded.Folder, controller::openFileWorkspace),
         ProAction("Kontakt", "Einmalig auswählen", Icons.Rounded.ContactPhone, requestContact),
         ProAction("Telefon", "System-Wähler", Icons.Rounded.Phone, controller::openPhone),
         ProAction("Widgets", "Android Host Board", Icons.Rounded.Widgets, controller::openWidgetBoard),

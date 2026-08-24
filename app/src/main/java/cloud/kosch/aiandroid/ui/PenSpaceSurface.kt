@@ -6,11 +6,14 @@ import android.graphics.Color as AndroidColor
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
+import android.os.Bundle
 import android.util.AttributeSet
 import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.PointerIcon
 import android.view.View
+import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import cloud.kosch.aiandroid.LauncherController
+import cloud.kosch.aiandroid.R
 import cloud.kosch.aiandroid.data.InkStrokeNormalizer
 import cloud.kosch.aiandroid.model.InkPoint
 import cloud.kosch.aiandroid.model.InkStroke
@@ -414,6 +418,34 @@ class PressureInkView @JvmOverloads constructor(
         return true
     }
 
+    override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
+        super.onInitializeAccessibilityNodeInfo(info)
+        info.className = View::class.java.name
+        info.contentDescription = "Pen-Space-Zeichenfläche, ${strokes.size} Striche, Werkzeug ${selectedTool.title}"
+        if (undoStack.isNotEmpty()) {
+            info.addAction(
+                AccessibilityNodeInfo.AccessibilityAction(
+                    R.id.accessibility_action_undo_ink,
+                    "Letzten Stiftschritt rückgängig machen",
+                ),
+            )
+        }
+        if (strokes.isNotEmpty()) {
+            info.addAction(
+                AccessibilityNodeInfo.AccessibilityAction(
+                    R.id.accessibility_action_clear_ink,
+                    "Alle Stiftstriche löschen",
+                ),
+            )
+        }
+    }
+
+    override fun performAccessibilityAction(action: Int, arguments: Bundle?): Boolean = when (action) {
+        R.id.accessibility_action_undo_ink -> true.also { undo() }
+        R.id.accessibility_action_clear_ink -> true.also { clearInk() }
+        else -> super.performAccessibilityAction(action, arguments)
+    }
+
     private fun drawGrid(canvas: Canvas) {
         val gap = resources.displayMetrics.density * 32f
         var x = gap
@@ -500,6 +532,7 @@ class PressureInkView @JvmOverloads constructor(
             strokes += normalized
         }
         onInkChanged(strokes.deepCopy())
+        sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED)
     }
 
     private fun List<InkStroke>.deepCopy(): List<InkStroke> = map { stroke ->

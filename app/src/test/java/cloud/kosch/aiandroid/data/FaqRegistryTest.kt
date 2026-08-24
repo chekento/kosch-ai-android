@@ -19,6 +19,8 @@ class FaqRegistryTest {
         assertTrue(FaqRegistry.entries.any { it.id == "process-recovery" })
         assertTrue(FaqRegistry.entries.any { it.id == "pen-svg" })
         assertTrue(FaqRegistry.entries.any { it.id == "local-learning" })
+        assertTrue(FaqRegistry.entries.any { it.id == "file-workspace" })
+        assertTrue(FaqRegistry.entries.any { it.id == "file-workspace-safety" })
     }
 
     @Test

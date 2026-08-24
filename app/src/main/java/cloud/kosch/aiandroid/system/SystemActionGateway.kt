@@ -109,11 +109,15 @@ class SystemActionGateway(context: Context) {
     )
 
     fun openFile(insight: FileInsight): Result<Unit> = start(
-        Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(insight.uri, insight.mimeType)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        },
+        documentIntent(insight.uri, insight.mimeType),
     )
+
+    fun openDocument(uri: Uri, mimeType: String): Result<Unit> = start(documentIntent(uri, mimeType))
+
+    private fun documentIntent(uri: Uri, mimeType: String) = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, mimeType)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
 
     private fun startWithFallback(primary: Intent, fallback: Intent): Result<Unit> =
         start(primary).recoverCatching { start(fallback).getOrThrow() }

@@ -70,6 +70,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val workspaceTreeRequest = registerForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri: Uri? ->
+        if (uri == null) {
+            controller.postNotice("Kein Arbeitsordner ausgewählt")
+        } else {
+            controller.adoptFileWorkspace(uri)
+        }
+    }
+
     private val contactRequest = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -194,6 +204,7 @@ class MainActivity : ComponentActivity() {
                     requestHomeRole = ::requestHomeRole,
                     requestVoiceInput = ::requestVoiceInput,
                     requestDocument = ::requestDocument,
+                    requestFileWorkspace = ::requestFileWorkspace,
                     requestContact = ::requestContact,
                     requestWidget = ::requestWidget,
                     requestBackupExport = ::requestBackupExport,
@@ -251,6 +262,7 @@ class MainActivity : ComponentActivity() {
             ProfessionalShortcut.CONTROL_CENTER -> controller.openControlCenter()
             ProfessionalShortcut.PHONE -> controller.openPhone()
             ProfessionalShortcut.FILES -> requestDocument()
+            ProfessionalShortcut.FILE_WORKSPACE -> controller.openFileWorkspace()
             ProfessionalShortcut.BACKUP -> controller.openBackup()
             ProfessionalShortcut.AUDIT -> controller.openAudit()
             ProfessionalShortcut.PEN_SPACE -> controller.openPenSpace()
@@ -279,6 +291,11 @@ class MainActivity : ComponentActivity() {
                 KeyboardShortcutInfo("Kontrollzentrum", KeyEvent.KEYCODE_COMMA, KeyEvent.META_CTRL_ON),
                 KeyboardShortcutInfo("Telefon", KeyEvent.KEYCODE_D, KeyEvent.META_CTRL_ON),
                 KeyboardShortcutInfo("Datei-KI", KeyEvent.KEYCODE_O, KeyEvent.META_CTRL_ON),
+                KeyboardShortcutInfo(
+                    "Datei-Arbeitsraum",
+                    KeyEvent.KEYCODE_O,
+                    KeyEvent.META_CTRL_ON or KeyEvent.META_SHIFT_ON,
+                ),
                 KeyboardShortcutInfo("Backup", KeyEvent.KEYCODE_B, KeyEvent.META_CTRL_ON),
                 KeyboardShortcutInfo("Audit", KeyEvent.KEYCODE_L, KeyEvent.META_CTRL_ON),
                 KeyboardShortcutInfo(
@@ -320,6 +337,11 @@ class MainActivity : ComponentActivity() {
     private fun requestDocument() {
         runCatching { documentRequest.launch(arrayOf("*/*")) }
             .onFailure { controller.postNotice("Die Android-Dateiauswahl ist nicht verfügbar") }
+    }
+
+    private fun requestFileWorkspace() {
+        runCatching { workspaceTreeRequest.launch(null) }
+            .onFailure { controller.postNotice("Die Android-Ordnerauswahl ist nicht verfügbar") }
     }
 
     private fun requestContact() {

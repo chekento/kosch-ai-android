@@ -20,6 +20,9 @@ enum class CapabilityAction {
     CLEAR_AUDIT,
     RESET_PERSONALIZATION,
     REQUEST_UNINSTALL,
+    CREATE_DIRECTORY,
+    RENAME_DOCUMENT,
+    DELETE_DOCUMENT,
 }
 
 data class CapabilityRule(
@@ -43,6 +46,9 @@ object CapabilityPolicy {
         CapabilityAction.CLEAR_AUDIT to CapabilityRule(CapabilityRisk.DESTRUCTIVE, true, true, false),
         CapabilityAction.RESET_PERSONALIZATION to CapabilityRule(CapabilityRisk.DESTRUCTIVE, true, true, false),
         CapabilityAction.REQUEST_UNINSTALL to CapabilityRule(CapabilityRisk.DESTRUCTIVE, true, true, false),
+        CapabilityAction.CREATE_DIRECTORY to CapabilityRule(CapabilityRisk.REVERSIBLE_WRITE, true, true, false),
+        CapabilityAction.RENAME_DOCUMENT to CapabilityRule(CapabilityRisk.REVERSIBLE_WRITE, true, true, true),
+        CapabilityAction.DELETE_DOCUMENT to CapabilityRule(CapabilityRisk.DESTRUCTIVE, true, true, false),
     )
 
     fun rule(action: CapabilityAction): CapabilityRule = checkNotNull(rules[action])

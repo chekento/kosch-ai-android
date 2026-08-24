@@ -17,6 +17,7 @@ import cloud.kosch.aiandroid.ai.LauncherCommand
 import cloud.kosch.aiandroid.ai.LocalAppClassifier
 import cloud.kosch.aiandroid.ai.LocalCommandPlanner
 import cloud.kosch.aiandroid.ai.LocalFileIntelligenceEngine
+import cloud.kosch.aiandroid.ai.LocalFileWorkspacePlanner
 import cloud.kosch.aiandroid.ai.LocalSmartOrganizer
 import cloud.kosch.aiandroid.ai.LocalUsageModel
 import cloud.kosch.aiandroid.ai.PhoneNumberParser
@@ -38,6 +39,8 @@ import cloud.kosch.aiandroid.model.DefaultWorkspace
 import cloud.kosch.aiandroid.model.LaunchableApp
 import cloud.kosch.aiandroid.model.LaunchableShortcut
 import cloud.kosch.aiandroid.model.FileInsight
+import cloud.kosch.aiandroid.model.FileWorkspaceEntry
+import cloud.kosch.aiandroid.model.FileWorkspaceSummary
 import cloud.kosch.aiandroid.model.HomePage
 import cloud.kosch.aiandroid.model.InkStroke
 import cloud.kosch.aiandroid.model.LauncherFolder
@@ -55,6 +58,7 @@ import cloud.kosch.aiandroid.system.NotificationAccess
 import cloud.kosch.aiandroid.system.NotificationBadgeRepository
 import cloud.kosch.aiandroid.system.SystemActionGateway
 import cloud.kosch.aiandroid.system.StylusMonitor
+import cloud.kosch.aiandroid.system.WorkspaceTreeManager
 import cloud.kosch.aiandroid.security.PortableBackupCodec
 import cloud.kosch.aiandroid.security.CapabilityAction
 import cloud.kosch.aiandroid.security.CapabilityPolicy
@@ -74,6 +78,7 @@ class LauncherController(context: Context) {
     private val commandPlanner = LocalCommandPlanner()
     private val contextEngine = LocalContextEngine(appContext)
     private val fileIntelligence = LocalFileIntelligenceEngine(appContext.contentResolver)
+    private val workspaceTree = WorkspaceTreeManager(appContext)
     private val systemActions = SystemActionGateway(appContext)
     private val appCatalog = AppCatalog(appContext, mainHandler, ::refreshApps)
     private val stylusMonitor = StylusMonitor(appContext, mainHandler, ::onStylusChanged)
@@ -119,6 +124,18 @@ class LauncherController(context: Context) {
     var fileLoading by mutableStateOf(false)
         private set
     var fileInsight by mutableStateOf<FileInsight?>(null)
+        private set
+    var fileWorkspaceVisible by mutableStateOf(false)
+        private set
+    var fileWorkspaceLoading by mutableStateOf(false)
+        private set
+    var fileWorkspacePath by mutableStateOf<List<FileWorkspaceEntry>>(emptyList())
+        private set
+    var fileWorkspaceEntries by mutableStateOf<List<FileWorkspaceEntry>>(emptyList())
+        private set
+    var fileWorkspaceSummary by mutableStateOf<FileWorkspaceSummary?>(null)
+        private set
+    var canUndoFileRename by mutableStateOf(false)
         private set
     var widgetBoardVisible by mutableStateOf(false)
         private set
@@ -185,6 +202,8 @@ class LauncherController(context: Context) {
     private var stagedWorkspacePayload: ByteArray? = null
     private var backupRequestToken = 0L
     private var shortcutRequestToken = 0L
+    private var fileWorkspaceRequestToken = 0L
+    private var fileRenameUndo: FileRenameUndo? = null
     private var started = false
     private val badgeListener = NotificationBadgeRepository.Listener { counts ->
         mainHandler.post { notificationCounts = counts }
@@ -502,6 +521,7 @@ class LauncherController(context: Context) {
         folderSheetVisible -> true.also { closeFolder() }
         phoneVisible -> true.also { closePhone() }
         fileSheetVisible -> true.also { closeFileSheet() }
+        fileWorkspaceVisible -> true.also { closeFileWorkspace() }
         widgetBoardVisible -> true.also { closeWidgetBoard() }
         controlCenterVisible -> true.also { closeControlCenter() }
         providerChooserVisible -> true.also { closeProviderChooser() }
@@ -787,6 +807,153 @@ class LauncherController(context: Context) {
         }
     }
 
+    fun openFileWorkspace() {
+        controlCenterVisible = false
+        fileSheetVisible = false
+        fileWorkspaceVisible = true
+        if (workspaceTree.currentTreeUri == null) {
+            fileWorkspacePath = emptyList()
+            fileWorkspaceEntries = emptyList()
+            fileWorkspaceSummary = null
+            notice = "Wähle einen Arbeitsordner über Android aus"
+        } else {
+            loadFileWorkspaceRoot()
+        }
+    }
+
+    fun closeFileWorkspace() {
+        fileWorkspaceRequestToken += 1
+        fileWorkspaceVisible = false
+        fileWorkspaceLoading = false
+    }
+
+    fun adoptFileWorkspace(treeUri: Uri) {
+        val requestToken = ++fileWorkspaceRequestToken
+        fileWorkspaceVisible = true
+        fileWorkspaceLoading = true
+        executor.execute {
+            val result = runCatching {
+                workspaceTree.adopt(treeUri).getOrThrow()
+                workspaceSnapshotRoot()
+            }
+            mainHandler.post {
+                if (requestToken != fileWorkspaceRequestToken) return@post
+                fileWorkspaceLoading = false
+                result.onSuccess { snapshot ->
+                    applyFileWorkspaceSnapshot(snapshot)
+                    audit(AuditAction.FILE_WORKSPACE, AuditOutcome.SUCCESS)
+                    notice = "Arbeitsordner lokal geöffnet"
+                }.onFailure {
+                    audit(AuditAction.FILE_WORKSPACE, AuditOutcome.FAILED)
+                    notice = it.message ?: "Arbeitsordner konnte nicht geöffnet werden"
+                }
+            }
+        }
+    }
+
+    fun forgetFileWorkspace() {
+        val requestToken = ++fileWorkspaceRequestToken
+        fileWorkspaceLoading = true
+        executor.execute {
+            val result = workspaceTree.releaseCurrent()
+            mainHandler.post {
+                if (requestToken != fileWorkspaceRequestToken) return@post
+                fileWorkspaceLoading = false
+                result.onSuccess {
+                    fileWorkspacePath = emptyList()
+                    fileWorkspaceEntries = emptyList()
+                    fileWorkspaceSummary = null
+                    fileRenameUndo = null
+                    canUndoFileRename = false
+                    notice = "Arbeitsordner und Android-Freigabe vergessen"
+                }.onFailure {
+                    notice = it.message ?: "Arbeitsordner konnte nicht vollständig vergessen werden"
+                }
+            }
+        }
+    }
+
+    fun openFileWorkspaceDirectory(entry: FileWorkspaceEntry) {
+        if (!entry.isDirectory || fileWorkspaceLoading) return
+        loadFileWorkspaceDirectory(entry, push = true)
+    }
+
+    fun navigateFileWorkspaceUp() {
+        if (fileWorkspacePath.size <= 1 || fileWorkspaceLoading) return
+        loadFileWorkspaceDirectory(fileWorkspacePath[fileWorkspacePath.lastIndex - 1], push = false)
+    }
+
+    fun openFileWorkspaceEntry(entry: FileWorkspaceEntry) {
+        if (entry.isDirectory) {
+            openFileWorkspaceDirectory(entry)
+            return
+        }
+        systemActions.openDocument(entry.uri, entry.mimeType)
+            .onFailure { notice = "Für ${entry.displayName} ist keine App verfügbar" }
+    }
+
+    fun createFileWorkspaceDirectory(name: String, confirmed: Boolean) {
+        val current = fileWorkspacePath.lastOrNull() ?: return
+        if (CapabilityPolicy.rule(CapabilityAction.CREATE_DIRECTORY).requiresConfirmation && !confirmed) {
+            notice = "Der neue Ordner muss ausdrücklich bestätigt werden"
+            return
+        }
+        mutateFileWorkspace(
+            action = AuditAction.FILE_CREATE_DIRECTORY,
+            successNotice = "Ordner erstellt",
+        ) {
+            workspaceTree.createDirectory(current.uri, name).getOrThrow()
+        }
+    }
+
+    fun renameFileWorkspaceEntry(entry: FileWorkspaceEntry, name: String, confirmed: Boolean) {
+        if (!entry.canRename) {
+            notice = "Dieser Android-Anbieter erlaubt kein Umbenennen"
+            return
+        }
+        if (CapabilityPolicy.rule(CapabilityAction.RENAME_DOCUMENT).requiresConfirmation && !confirmed) {
+            notice = "Der neue Name muss ausdrücklich bestätigt werden"
+            return
+        }
+        mutateFileWorkspace(
+            action = AuditAction.FILE_RENAME,
+            successNotice = "${entry.displayName} umbenannt",
+        ) {
+            val renamedUri = workspaceTree.rename(entry.uri, name).getOrThrow()
+            fileRenameUndo = FileRenameUndo(renamedUri, entry.displayName)
+        }
+    }
+
+    fun undoFileWorkspaceRename() {
+        val undo = fileRenameUndo ?: return
+        mutateFileWorkspace(
+            action = AuditAction.FILE_RENAME,
+            successNotice = "Umbenennung rückgängig gemacht",
+        ) {
+            workspaceTree.rename(undo.renamedUri, undo.originalName).getOrThrow()
+            fileRenameUndo = null
+        }
+    }
+
+    fun deleteFileWorkspaceEntry(entry: FileWorkspaceEntry, confirmed: Boolean) {
+        if (!entry.canDelete) {
+            notice = "Dieser Android-Anbieter erlaubt kein Löschen"
+            return
+        }
+        if (CapabilityPolicy.rule(CapabilityAction.DELETE_DOCUMENT).requiresConfirmation && !confirmed) {
+            audit(AuditAction.FILE_DELETE, AuditOutcome.REJECTED)
+            notice = "Löschen braucht eine ausdrückliche Bestätigung"
+            return
+        }
+        mutateFileWorkspace(
+            action = AuditAction.FILE_DELETE,
+            successNotice = "${entry.displayName} gelöscht – der Anbieter bietet hier kein Undo",
+        ) {
+            workspaceTree.delete(entry.uri).getOrThrow()
+            if (fileRenameUndo?.renamedUri == entry.uri) fileRenameUndo = null
+        }
+    }
+
     fun openWidgetBoard() {
         widgetBoardVisible = true
     }
@@ -1068,6 +1235,7 @@ class LauncherController(context: Context) {
             LauncherCommand.OpenDrawer -> openDrawer()
             LauncherCommand.StartVoice -> requestVoice()
             LauncherCommand.OpenFiles -> requestDocument()
+            LauncherCommand.OpenFileWorkspace -> openFileWorkspace()
             LauncherCommand.OpenControls -> openControlCenter()
             LauncherCommand.OpenWidgets -> openWidgetBoard()
             LauncherCommand.OpenFaq -> openFaq()
@@ -1247,6 +1415,99 @@ class LauncherController(context: Context) {
         }
     }
 
+    private fun loadFileWorkspaceRoot() {
+        val requestToken = ++fileWorkspaceRequestToken
+        fileWorkspaceLoading = true
+        executor.execute {
+            val result = runCatching(::workspaceSnapshotRoot)
+            mainHandler.post {
+                if (requestToken != fileWorkspaceRequestToken) return@post
+                fileWorkspaceLoading = false
+                result.onSuccess(::applyFileWorkspaceSnapshot)
+                    .onFailure {
+                        fileWorkspacePath = emptyList()
+                        fileWorkspaceEntries = emptyList()
+                        fileWorkspaceSummary = null
+                        notice = it.message ?: "Arbeitsordner ist nicht mehr erreichbar"
+                    }
+            }
+        }
+    }
+
+    private fun loadFileWorkspaceDirectory(entry: FileWorkspaceEntry, push: Boolean) {
+        val requestToken = ++fileWorkspaceRequestToken
+        val nextPath = if (push) {
+            (fileWorkspacePath + entry).distinctBy(FileWorkspaceEntry::documentId)
+        } else {
+            fileWorkspacePath.dropLast(1)
+        }
+        fileWorkspaceLoading = true
+        executor.execute {
+            val result = workspaceTree.listChildren(entry.uri).map { children ->
+                FileWorkspaceSnapshot(
+                    path = nextPath.ifEmpty { listOf(entry) },
+                    entries = children,
+                    summary = LocalFileWorkspacePlanner.analyze(children),
+                )
+            }
+            mainHandler.post {
+                if (requestToken != fileWorkspaceRequestToken) return@post
+                fileWorkspaceLoading = false
+                result.onSuccess(::applyFileWorkspaceSnapshot)
+                    .onFailure { notice = it.message ?: "Ordner konnte nicht geöffnet werden" }
+            }
+        }
+    }
+
+    private fun mutateFileWorkspace(
+        action: AuditAction,
+        successNotice: String,
+        mutation: () -> Unit,
+    ) {
+        val current = fileWorkspacePath.lastOrNull() ?: return
+        if (fileWorkspaceLoading) return
+        val requestToken = ++fileWorkspaceRequestToken
+        fileWorkspaceLoading = true
+        executor.execute {
+            val result = runCatching {
+                mutation()
+                val entries = workspaceTree.listChildren(current.uri).getOrThrow()
+                entries to LocalFileWorkspacePlanner.analyze(entries)
+            }
+            mainHandler.post {
+                if (requestToken != fileWorkspaceRequestToken) return@post
+                fileWorkspaceLoading = false
+                result.onSuccess { (entries, summary) ->
+                    fileWorkspaceEntries = entries
+                    fileWorkspaceSummary = summary
+                    canUndoFileRename = fileRenameUndo != null
+                    audit(action, AuditOutcome.SUCCESS)
+                    notice = successNotice
+                }.onFailure {
+                    audit(action, AuditOutcome.FAILED)
+                    notice = it.message ?: "Dateioperation ist fehlgeschlagen"
+                }
+            }
+        }
+    }
+
+    private fun workspaceSnapshotRoot(): FileWorkspaceSnapshot {
+        val root = workspaceTree.rootDirectory().getOrThrow()
+        val entries = workspaceTree.listChildren(root.uri).getOrThrow()
+        return FileWorkspaceSnapshot(
+            path = listOf(root),
+            entries = entries,
+            summary = LocalFileWorkspacePlanner.analyze(entries),
+        )
+    }
+
+    private fun applyFileWorkspaceSnapshot(snapshot: FileWorkspaceSnapshot) {
+        fileWorkspacePath = snapshot.path
+        fileWorkspaceEntries = snapshot.entries
+        fileWorkspaceSummary = snapshot.summary
+        canUndoFileRename = fileRenameUndo != null
+    }
+
     private fun rememberUndoPoint() {
         undoPositions = workspacePositions.mapValues { (_, positions) -> positions.toMap() }
         canUndoLayout = true
@@ -1313,4 +1574,15 @@ class LauncherController(context: Context) {
         const val DOCK_SIZE = 5
         const val MAX_BACKUP_ENVELOPE_BYTES = 8 * 1024 * 1024
     }
+
+    private data class FileWorkspaceSnapshot(
+        val path: List<FileWorkspaceEntry>,
+        val entries: List<FileWorkspaceEntry>,
+        val summary: FileWorkspaceSummary,
+    )
+
+    private data class FileRenameUndo(
+        val renamedUri: Uri,
+        val originalName: String,
+    )
 }

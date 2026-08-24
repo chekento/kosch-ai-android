@@ -36,6 +36,7 @@ import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Backup
 import androidx.compose.material.icons.rounded.Bluetooth
@@ -47,6 +48,11 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material.icons.rounded.DisplaySettings
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.InsertDriveFile
+import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.ContactPhone
 import androidx.compose.material.icons.rounded.Home
@@ -110,6 +116,7 @@ import cloud.kosch.aiandroid.LauncherController
 import cloud.kosch.aiandroid.ai.LocalRuntimeRegistry
 import cloud.kosch.aiandroid.ai.RuntimeStage
 import cloud.kosch.aiandroid.model.SystemPanel
+import cloud.kosch.aiandroid.model.FileWorkspaceEntry
 import cloud.kosch.aiandroid.model.WidgetSizePreset
 import cloud.kosch.aiandroid.ai.SmartCollection
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
@@ -120,6 +127,10 @@ import cloud.kosch.aiandroid.ui.theme.RaisedSurface
 import cloud.kosch.aiandroid.ui.theme.Sky
 import cloud.kosch.aiandroid.ui.theme.Violet
 import cloud.kosch.aiandroid.ui.theme.Warm
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 fun QuickActionsRail(
@@ -378,13 +389,13 @@ fun ControlCenterSheet(
             }
             item {
                 ControlPair(
-                    left = ControlItem("Telefon", "System-Wähler", Icons.Rounded.Phone) {
-                        controller.closeControlCenter()
-                        controller.openPhone()
-                    },
-                    right = ControlItem("Datei-KI", "Lokal prüfen", Icons.Rounded.FolderOpen) {
+                    left = ControlItem("Datei prüfen", "Ein Dokument lokal", Icons.Rounded.FolderOpen) {
                         controller.closeControlCenter()
                         requestDocument()
+                    },
+                    right = ControlItem("Arbeitsordner", "Sicher verwalten", Icons.Rounded.Storage) {
+                        controller.closeControlCenter()
+                        controller.openFileWorkspace()
                     },
                 )
             }
@@ -414,12 +425,13 @@ fun ControlCenterSheet(
             }
             item {
                 ControlPair(
-                    left = ControlItem("Kontakt", "Einmalige Systemauswahl", Icons.Rounded.ContactPhone) {
+                    left = ControlItem("Telefon", "System-Wähler", Icons.Rounded.Phone) {
+                        controller.closeControlCenter()
+                        controller.openPhone()
+                    },
+                    right = ControlItem("Kontakt", "Einmalige Systemauswahl", Icons.Rounded.ContactPhone) {
                         controller.closeControlCenter()
                         requestContact()
-                    },
-                    right = ControlItem("Pro Desk", "Kommandozentrale", Icons.Rounded.BusinessCenter) {
-                        controller.openProDesk()
                     },
                 )
             }
@@ -746,6 +758,352 @@ fun FileIntelligenceSheet(
         }
     }
 }
+
+private enum class FileWorkspaceSort(val title: String) {
+    NAME("A–Z"),
+    NEWEST("Neu"),
+    SIZE("Größe"),
+    TYPE("Typ"),
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FileWorkspaceSheet(
+    controller: LauncherController,
+    requestWorkspace: () -> Unit,
+) {
+    var query by remember { mutableStateOf("") }
+    var sort by remember { mutableStateOf(FileWorkspaceSort.NAME) }
+    var createDirectory by remember { mutableStateOf(false) }
+    var createName by remember { mutableStateOf("") }
+    var renameTarget by remember { mutableStateOf<FileWorkspaceEntry?>(null) }
+    var renameName by remember { mutableStateOf("") }
+    var deleteTarget by remember { mutableStateOf<FileWorkspaceEntry?>(null) }
+    val current = controller.fileWorkspacePath.lastOrNull()
+    val entries = remember(query, sort, controller.fileWorkspaceEntries) {
+        val filtered = controller.fileWorkspaceEntries.filter {
+            query.isBlank() || it.displayName.contains(query.trim(), ignoreCase = true) ||
+                it.category.contains(query.trim(), ignoreCase = true)
+        }
+        val comparator = when (sort) {
+            FileWorkspaceSort.NAME -> compareBy<FileWorkspaceEntry> { it.displayName.lowercase(Locale.ROOT) }
+            FileWorkspaceSort.NEWEST -> compareByDescending { it.lastModifiedEpochMillis ?: Long.MIN_VALUE }
+            FileWorkspaceSort.SIZE -> compareByDescending { it.sizeBytes ?: Long.MIN_VALUE }
+            FileWorkspaceSort.TYPE -> compareBy<FileWorkspaceEntry> { it.category }
+                .thenBy { it.displayName.lowercase(Locale.ROOT) }
+        }
+        filtered.sortedWith(compareByDescending<FileWorkspaceEntry> { it.isDirectory }.then(comparator))
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = controller::closeFileWorkspace,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = DeepSurface,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.94f).padding(horizontal = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            SheetHeader(
+                "Datei-Arbeitsraum",
+                "Nur gewählter SAF-Ordner · lokal analysiert",
+                controller::closeFileWorkspace,
+            )
+
+            if (current == null) {
+                Surface(color = RaisedSurface, shape = RoundedCornerShape(20.dp)) {
+                    Column(
+                        Modifier.fillMaxWidth().padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Icon(Icons.Rounded.FolderOpen, contentDescription = null, tint = Sky, modifier = Modifier.size(42.dp))
+                        Text("Sicheren Arbeitsordner wählen", style = MaterialTheme.typography.titleLarge)
+                        Text(
+                            "Android gibt KoSch ausschließlich den ausgewählten Ordner frei. Es gibt kein MANAGE_EXTERNAL_STORAGE und keinen heimlichen Gerätescan.",
+                            color = MutedMist,
+                        )
+                        Button(onClick = requestWorkspace, modifier = Modifier.fillMaxWidth()) {
+                            Icon(Icons.Rounded.FolderOpen, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Ordner über Android auswählen")
+                        }
+                    }
+                }
+                if (controller.fileWorkspaceLoading) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                } else {
+                    Spacer(Modifier.weight(1f))
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    if (controller.fileWorkspacePath.size > 1) {
+                        AssistChip(
+                            onClick = controller::navigateFileWorkspaceUp,
+                            label = { Text("Hoch") },
+                            leadingIcon = { Icon(Icons.Rounded.ArrowBack, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        )
+                    }
+                    AssistChip(
+                        onClick = controller::openFileWorkspace,
+                        label = { Text("Aktualisieren") },
+                        leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    )
+                    AssistChip(
+                        onClick = requestWorkspace,
+                        label = { Text("Wechseln") },
+                        leadingIcon = { Icon(Icons.Rounded.FolderOpen, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                    )
+                    if (current.canCreateChildren) {
+                        AssistChip(
+                            onClick = { createDirectory = true },
+                            label = { Text("Ordner +") },
+                            leadingIcon = { Icon(Icons.Rounded.CreateNewFolder, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        )
+                    }
+                    if (controller.canUndoFileRename) {
+                        AssistChip(
+                            onClick = controller::undoFileWorkspaceRename,
+                            label = { Text("Rename Undo") },
+                            leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        )
+                    }
+                }
+
+                Surface(color = Mint.copy(alpha = 0.10f), shape = RoundedCornerShape(18.dp)) {
+                    Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(current.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        val summary = controller.fileWorkspaceSummary
+                        if (summary != null) {
+                            Text(
+                                "${summary.directoryCount} Ordner · ${summary.fileCount} Dateien · ${humanBytes(summary.knownBytes)} bekannt",
+                                color = MutedMist,
+                            )
+                            val categories = summary.categoryCounts.entries.joinToString(" · ") { "${it.key} ${it.value}" }
+                            if (categories.isNotBlank()) Text(categories, color = Sky, style = MaterialTheme.typography.labelSmall)
+                            if (summary.duplicateNameGroups > 0) {
+                                Text(
+                                    "Lokaler Hinweis: ${summary.duplicateNameGroups} mögliche Namensduplikate",
+                                    color = Warm,
+                                    style = MaterialTheme.typography.labelMedium,
+                                )
+                            }
+                            if (summary.largestFiles.isNotEmpty()) {
+                                Text(
+                                    "Größte sichtbare Dateien: ${summary.largestFiles.joinToString()}",
+                                    color = MutedMist,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it.take(80) },
+                    modifier = Modifier.fillMaxWidth(),
+                    leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
+                    label = { Text("Im aktuellen Ordner suchen") },
+                    singleLine = true,
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    FileWorkspaceSort.entries.forEach { mode ->
+                        FilterChip(
+                            selected = sort == mode,
+                            onClick = { sort = mode },
+                            label = { Text(mode.title) },
+                        )
+                    }
+                }
+
+                when {
+                    controller.fileWorkspaceLoading -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+
+                    entries.isEmpty() -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text(
+                            if (query.isBlank()) "Dieser Ordner ist leer." else "Keine Datei passt zu „$query“.",
+                            color = MutedMist,
+                        )
+                    }
+
+                    else -> LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        verticalArrangement = Arrangement.spacedBy(9.dp),
+                    ) {
+                        items(entries, key = FileWorkspaceEntry::documentId) { entry ->
+                            Card(
+                                onClick = { controller.openFileWorkspaceEntry(entry) },
+                                colors = CardDefaults.cardColors(containerColor = RaisedSurface),
+                                shape = RoundedCornerShape(18.dp),
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(11.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Icon(
+                                        if (entry.isDirectory) Icons.Rounded.Folder else Icons.Rounded.InsertDriveFile,
+                                        contentDescription = null,
+                                        tint = if (entry.isDirectory) Mint else Sky,
+                                        modifier = Modifier.size(30.dp),
+                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(entry.displayName, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(
+                                            fileEntrySubtitle(entry),
+                                            color = MutedMist,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    }
+                                    if (entry.canRename) {
+                                        IconButton(onClick = {
+                                            renameTarget = entry
+                                            renameName = entry.displayName
+                                        }) {
+                                            Icon(Icons.Rounded.Edit, contentDescription = "${entry.displayName} umbenennen")
+                                        }
+                                    }
+                                    if (entry.canDelete) {
+                                        IconButton(onClick = { deleteTarget = entry }) {
+                                            Icon(Icons.Rounded.DeleteOutline, contentDescription = "${entry.displayName} löschen")
+                                        }
+                                    }
+                                    if (!entry.isDirectory) {
+                                        Icon(Icons.Rounded.OpenInNew, contentDescription = "${entry.displayName} öffnen", tint = Sky)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                TextButton(onClick = controller::forgetFileWorkspace, modifier = Modifier.fillMaxWidth()) {
+                    Text("Arbeitsordner und Android-Freigabe vergessen")
+                }
+                Spacer(Modifier.height(16.dp))
+            }
+        }
+    }
+
+    if (createDirectory) {
+        FileNameDialog(
+            title = "Neuen Ordner erstellen",
+            value = createName,
+            confirmLabel = "Erstellen",
+            onValueChange = { createName = it },
+            onDismiss = {
+                createDirectory = false
+                createName = ""
+            },
+            onConfirm = {
+                controller.createFileWorkspaceDirectory(createName, confirmed = true)
+                createDirectory = false
+                createName = ""
+            },
+        )
+    }
+    renameTarget?.let { entry ->
+        FileNameDialog(
+            title = "${entry.displayName} umbenennen",
+            value = renameName,
+            confirmLabel = "Umbenennen",
+            onValueChange = { renameName = it },
+            onDismiss = { renameTarget = null },
+            onConfirm = {
+                controller.renameFileWorkspaceEntry(entry, renameName, confirmed = true)
+                renameTarget = null
+            },
+        )
+    }
+    deleteTarget?.let { entry ->
+        Dialog(onDismissRequest = { deleteTarget = null }) {
+            Surface(color = DeepSurface, shape = RoundedCornerShape(24.dp)) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Endgültig löschen?", style = MaterialTheme.typography.titleLarge, color = Warm)
+                    Text(
+                        "„${entry.displayName}“ wird über den gewählten Android-Dateianbieter gelöscht. KoSch kann diese Aktion nicht rückgängig machen.",
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { deleteTarget = null }) { Text("Abbrechen") }
+                        Button(onClick = {
+                            controller.deleteFileWorkspaceEntry(entry, confirmed = true)
+                            deleteTarget = null
+                        }) { Text("Endgültig löschen") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FileNameDialog(
+    title: String,
+    value: String,
+    confirmLabel: String,
+    onValueChange: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(color = DeepSurface, shape = RoundedCornerShape(24.dp)) {
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(title, style = MaterialTheme.typography.titleLarge)
+                OutlinedTextField(
+                    value = value,
+                    onValueChange = { onValueChange(it.take(120)) },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Name") },
+                    singleLine = true,
+                )
+                Text(
+                    "Lokale Vorschau · keine Aktion vor Bestätigung",
+                    color = Mint,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onDismiss) { Text("Abbrechen") }
+                    Button(onClick = onConfirm, enabled = value.trim().isNotEmpty()) { Text(confirmLabel) }
+                }
+            }
+        }
+    }
+}
+
+private fun fileEntrySubtitle(entry: FileWorkspaceEntry): String {
+    val modified = entry.lastModifiedEpochMillis?.let {
+        FILE_DATE_FORMAT.format(Instant.ofEpochMilli(it))
+    }
+    return listOfNotNull(
+        entry.category,
+        entry.sizeBytes?.let(::humanBytes),
+        modified,
+    ).joinToString(" · ")
+}
+
+private fun humanBytes(bytes: Long): String = when {
+    bytes < 1_024 -> "$bytes B"
+    bytes < 1_048_576 -> "%.1f KB".format(Locale.GERMAN, bytes / 1_024.0)
+    bytes < 1_073_741_824 -> "%.1f MB".format(Locale.GERMAN, bytes / 1_048_576.0)
+    else -> "%.1f GB".format(Locale.GERMAN, bytes / 1_073_741_824.0)
+}
+
+private val FILE_DATE_FORMAT: DateTimeFormatter = DateTimeFormatter
+    .ofPattern("dd.MM.yyyy HH:mm")
+    .withZone(ZoneId.systemDefault())
 
 @Composable
 private fun InsightBlock(title: String, body: String) {

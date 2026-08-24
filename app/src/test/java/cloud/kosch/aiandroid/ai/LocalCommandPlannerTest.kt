@@ -53,6 +53,7 @@ class LocalCommandPlannerTest {
     @Test
     fun `file command stays inside explicit document picker route`() {
         assertEquals(LauncherCommand.OpenFiles, planner.plan("Datei analysieren"))
+        assertEquals(LauncherCommand.OpenFileWorkspace, planner.plan("Dateien verwalten"))
     }
 
     @Test

@@ -9,6 +9,7 @@ enum class ProfessionalShortcut {
     CONTROL_CENTER,
     PHONE,
     FILES,
+    FILE_WORKSPACE,
     BACKUP,
     AUDIT,
     PEN_SPACE,
@@ -28,7 +29,7 @@ object ProfessionalShortcutResolver {
             KeyEvent.KEYCODE_H -> ProfessionalShortcut.PRO_DESK
             KeyEvent.KEYCODE_COMMA -> ProfessionalShortcut.CONTROL_CENTER
             KeyEvent.KEYCODE_D -> ProfessionalShortcut.PHONE
-            KeyEvent.KEYCODE_O -> ProfessionalShortcut.FILES
+            KeyEvent.KEYCODE_O -> if (isShiftPressed) ProfessionalShortcut.FILE_WORKSPACE else ProfessionalShortcut.FILES
             KeyEvent.KEYCODE_B -> ProfessionalShortcut.BACKUP
             KeyEvent.KEYCODE_L -> ProfessionalShortcut.AUDIT
             KeyEvent.KEYCODE_P -> if (isShiftPressed) ProfessionalShortcut.PEN_SPACE else null

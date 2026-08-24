@@ -33,6 +33,29 @@ data class FileInsight(
     val safetyNote: String,
 )
 
+data class FileWorkspaceEntry(
+    val uri: Uri,
+    val documentId: String,
+    val displayName: String,
+    val mimeType: String,
+    val sizeBytes: Long?,
+    val lastModifiedEpochMillis: Long?,
+    val isDirectory: Boolean,
+    val canRename: Boolean,
+    val canDelete: Boolean,
+    val canCreateChildren: Boolean,
+    val category: String,
+)
+
+data class FileWorkspaceSummary(
+    val fileCount: Int,
+    val directoryCount: Int,
+    val knownBytes: Long,
+    val duplicateNameGroups: Int,
+    val categoryCounts: Map<String, Int>,
+    val largestFiles: List<String>,
+)
+
 data class LaunchableShortcut(
     val id: String,
     val packageName: String,

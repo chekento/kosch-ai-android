@@ -32,6 +32,18 @@ class ProfessionalShortcutResolverTest {
     }
 
     @Test
+    fun fileWorkspaceUsesShiftOWithoutReplacingSingleFileInspection() {
+        assertEquals(
+            ProfessionalShortcut.FILES,
+            ProfessionalShortcutResolver.resolve(KeyEvent.KEYCODE_O, true, false, false),
+        )
+        assertEquals(
+            ProfessionalShortcut.FILE_WORKSPACE,
+            ProfessionalShortcutResolver.resolve(KeyEvent.KEYCODE_O, true, false, true),
+        )
+    }
+
+    @Test
     fun plainKeysAreNeverIntercepted() {
         assertNull(ProfessionalShortcutResolver.resolve(KeyEvent.KEYCODE_K, false, false, false))
     }
