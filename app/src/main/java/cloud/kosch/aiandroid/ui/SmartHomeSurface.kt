@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -61,19 +64,30 @@ import cloud.kosch.aiandroid.ui.theme.Violet
 
 @Composable
 fun HomePageSelector(controller: LauncherController) {
+    val pages = HomePage.entries.filter { page ->
+        page != HomePage.PEN_SPACE || controller.stylusState.present || controller.homePage == HomePage.PEN_SPACE
+    }
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        HomePage.entries.forEach { page ->
+        pages.forEach { page ->
             FilterChip(
                 selected = controller.homePage == page,
                 onClick = { controller.switchHomePage(page) },
                 label = { Text(page.title) },
-                leadingIcon = if (page == HomePage.SMART_SPACE) {
-                    { Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(17.dp)) }
-                } else {
-                    null
+                leadingIcon = when (page) {
+                    HomePage.SMART_SPACE -> {
+                        { Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(17.dp)) }
+                    }
+
+                    HomePage.PEN_SPACE -> {
+                        { Icon(Icons.Rounded.Draw, contentDescription = null, modifier = Modifier.size(17.dp)) }
+                    }
+
+                    HomePage.WORKSPACE -> null
                 },
             )
         }

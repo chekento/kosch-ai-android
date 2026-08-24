@@ -12,6 +12,8 @@ sealed interface LauncherCommand {
     data object OpenFiles : LauncherCommand
     data object OpenControls : LauncherCommand
     data object OpenWidgets : LauncherCommand
+    data object OpenFaq : LauncherCommand
+    data object OpenPenSpace : LauncherCommand
     data class OpenPhone(val number: String?) : LauncherCommand
     data class OpenSystemPanel(val panel: SystemPanel) : LauncherCommand
     data class SwitchScene(val scene: SceneId) : LauncherCommand
@@ -30,6 +32,8 @@ class LocalCommandPlanner {
         if (normalized in fileCommands) return LauncherCommand.OpenFiles
         if (normalized in controlCommands) return LauncherCommand.OpenControls
         if (normalized in widgetCommands) return LauncherCommand.OpenWidgets
+        if (normalized in faqCommands) return LauncherCommand.OpenFaq
+        if (normalized in penCommands) return LauncherCommand.OpenPenSpace
         systemPanelFrom(normalized)?.let { return LauncherCommand.OpenSystemPanel(it) }
         phoneFrom(raw, normalized)?.let { return it }
 
@@ -100,6 +104,12 @@ class LocalCommandPlanner {
         )
         val widgetCommands = setOf(
             "widget", "widgets", "widget board", "widget-bereich",
+        )
+        val faqCommands = setOf(
+            "faq", "hilfe", "hilfebereich", "haufige fragen", "häufige fragen",
+        )
+        val penCommands = setOf(
+            "pen space", "penspace", "stift", "smartpen", "notiz", "zeichnen",
         )
         val phoneCommands = setOf(
             "telefon", "wahler", "dialer", "anrufen", "phone",

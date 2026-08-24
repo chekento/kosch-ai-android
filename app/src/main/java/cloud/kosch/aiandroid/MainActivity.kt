@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.speech.RecognizerIntent
+import android.view.MotionEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -136,6 +137,16 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         controller.close()
         super.onDestroy()
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        if (::controller.isInitialized) controller.observeInputEvent(event)
+        return super.dispatchTouchEvent(event)
+    }
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
+        if (::controller.isInitialized) controller.observeInputEvent(event)
+        return super.dispatchGenericMotionEvent(event)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

@@ -62,4 +62,14 @@ class LocalCommandPlannerTest {
             planner.plan("Launcher Auswahl"),
         )
     }
+
+    @Test
+    fun `faq command opens local help`() {
+        assertEquals(LauncherCommand.OpenFaq, planner.plan("Hilfe"))
+    }
+
+    @Test
+    fun `pen command opens the local pen workspace`() {
+        assertEquals(LauncherCommand.OpenPenSpace, planner.plan("Pen Space"))
+    }
 }
