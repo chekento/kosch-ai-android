@@ -10,6 +10,7 @@ sealed interface LauncherCommand {
     data object OpenDrawer : LauncherCommand
     data object StartVoice : LauncherCommand
     data object OpenFiles : LauncherCommand
+    data object OpenFileWorkspace : LauncherCommand
     data object OpenControls : LauncherCommand
     data object OpenWidgets : LauncherCommand
     data object OpenFaq : LauncherCommand
@@ -33,6 +34,7 @@ class LocalCommandPlanner {
         val normalized = raw.normalized()
         if (normalized in drawerCommands) return LauncherCommand.OpenDrawer
         if (normalized in voiceCommands) return LauncherCommand.StartVoice
+        if (normalized in fileWorkspaceCommands) return LauncherCommand.OpenFileWorkspace
         if (normalized in fileCommands) return LauncherCommand.OpenFiles
         if (normalized in controlCommands) return LauncherCommand.OpenControls
         if (normalized in widgetCommands) return LauncherCommand.OpenWidgets
@@ -60,6 +62,14 @@ class LocalCommandPlanner {
         "bluetooth", "bluetooth einstellungen" -> SystemPanel.BLUETOOTH
         "benachrichtigungen", "notification settings" -> SystemPanel.NOTIFICATIONS
         "benachrichtigungspunkte", "notification dots", "app punkte" -> SystemPanel.NOTIFICATION_ACCESS
+        "hintergrund", "hintergrundbild", "wallpaper" -> SystemPanel.WALLPAPER
+        "anzeige", "display", "bildschirm" -> SystemPanel.DISPLAY
+        "ton", "sound", "lautstarke", "lautstärke" -> SystemPanel.SOUND
+        "akku", "batterie", "battery" -> SystemPanel.BATTERY
+        "datenschutz", "privacy" -> SystemPanel.PRIVACY
+        "bedienungshilfen", "barrierefreiheit", "accessibility" -> SystemPanel.ACCESSIBILITY
+        "standard apps", "standard-apps", "default apps" -> SystemPanel.DEFAULT_APPS
+        "speicher", "storage" -> SystemPanel.STORAGE
         "android einstellungen", "systemeinstellungen", "settings" -> SystemPanel.ANDROID_SETTINGS
         "home auswahl", "launcher auswahl", "start app auswahl", "standard launcher" -> SystemPanel.HOME_SELECTION
         else -> null
@@ -106,6 +116,9 @@ class LocalCommandPlanner {
         )
         val fileCommands = setOf(
             "datei", "dateien", "datei offnen", "datei analysieren", "file", "files",
+        )
+        val fileWorkspaceCommands = setOf(
+            "arbeitsordner", "dateien verwalten", "dateimanager", "file manager", "file workspace",
         )
         val controlCommands = setOf(
             "kontrollzentrum", "schnelleinstellungen", "systemsteuerung", "quick controls",

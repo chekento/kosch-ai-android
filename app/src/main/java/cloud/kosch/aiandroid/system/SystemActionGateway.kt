@@ -45,6 +45,46 @@ class SystemActionGateway(context: Context) {
             Intent(Settings.ACTION_SETTINGS),
         )
 
+        SystemPanel.WALLPAPER -> startWithFallback(
+            Intent(Intent.ACTION_SET_WALLPAPER),
+            Intent(Settings.ACTION_DISPLAY_SETTINGS),
+        )
+
+        SystemPanel.DISPLAY -> startWithFallback(
+            Intent(Settings.ACTION_DISPLAY_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        )
+
+        SystemPanel.SOUND -> startWithFallback(
+            Intent(Settings.ACTION_SOUND_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        )
+
+        SystemPanel.BATTERY -> startWithFallback(
+            Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        )
+
+        SystemPanel.PRIVACY -> startWithFallback(
+            Intent(Settings.ACTION_PRIVACY_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        )
+
+        SystemPanel.ACCESSIBILITY -> startWithFallback(
+            Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        )
+
+        SystemPanel.DEFAULT_APPS -> startWithFallback(
+            Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        )
+
+        SystemPanel.STORAGE -> startWithFallback(
+            Intent(Settings.ACTION_INTERNAL_STORAGE_SETTINGS),
+            Intent(Settings.ACTION_SETTINGS),
+        )
+
         SystemPanel.ANDROID_SETTINGS -> start(Intent(Settings.ACTION_SETTINGS))
         SystemPanel.HOME_SELECTION -> startWithFallback(
             Intent(Settings.ACTION_HOME_SETTINGS),
@@ -59,12 +99,25 @@ class SystemActionGateway(context: Context) {
         ),
     )
 
-    fun openFile(insight: FileInsight): Result<Unit> = start(
-        Intent(Intent.ACTION_VIEW).apply {
-            setDataAndType(insight.uri, insight.mimeType)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-        },
+    fun openStoreListing(packageName: String): Result<Unit> = startWithFallback(
+        Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName")),
+        Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName")),
     )
+
+    fun requestUninstall(packageName: String): Result<Unit> = start(
+        Intent(Intent.ACTION_DELETE, Uri.fromParts("package", packageName, null)),
+    )
+
+    fun openFile(insight: FileInsight): Result<Unit> = start(
+        documentIntent(insight.uri, insight.mimeType),
+    )
+
+    fun openDocument(uri: Uri, mimeType: String): Result<Unit> = start(documentIntent(uri, mimeType))
+
+    private fun documentIntent(uri: Uri, mimeType: String) = Intent(Intent.ACTION_VIEW).apply {
+        setDataAndType(uri, mimeType)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
 
     private fun startWithFallback(primary: Intent, fallback: Intent): Result<Unit> =
         start(primary).recoverCatching { start(fallback).getOrThrow() }

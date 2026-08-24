@@ -82,6 +82,7 @@ enum class SmartCollection(val title: String) {
     COMMUNICATION("Kommunikation"),
     TOOLS("Tools"),
     GAMES("Spiele"),
+    HIDDEN("Verborgen"),
 }
 
 object LocalAppClassifier {

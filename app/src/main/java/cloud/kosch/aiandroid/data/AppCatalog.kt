@@ -76,6 +76,7 @@ class AppCatalog(
                             userSerialNumber = serial,
                             profile = profileType,
                             icon = activity.getBadgedIcon(0).safeBitmap().asImageBitmap(),
+                            legacyKeys = setOf("${activity.user.hashCode()}:${component.flattenToShortString()}"),
                         )
                     }.getOrNull()
                 }

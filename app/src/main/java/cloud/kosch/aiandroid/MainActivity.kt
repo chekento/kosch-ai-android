@@ -16,6 +16,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
+import cloud.kosch.aiandroid.data.PendingDocumentKind
+import cloud.kosch.aiandroid.data.PendingDocumentStore
 import cloud.kosch.aiandroid.system.HomeRoleController
 import cloud.kosch.aiandroid.system.DocumentGrantManager
 import cloud.kosch.aiandroid.system.ProfessionalShortcut
@@ -26,12 +29,15 @@ import cloud.kosch.aiandroid.ui.theme.KoSchLauncherTheme
 import java.time.LocalDate
 
 class MainActivity : ComponentActivity() {
-    private lateinit var controller: LauncherController
+    private val launcherViewModel: LauncherViewModel by viewModels()
+    private val controller: LauncherController get() = launcherViewModel.controller
     private lateinit var widgetHostController: WidgetHostController
     private lateinit var documentGrantManager: DocumentGrantManager
+    private lateinit var pendingDocumentStore: PendingDocumentStore
     private var pendingWidgetId: Int? = null
-    private var pendingBackupExport: ByteArray? = null
-    private var pendingAuditExport: ByteArray? = null
+    private var pendingBackupExportToken: String? = null
+    private var pendingAuditExportToken: String? = null
+    private var pendingInkExportToken: String? = null
 
     private val homeRoleRequest = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -64,6 +70,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private val workspaceTreeRequest = registerForActivityResult(
+        ActivityResultContracts.OpenDocumentTree(),
+    ) { uri: Uri? ->
+        if (uri == null) {
+            controller.postNotice("Kein Arbeitsordner ausgewählt")
+        } else {
+            controller.adoptFileWorkspace(uri)
+        }
+    }
+
     private val contactRequest = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -78,8 +94,9 @@ class MainActivity : ComponentActivity() {
     private val backupCreateRequest = registerForActivityResult(
         ActivityResultContracts.CreateDocument(BACKUP_MIME_TYPE),
     ) { uri ->
-        val payload = pendingBackupExport
-        pendingBackupExport = null
+        val token = pendingBackupExportToken
+        pendingBackupExportToken = null
+        val payload = token?.let { pendingDocumentStore.consume(PendingDocumentKind.BACKUP, it) }
         if (uri == null || payload == null) {
             payload?.fill(0)
             controller.recordBackupExport(false)
@@ -101,13 +118,28 @@ class MainActivity : ComponentActivity() {
     private val auditCreateRequest = registerForActivityResult(
         ActivityResultContracts.CreateDocument("text/csv"),
     ) { uri ->
-        val payload = pendingAuditExport
-        pendingAuditExport = null
+        val token = pendingAuditExportToken
+        pendingAuditExportToken = null
+        val payload = token?.let { pendingDocumentStore.consume(PendingDocumentKind.AUDIT, it) }
         if (uri == null || payload == null) {
             payload?.fill(0)
             controller.recordAuditExport(false)
         } else {
             controller.writeUserDocument(uri, payload, controller::recordAuditExport)
+        }
+    }
+
+    private val inkCreateRequest = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("image/svg+xml"),
+    ) { uri ->
+        val token = pendingInkExportToken
+        pendingInkExportToken = null
+        val payload = token?.let { pendingDocumentStore.consume(PendingDocumentKind.INK_SVG, it) }
+        if (uri == null || payload == null) {
+            payload?.fill(0)
+            controller.recordInkExport(false)
+        } else {
+            controller.writeUserDocument(uri, payload, controller::recordInkExport)
         }
     }
 
@@ -152,10 +184,15 @@ class MainActivity : ComponentActivity() {
         pendingWidgetId = savedInstanceState
             ?.getInt(STATE_PENDING_WIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
             ?.takeUnless { it == AppWidgetManager.INVALID_APPWIDGET_ID }
-        controller = LauncherController(applicationContext)
         widgetHostController = WidgetHostController(applicationContext)
         documentGrantManager = DocumentGrantManager(applicationContext)
-        controller.start()
+        pendingDocumentStore = PendingDocumentStore(applicationContext)
+        pendingBackupExportToken = savedInstanceState?.getString(STATE_PENDING_BACKUP_EXPORT)
+            ?.takeIf { pendingDocumentStore.contains(PendingDocumentKind.BACKUP, it) }
+        pendingAuditExportToken = savedInstanceState?.getString(STATE_PENDING_AUDIT_EXPORT)
+            ?.takeIf { pendingDocumentStore.contains(PendingDocumentKind.AUDIT, it) }
+        pendingInkExportToken = savedInstanceState?.getString(STATE_PENDING_INK_EXPORT)
+            ?.takeIf { pendingDocumentStore.contains(PendingDocumentKind.INK_SVG, it) }
         controller.widgetIds.toList()
             .filterNot(widgetHostController::isValid)
             .forEach(controller::removeWidgetRecord)
@@ -167,11 +204,13 @@ class MainActivity : ComponentActivity() {
                     requestHomeRole = ::requestHomeRole,
                     requestVoiceInput = ::requestVoiceInput,
                     requestDocument = ::requestDocument,
+                    requestFileWorkspace = ::requestFileWorkspace,
                     requestContact = ::requestContact,
                     requestWidget = ::requestWidget,
                     requestBackupExport = ::requestBackupExport,
                     requestBackupImport = ::requestBackupImport,
                     requestAuditExport = ::requestAuditExport,
+                    requestInkExport = ::requestInkExport,
                     createWidgetView = widgetHostController::createView,
                     deleteWidget = ::deleteWidget,
                     forgetDocument = ::forgetDocument,
@@ -195,25 +234,18 @@ class MainActivity : ComponentActivity() {
         super.onStop()
     }
 
-    override fun onDestroy() {
-        pendingBackupExport?.fill(0)
-        pendingAuditExport?.fill(0)
-        controller.close()
-        super.onDestroy()
-    }
-
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {
-        if (::controller.isInitialized) controller.observeInputEvent(event)
+        controller.observeInputEvent(event)
         return super.dispatchTouchEvent(event)
     }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
-        if (::controller.isInitialized) controller.observeInputEvent(event)
+        controller.observeInputEvent(event)
         return super.dispatchGenericMotionEvent(event)
     }
 
     override fun onKeyShortcut(keyCode: Int, event: KeyEvent): Boolean {
-        if (!::controller.isInitialized || controller.onboardingVisible) {
+        if (controller.onboardingVisible) {
             return super.onKeyShortcut(keyCode, event)
         }
         val shortcut = ProfessionalShortcutResolver.resolve(
@@ -230,6 +262,7 @@ class MainActivity : ComponentActivity() {
             ProfessionalShortcut.CONTROL_CENTER -> controller.openControlCenter()
             ProfessionalShortcut.PHONE -> controller.openPhone()
             ProfessionalShortcut.FILES -> requestDocument()
+            ProfessionalShortcut.FILE_WORKSPACE -> controller.openFileWorkspace()
             ProfessionalShortcut.BACKUP -> controller.openBackup()
             ProfessionalShortcut.AUDIT -> controller.openAudit()
             ProfessionalShortcut.PEN_SPACE -> controller.openPenSpace()
@@ -238,7 +271,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
-        if (::controller.isInitialized && keyCode == KeyEvent.KEYCODE_ESCAPE && controller.closeTopSurface()) {
+        if (keyCode == KeyEvent.KEYCODE_ESCAPE && controller.closeTopSurface()) {
             return true
         }
         return super.onKeyUp(keyCode, event)
@@ -258,6 +291,11 @@ class MainActivity : ComponentActivity() {
                 KeyboardShortcutInfo("Kontrollzentrum", KeyEvent.KEYCODE_COMMA, KeyEvent.META_CTRL_ON),
                 KeyboardShortcutInfo("Telefon", KeyEvent.KEYCODE_D, KeyEvent.META_CTRL_ON),
                 KeyboardShortcutInfo("Datei-KI", KeyEvent.KEYCODE_O, KeyEvent.META_CTRL_ON),
+                KeyboardShortcutInfo(
+                    "Datei-Arbeitsraum",
+                    KeyEvent.KEYCODE_O,
+                    KeyEvent.META_CTRL_ON or KeyEvent.META_SHIFT_ON,
+                ),
                 KeyboardShortcutInfo("Backup", KeyEvent.KEYCODE_B, KeyEvent.META_CTRL_ON),
                 KeyboardShortcutInfo("Audit", KeyEvent.KEYCODE_L, KeyEvent.META_CTRL_ON),
                 KeyboardShortcutInfo(
@@ -272,6 +310,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         pendingWidgetId?.let { outState.putInt(STATE_PENDING_WIDGET_ID, it) }
+        pendingBackupExportToken?.let { outState.putString(STATE_PENDING_BACKUP_EXPORT, it) }
+        pendingAuditExportToken?.let { outState.putString(STATE_PENDING_AUDIT_EXPORT, it) }
+        pendingInkExportToken?.let { outState.putString(STATE_PENDING_INK_EXPORT, it) }
         super.onSaveInstanceState(outState)
     }
 
@@ -298,6 +339,11 @@ class MainActivity : ComponentActivity() {
             .onFailure { controller.postNotice("Die Android-Dateiauswahl ist nicht verfügbar") }
     }
 
+    private fun requestFileWorkspace() {
+        runCatching { workspaceTreeRequest.launch(null) }
+            .onFailure { controller.postNotice("Die Android-Ordnerauswahl ist nicht verfügbar") }
+    }
+
     private fun requestContact() {
         val intent = Intent(Intent.ACTION_PICK, ContactsContract.CommonDataKinds.Phone.CONTENT_URI).apply {
             putExtra(EXTRA_USE_SYSTEM_CONTACTS_PICKER, true)
@@ -310,15 +356,19 @@ class MainActivity : ComponentActivity() {
     private fun requestBackupExport(passphrase: String) {
         controller.buildEncryptedBackup(passphrase.toCharArray()) { result ->
             result.onSuccess { payload ->
-                pendingBackupExport?.fill(0)
-                pendingBackupExport = payload
-                runCatching {
-                    backupCreateRequest.launch("kosch-workspace-${LocalDate.now()}.koschbackup")
-                }.onFailure {
-                    pendingBackupExport?.fill(0)
-                    pendingBackupExport = null
-                    controller.recordBackupExport(false)
-                }
+                pendingBackupExportToken?.let { pendingDocumentStore.discard(PendingDocumentKind.BACKUP, it) }
+                pendingDocumentStore.stage(PendingDocumentKind.BACKUP, payload)
+                    .onSuccess { token ->
+                        pendingBackupExportToken = token
+                        runCatching {
+                            backupCreateRequest.launch("kosch-workspace-${LocalDate.now()}.koschbackup")
+                        }.onFailure {
+                            pendingDocumentStore.discard(PendingDocumentKind.BACKUP, pendingBackupExportToken)
+                            pendingBackupExportToken = null
+                            controller.recordBackupExport(false)
+                        }
+                    }
+                    .onFailure { controller.recordBackupExport(false) }
             }
         }
     }
@@ -329,14 +379,33 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun requestAuditExport() {
-        pendingAuditExport?.fill(0)
-        pendingAuditExport = controller.auditCsv()
-        runCatching { auditCreateRequest.launch("kosch-audit-${LocalDate.now()}.csv") }
-            .onFailure {
-                pendingAuditExport?.fill(0)
-                pendingAuditExport = null
-                controller.recordAuditExport(false)
+        pendingAuditExportToken?.let { pendingDocumentStore.discard(PendingDocumentKind.AUDIT, it) }
+        pendingDocumentStore.stage(PendingDocumentKind.AUDIT, controller.auditCsv())
+            .onSuccess { token ->
+                pendingAuditExportToken = token
+                runCatching { auditCreateRequest.launch("kosch-audit-${LocalDate.now()}.csv") }
+                    .onFailure {
+                        pendingDocumentStore.discard(PendingDocumentKind.AUDIT, pendingAuditExportToken)
+                        pendingAuditExportToken = null
+                        controller.recordAuditExport(false)
+                    }
             }
+            .onFailure { controller.recordAuditExport(false) }
+    }
+
+    private fun requestInkExport() {
+        pendingInkExportToken?.let { pendingDocumentStore.discard(PendingDocumentKind.INK_SVG, it) }
+        pendingDocumentStore.stage(PendingDocumentKind.INK_SVG, controller.inkSvg())
+            .onSuccess { token ->
+                pendingInkExportToken = token
+                runCatching { inkCreateRequest.launch("kosch-pen-space-${LocalDate.now()}.svg") }
+                    .onFailure {
+                        pendingDocumentStore.discard(PendingDocumentKind.INK_SVG, pendingInkExportToken)
+                        pendingInkExportToken = null
+                        controller.recordInkExport(false)
+                    }
+            }
+            .onFailure { controller.recordInkExport(false) }
     }
 
     private fun requestWidget() {
@@ -382,6 +451,9 @@ class MainActivity : ComponentActivity() {
 
     private companion object {
         const val STATE_PENDING_WIDGET_ID = "pending_widget_id"
+        const val STATE_PENDING_BACKUP_EXPORT = "pending_backup_export"
+        const val STATE_PENDING_AUDIT_EXPORT = "pending_audit_export"
+        const val STATE_PENDING_INK_EXPORT = "pending_ink_export"
         const val BACKUP_MIME_TYPE = "application/vnd.kosch.workspace-backup"
         const val EXTRA_USE_SYSTEM_CONTACTS_PICKER = "android.intent.extra.USE_SYSTEM_CONTACTS_PICKER"
     }

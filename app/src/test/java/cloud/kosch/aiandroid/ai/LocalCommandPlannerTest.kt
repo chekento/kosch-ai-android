@@ -53,6 +53,7 @@ class LocalCommandPlannerTest {
     @Test
     fun `file command stays inside explicit document picker route`() {
         assertEquals(LauncherCommand.OpenFiles, planner.plan("Datei analysieren"))
+        assertEquals(LauncherCommand.OpenFileWorkspace, planner.plan("Dateien verwalten"))
     }
 
     @Test
@@ -79,5 +80,13 @@ class LocalCommandPlannerTest {
         assertEquals(LauncherCommand.OpenBackup, planner.plan("Workspace sichern"))
         assertEquals(LauncherCommand.OpenAudit, planner.plan("Sicherheitsverlauf"))
         assertEquals(LauncherCommand.PickContact, planner.plan("Kontakt auswählen"))
+    }
+
+    @Test
+    fun `professional Android settings remain explicit system routes`() {
+        assertEquals(LauncherCommand.OpenSystemPanel(SystemPanel.WALLPAPER), planner.plan("Hintergrundbild"))
+        assertEquals(LauncherCommand.OpenSystemPanel(SystemPanel.ACCESSIBILITY), planner.plan("Barrierefreiheit"))
+        assertEquals(LauncherCommand.OpenSystemPanel(SystemPanel.DEFAULT_APPS), planner.plan("Standard Apps"))
+        assertEquals(LauncherCommand.OpenSystemPanel(SystemPanel.STORAGE), planner.plan("Speicher"))
     }
 }

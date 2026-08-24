@@ -1,0 +1,91 @@
+ID,Kategorie,Bereich,KoSch M2.4,Pixel / Android 17,Nova 8 / 8.1 Beta,Niagara 1.x,Smart Launcher 6.6,Microsoft Launcher,Lawnchair 15 Beta 3,Führend,KoSch_Lücke_zur_Spitze
+C01,Erster visueller Eindruck,UX,8.8,8.6,8.1,9.3,8.8,8.0,8.3,Niagara 1.x,0.5
+C02,Onboarding-Qualität,UX,8.6,8.2,7.7,8.0,8.0,8.1,7.0,KoSch M2.4,0.0
+C03,Time-to-Value,UX,8.5,9.3,8.4,9.0,8.6,7.5,8.5,Pixel / Android 17,0.8
+C04,Interaktionsklarheit,UX,8.4,9.0,8.2,9.2,8.5,8.0,8.0,Niagara 1.x,0.8
+C05,Visuelle Kohärenz,UX,8.6,9.4,8.2,9.5,9.0,8.5,8.6,Niagara 1.x,0.9
+C06,Kleine Displays,UX,7.2,9.1,8.5,9.3,8.8,8.0,8.7,Niagara 1.x,2.1
+C07,Tablet/Foldable/Landscape,UX,7.6,8.3,7.8,7.0,8.2,7.5,8.0,Pixel / Android 17,0.7
+C08,Semantische Accessibility,UX,7.3,9.1,7.8,8.5,8.0,8.2,7.5,Pixel / Android 17,1.8
+C09,Kontrast und Lesbarkeit,UX,8.1,9.3,8.4,9.0,8.8,8.5,8.5,Pixel / Android 17,1.2
+C10,Reduced Motion und Bewegung,UX,7.4,9.0,8.2,8.8,8.3,8.0,8.0,Pixel / Android 17,1.6
+C11,App-Entdeckung,Launcher,8.5,8.8,9.0,9.4,9.1,8.5,9.0,Niagara 1.x,0.9
+C12,App-Start-Zuverlässigkeit,Launcher,8.3,9.7,9.2,9.3,9.2,9.0,8.2,Pixel / Android 17,1.4
+C13,Suchrelevanz,Launcher,8.0,9.2,8.7,9.0,9.0,8.0,8.7,Pixel / Android 17,1.2
+C14,Smart Collections,Launcher,8.1,6.8,9.0,8.2,9.7,8.5,8.0,Smart Launcher 6.6,1.6
+C15,Zuletzt verwendet,Launcher,8.2,8.7,8.6,8.8,8.7,9.0,8.5,Microsoft Launcher,0.8
+C16,Workspace-Anpassung,Launcher,7.6,6.8,9.6,7.0,9.2,8.5,9.5,Nova 8 / 8.1 Beta,2.0
+C17,Ordner,Launcher,6.7,7.6,9.3,9.2,9.1,8.8,8.8,Nova 8 / 8.1 Beta,2.6
+C18,Mehrere Seiten und Dock,Launcher,7.6,8.7,9.5,5.2,9.3,8.8,9.0,Nova 8 / 8.1 Beta,1.9
+C19,App-Shortcuts,Launcher,7.4,9.5,9.2,9.0,9.0,8.0,9.0,Pixel / Android 17,2.1
+C20,Widget Hosting,Launcher,7.2,9.1,9.2,9.2,9.3,8.5,9.0,Smart Launcher 6.6,2.1
+C21,Widget Resize/Restore/Undo,Launcher,6.4,8.8,9.0,8.8,8.8,8.0,8.5,Nova 8 / 8.1 Beta,2.6
+C22,Notification Dots/Badges,Launcher,6.3,9.2,8.8,9.2,8.7,8.0,3.0,Pixel / Android 17 / Niagara 1.x,2.9
+C23,Wallpaper- und Theme-System,Launcher,6.4,8.7,9.6,8.0,9.0,8.2,9.4,Nova 8 / 8.1 Beta,3.2
+C24,Backup und Migration,Launcher,8.5,8.7,9.4,8.0,9.0,9.0,7.5,Nova 8 / 8.1 Beta,0.9
+C25,Sicherer Launcher-Wechsel,Launcher,9.4,8.2,7.5,7.2,7.3,7.5,7.5,KoSch M2.4,0.0
+C26,Telefon-Einstieg,System,7.7,7.0,4.0,3.5,3.5,6.5,3.0,KoSch M2.4,0.0
+C27,Kontakte-Integration,System,6.8,6.5,1.0,1.0,1.0,8.0,1.0,Microsoft Launcher,1.2
+C28,Sichere Dateiauswahl,System,9.3,7.5,3.0,2.5,2.5,8.0,2.0,KoSch M2.4,0.0
+C29,Nutzen der Datei-Intelligenz,System,7.8,4.0,1.0,1.0,1.0,3.0,1.0,KoSch M2.4,0.0
+C30,System-Kontrollzentrum,System,8.8,7.8,4.5,3.5,4.0,5.0,3.0,KoSch M2.4,0.0
+C31,Spracheingabe,System,6.0,8.4,5.0,4.5,4.5,5.5,3.5,Pixel / Android 17,2.4
+C32,Offline-Kern,AI,9.4,7.8,7.5,8.2,8.0,5.0,9.0,KoSch M2.4,0.0
+C33,Ohne Konto oder API,AI,9.6,7.2,7.0,8.0,7.5,6.0,9.5,KoSch M2.4,0.0
+C34,Lokale Open-Source-Auswahl,AI,8.2,3.0,2.5,2.0,2.0,2.0,9.5,Lawnchair 15 Beta 3,1.3
+C35,Integriertes generatives Modell,AI,1.3,3.5,2.0,1.0,1.5,3.5,1.0,Pixel / Android 17 / Microsoft Launcher,2.2
+C36,KI-Befehlsabdeckung,AI,8.2,6.0,6.0,4.5,6.5,5.5,3.0,KoSch M2.4,0.0
+C37,Grounding von KI-Aktionen,AI,8.8,8.0,6.8,7.5,6.0,7.0,8.0,KoSch M2.4,0.0
+C38,Kontextbewusstsein,AI,7.0,8.6,7.0,7.8,7.0,8.8,6.0,Microsoft Launcher,1.8
+C39,Lernen und Personalisierung,AI,7.6,7.7,7.5,7.0,8.0,8.5,6.0,Microsoft Launcher,0.9
+C40,Halluzinationsbegrenzung,AI,9.1,7.8,7.0,8.3,8.0,7.0,9.0,KoSch M2.4,0.0
+C41,Datenminimierung,Security,9.5,7.0,6.5,6.8,6.5,5.5,8.5,KoSch M2.4,0.0
+C42,Berechtigungsminimierung,Security,9.6,8.6,7.5,7.2,7.5,6.0,8.0,KoSch M2.4,0.0
+C43,Secret-Vault-Grundlage,Security,6.8,8.8,7.0,6.5,7.0,8.5,7.0,Pixel / Android 17,2.0
+C44,Netzwerksicherheit,Security,8.7,9.2,8.0,8.0,8.0,8.5,8.0,Pixel / Android 17,0.5
+C45,Prompt-Injection-Abwehr,Security,6.7,7.7,6.0,7.0,6.5,6.0,9.0,Lawnchair 15 Beta 3,2.3
+C46,Schutz vor destruktiven Aktionen,Security,9.4,9.0,8.0,8.2,8.0,8.0,8.5,KoSch M2.4,0.0
+C47,Architektur und Modularität,Engineering,8.5,9.6,8.8,8.5,8.5,8.5,8.0,Pixel / Android 17,1.1
+C48,Testabdeckung,Engineering,7.6,9.5,8.5,8.0,8.0,8.5,7.0,Pixel / Android 17,1.9
+C49,Build-Reproduzierbarkeit,Engineering,8.8,4.0,3.5,3.5,3.5,3.0,9.4,Lawnchair 15 Beta 3,0.6
+C50,Gemessene Laufzeitperformance,Engineering,4.4,9.6,8.8,9.0,8.7,8.3,7.5,Pixel / Android 17,5.2
+C51,Crash Recovery,Engineering,8.4,9.5,8.8,8.7,8.6,8.0,6.5,Pixel / Android 17,1.1
+C52,OEM-Kompatibilität,Engineering,5.4,8.5,8.0,7.8,7.8,8.0,7.0,Pixel / Android 17,3.1
+C53,Akku- und Energieeffizienz,Engineering,6.4,9.1,8.3,8.7,8.2,7.5,7.7,Pixel / Android 17,2.7
+C54,Observability und Audit,Engineering,8.4,6.0,5.5,5.0,5.2,7.0,7.0,KoSch M2.4,0.0
+C55,Privacy-Kommunikation,Security,9.5,7.2,7.0,7.2,7.0,7.5,7.5,KoSch M2.4,0.0
+C56,Lokalisierung,UX,4.2,9.5,8.8,8.5,8.5,9.0,8.5,Pixel / Android 17,5.3
+C57,Wettbewerbsdifferenzierung,Product,9.2,7.0,8.6,9.2,8.8,7.8,7.5,KoSch M2.4 / Niagara 1.x,0.0
+C58,Produktionsreife,Product,5.6,9.6,9.0,9.0,8.8,8.8,6.8,Pixel / Android 17,4.0
+C59,Play-Policy-Readiness,Product,7.8,9.8,8.8,8.8,8.5,9.0,7.5,Pixel / Android 17,2.0
+C60,Wartbarkeit,Engineering,8.4,9.0,8.4,8.3,8.2,8.0,7.5,Pixel / Android 17,0.6
+C61,Smartpen-Erkennung und Gerätewechsel,System,8.6,8.8,2.0,2.5,2.5,2.5,3.5,Pixel / Android 17,0.2
+C62,"Druck, Neigung, Hover und Radierer",System,8.5,9.2,1.5,1.5,1.5,1.5,2.5,Pixel / Android 17,0.7
+C63,Integrierter Pen-Workspace,Launcher,9.0,5.0,1.5,1.0,1.2,1.5,2.0,KoSch M2.4,0.0
+C64,Systemhandschrift und IME-Integration,System,7.2,9.0,6.8,6.5,6.5,6.8,6.8,Pixel / Android 17,1.8
+C65,In-App FAQ und Self-Service,Product,9.3,8.5,6.5,9.0,8.5,8.2,7.5,KoSch M2.4,0.0
+C66,Professionelles Command Center,Product,9.1,8.0,6.8,7.3,8.0,9.0,6.5,KoSch M2.4,0.0
+C67,Hardware-Tastatur-Produktivität,UX,8.9,8.8,6.8,7.2,7.6,8.2,7.2,KoSch M2.4,0.0
+C68,Datensparsame Kontaktaktion,System,9.2,8.8,1.2,1.2,1.5,7.5,6.5,KoSch M2.4,0.0
+C69,Portable Backup-Vertraulichkeit und Integrität,Security,9.2,8.7,7.5,7.0,7.8,8.5,6.2,KoSch M2.4,0.0
+C70,"Restore-Vorschau, Validierung und Kontrolle",Launcher,8.8,7.8,8.8,7.8,8.6,8.2,6.8,KoSch M2.4 / Nova 8 / 8.1 Beta,0.0
+C71,Metadatenarmes lokales Audit,Engineering,8.5,7.0,5.5,5.0,5.5,7.0,7.0,KoSch M2.4,0.0
+C72,Capability-Policy und Risikogates,Security,9.0,9.0,8.0,8.2,8.0,8.0,8.5,KoSch M2.4 / Pixel / Android 17,0.0
+C73,Widget-Größenvertrag und Presets,Launcher,8.0,9.2,9.0,8.8,9.0,8.5,8.5,Pixel / Android 17,1.2
+C74,Shortcut-Discoverability und Recovery,UX,9.0,8.6,6.8,7.2,7.6,8.2,7.2,KoSch M2.4,0.0
+C75,Automatisierte Release- und Sicherheitsgates,Engineering,8.4,9.5,7.8,7.6,7.6,8.2,8.5,Pixel / Android 17,1.1
+C76,Konfigurationswechsel- und ViewModel-Resilienz,Engineering,8.8,9.6,8.7,8.8,8.8,8.5,7.8,Pixel / Android 17,0.8
+C77,Prozesssichere Exportübergabe,Security,9.0,9.3,8.0,7.8,8.2,8.5,7.5,Pixel / Android 17,0.3
+C78,Profilstabile App-Key-Migration,Launcher,8.8,9.5,9.0,8.7,9.2,9.0,8.2,Pixel / Android 17,0.7
+C79,Adaptives lokales Nutzungsranking,AI,8.6,8.6,8.8,9.0,9.3,9.2,7.8,Smart Launcher 6.6,0.7
+C80,Transparenz und Löschung lokaler Lernsignale,Security,9.2,8.8,7.5,8.0,7.8,7.5,7.5,KoSch M2.4,0.0
+C81,Verborgene Apps und steuerbare App-Sortierung,Launcher,8.5,9.2,9.4,9.0,9.4,8.8,8.7,Nova 8 / 8.1 Beta / Smart Launcher 6.6,0.9
+C82,Sichere App-Verwaltung und Deinstallationsgrenze,System,8.8,9.2,8.7,8.5,8.7,8.8,8.5,Pixel / Android 17,0.4
+C83,Begrenzter SAF-Datei-Arbeitsraum,System,9.1,8.5,2.5,2.0,2.5,7.0,2.0,KoSch M2.4,0.0
+C84,"Dateioperationen mit Vorschau, Bestätigung und Undo",Security,8.8,9.0,3.0,2.5,3.0,7.5,2.5,Pixel / Android 17,0.2
+C85,Lokale Dateimetadaten-Intelligenz,AI,7.8,5.0,1.5,1.0,1.5,4.0,1.0,KoSch M2.4,0.0
+C86,Systemeinstellungs-Abdeckung und Fallback,System,9.0,9.7,6.0,5.0,5.5,6.5,5.5,Pixel / Android 17,0.7
+C87,Widget-Reihenfolge und Undo,Launcher,8.2,9.3,9.2,9.0,9.2,8.7,8.8,Pixel / Android 17,1.1
+C88,Pen-SVG und Integrität sehr langer Striche,System,9.0,8.5,1.0,1.0,1.0,1.0,2.0,KoSch M2.4,0.0
+C89,Explizite Semantik und Accessibility-Aktionen,UX,7.8,9.3,8.0,8.5,8.2,8.3,7.8,Pixel / Android 17,1.5
+C90,Evidenztreue und Release-Nachvollziehbarkeit,Product,9.1,9.5,8.3,8.0,8.2,8.8,8.8,Pixel / Android 17,0.4

@@ -5,12 +5,20 @@ data class SelectedContact(
     val phoneNumber: String,
 )
 
+data class AppUsageSignal(
+    val key: String,
+    val launchCount: Int,
+    val lastUsedEpochMillis: Long,
+)
+
 data class BackupPreview(
     val scene: SceneId,
     val homePage: HomePage,
     val positionCount: Int,
     val recentCount: Int,
     val pinnedCount: Int,
+    val hiddenCount: Int,
+    val usageSignalCount: Int,
     val folderCount: Int,
     val inkStrokeCount: Int,
     val createdAtEpochMillis: Long,
@@ -20,10 +28,16 @@ data class BackupPreview(
 enum class AuditAction(val title: String) {
     APP_LAUNCH("App gestartet"),
     APP_SHORTCUT("App-Shortcut gestartet"),
+    APP_VISIBILITY("App-Sichtbarkeit geändert"),
+    APP_UNINSTALL_REQUEST("Deinstallation angefordert"),
     COMMAND("Lokaler Befehl"),
     DIALER("Telefon-Wähler geöffnet"),
     CONTACT_PICKER("Kontakt gewählt"),
     DOCUMENT_INSPECT("Dokument lokal geprüft"),
+    FILE_WORKSPACE("Datei-Arbeitsraum geöffnet"),
+    FILE_CREATE_DIRECTORY("Ordner erstellt"),
+    FILE_RENAME("Dokument umbenannt"),
+    FILE_DELETE("Dokument gelöscht"),
     SYSTEM_PANEL("Systembereich geöffnet"),
     SCENE_SWITCH("Szene gewechselt"),
     LAYOUT_CHANGE("Layout geändert"),
@@ -33,6 +47,8 @@ enum class AuditAction(val title: String) {
     AUDIT_EXPORT("Audit exportiert"),
     AUDIT_CLEAR("Audit gelöscht"),
     PEN_SAVE("Pen-Inhalt gespeichert"),
+    PEN_EXPORT("Pen-Inhalt exportiert"),
+    PERSONALIZATION_RESET("Lernsignale gelöscht"),
 }
 
 enum class AuditOutcome(val title: String) {

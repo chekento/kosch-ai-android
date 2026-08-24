@@ -83,6 +83,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -94,6 +95,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
@@ -124,6 +129,7 @@ import cloud.kosch.aiandroid.ui.theme.MutedMist
 import cloud.kosch.aiandroid.ui.theme.RaisedSurface
 import cloud.kosch.aiandroid.ui.theme.Sky
 import cloud.kosch.aiandroid.ui.theme.Violet
+import java.util.Locale
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -133,11 +139,13 @@ fun LauncherRoot(
     requestHomeRole: () -> Unit,
     requestVoiceInput: () -> Unit,
     requestDocument: () -> Unit,
+    requestFileWorkspace: () -> Unit,
     requestContact: () -> Unit,
     requestWidget: () -> Unit,
     requestBackupExport: (String) -> Unit,
     requestBackupImport: () -> Unit,
     requestAuditExport: () -> Unit,
+    requestInkExport: () -> Unit,
     createWidgetView: (Context, Int, WidgetSizePreset) -> View?,
     deleteWidget: (Int) -> Unit,
     forgetDocument: () -> Unit,
@@ -166,6 +174,7 @@ fun LauncherRoot(
         enabled = controller.drawerVisible || controller.providerChooserVisible ||
             controller.contextDetailsVisible || controller.controlCenterVisible ||
             controller.phoneVisible || controller.fileSheetVisible ||
+            controller.fileWorkspaceVisible ||
             controller.widgetBoardVisible || controller.appActionsVisible ||
             controller.folderSheetVisible || controller.faqVisible ||
             controller.backupVisible || controller.auditVisible,
@@ -178,6 +187,7 @@ fun LauncherRoot(
             controller.folderSheetVisible -> controller.closeFolder()
             controller.phoneVisible -> controller.closePhone()
             controller.fileSheetVisible -> controller.closeFileSheet()
+            controller.fileWorkspaceVisible -> controller.closeFileWorkspace()
             controller.widgetBoardVisible -> controller.closeWidgetBoard()
             controller.controlCenterVisible -> controller.closeControlCenter()
             controller.providerChooserVisible -> controller.closeProviderChooser()
@@ -241,6 +251,7 @@ fun LauncherRoot(
                                 },
                                 requestDocument = requestDocument,
                                 requestContact = requestContact,
+                                requestInkExport = requestInkExport,
                             )
                             PersistentSmartDock(controller)
                             AskDock(
@@ -273,6 +284,7 @@ fun LauncherRoot(
                             },
                             requestDocument = requestDocument,
                             requestContact = requestContact,
+                            requestInkExport = requestInkExport,
                         )
                         QuickActionsRail(
                             onPhone = controller::openPhone,
@@ -330,6 +342,9 @@ fun LauncherRoot(
     if (controller.fileSheetVisible) {
         FileIntelligenceSheet(controller, requestDocument, forgetDocument)
     }
+    if (controller.fileWorkspaceVisible) {
+        FileWorkspaceSheet(controller, requestFileWorkspace)
+    }
     if (controller.widgetBoardVisible) {
         WidgetBoardSheet(controller, requestWidget, createWidgetView, deleteWidget)
     }
@@ -384,6 +399,7 @@ private fun ColumnScope.HomeSurface(
     onAsk: () -> Unit,
     requestDocument: () -> Unit,
     requestContact: () -> Unit,
+    requestInkExport: () -> Unit,
 ) {
     when (controller.homePage) {
         HomePage.PRO_DESK -> ProfessionalHubSurface(controller, onAsk, requestDocument, requestContact)
@@ -396,7 +412,7 @@ private fun ColumnScope.HomeSurface(
         }
 
         HomePage.SMART_SPACE -> SmartHomeSurface(controller)
-        HomePage.PEN_SPACE -> PenSpaceSurface(controller, onAsk)
+        HomePage.PEN_SPACE -> PenSpaceSurface(controller, onAsk, requestInkExport)
     }
 }
 
@@ -827,14 +843,37 @@ private fun AskDock(
 @Composable
 private fun AppDrawerSheet(controller: LauncherController) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var query by remember { mutableStateOf("") }
+    var query by rememberSaveable { mutableStateOf("") }
+    var sortName by rememberSaveable { mutableStateOf(AppDrawerSort.SMART.name) }
+    val sort = AppDrawerSort.entries.firstOrNull { it.name == sortName } ?: AppDrawerSort.SMART
     val visibleApps = remember(
         query,
+        sort,
         controller.apps,
         controller.drawerCollection,
         controller.recentPackages,
+        controller.hiddenAppKeys,
+        controller.appUsageSignals,
     ) {
-        controller.rankedApps(query, controller.drawerCollection)
+        val ranked = controller.rankedApps(query, controller.drawerCollection)
+        if (query.isNotBlank()) {
+            ranked
+        } else {
+            when (sort) {
+                AppDrawerSort.SMART -> ranked
+                AppDrawerSort.ALPHABETICAL -> ranked.sortedBy { it.label.lowercase(Locale.ROOT) }
+                AppDrawerSort.FREQUENT -> ranked.sortedWith(
+                    compareByDescending<cloud.kosch.aiandroid.model.LaunchableApp> {
+                        controller.appUsageSignals[it.key]?.launchCount ?: 0
+                    }.thenBy { it.label.lowercase(Locale.ROOT) },
+                )
+                AppDrawerSort.RECENT -> ranked.sortedWith(
+                    compareByDescending<cloud.kosch.aiandroid.model.LaunchableApp> {
+                        controller.appUsageSignals[it.key]?.lastUsedEpochMillis ?: Long.MIN_VALUE
+                    }.thenBy { it.label.lowercase(Locale.ROOT) },
+                )
+            }
+        }
     }
 
     ModalBottomSheet(
@@ -882,6 +921,23 @@ private fun AppDrawerSheet(controller: LauncherController) {
                     )
                 }
             }
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                item {
+                    Text(
+                        "Sortierung",
+                        modifier = Modifier.padding(top = 10.dp, end = 2.dp),
+                        color = MutedMist,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
+                items(AppDrawerSort.entries, key = { it.name }) { mode ->
+                    FilterChip(
+                        selected = sort == mode,
+                        onClick = { sortName = mode.name },
+                        label = { Text(mode.title) },
+                    )
+                }
+            }
 
             when {
                 controller.appsLoading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -909,6 +965,14 @@ private fun AppDrawerSheet(controller: LauncherController) {
                         Column(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(16.dp))
+                                .semantics(mergeDescendants = true) {
+                                    role = Role.Button
+                                    contentDescription = buildString {
+                                        append(app.label)
+                                        if (app.profile != AppProfile.PERSONAL) append(", ${app.profile.title}")
+                                        append(". Tippen zum Öffnen, lange drücken für App-Aktionen")
+                                    }
+                                }
                                 .combinedClickable(
                                     onClick = { controller.launch(app) },
                                     onLongClick = { controller.showAppActions(app) },
@@ -941,6 +1005,13 @@ private fun AppDrawerSheet(controller: LauncherController) {
             }
         }
     }
+}
+
+private enum class AppDrawerSort(val title: String) {
+    SMART("Smart"),
+    ALPHABETICAL("A–Z"),
+    FREQUENT("Häufig"),
+    RECENT("Zuletzt"),
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

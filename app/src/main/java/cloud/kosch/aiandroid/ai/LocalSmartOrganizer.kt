@@ -46,6 +46,7 @@ object LocalSmartOrganizer {
         apps: List<SmartAppDescriptor>,
         pinnedKeys: List<String>,
         recentPackages: List<String>,
+        usageKeys: List<String> = emptyList(),
         scene: SceneId,
         limit: Int = DEFAULT_DOCK_SIZE,
     ): List<String> {
@@ -55,6 +56,7 @@ object LocalSmartOrganizer {
         val recent = recentPackages.mapNotNull { packageName ->
             apps.firstOrNull { it.packageName == packageName }
         }
+        val learned = usageKeys.mapNotNull(byKey::get)
         val preferredKinds = when (scene) {
             SceneId.WORK -> listOf(FolderKind.WORK, FolderKind.TOOLS, FolderKind.COMMUNICATION)
             SceneId.STUDIO -> listOf(FolderKind.MEDIA, FolderKind.AI, FolderKind.TOOLS)
@@ -66,7 +68,7 @@ object LocalSmartOrganizer {
             apps.filter { kindFor(it) == preferred }
                 .sortedBy { it.label.lowercase(Locale.ROOT) }
         }
-        return (availablePinned.mapNotNull(byKey::get) + recent + contextual + apps)
+        return (availablePinned.mapNotNull(byKey::get) + recent + learned + contextual + apps)
             .distinctBy(SmartAppDescriptor::key)
             .take(limit)
             .map(SmartAppDescriptor::key)

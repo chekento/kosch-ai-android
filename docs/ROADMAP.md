@@ -29,7 +29,8 @@ Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn 
 - [x] ruhender Android-Keystore-Vault und Endpoint-Policy
 - [x] code-nativer Neural-Glass-Hintergrund
 - [x] Widget-Größenpresets und Provider-Size-Update
-- [ ] freie Widget-Platzierung, Stacks, Restore-Mapping und Undo
+- [x] Widget-Reihenfolge und Undo
+- [ ] freie Widget-Platzierung, Stacks und Restore-Mapping
 - [x] lokale Smart-Ordner, zwei Home-Räume, adaptives App-Dock und Pinning
 - [x] opt-in Notification Dots ohne Inhaltskopie
 - [ ] vollständige Accessibility- und OEM-Gerätetests
@@ -78,27 +79,48 @@ Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn 
 - [x] CI, Lint, Debug-/Release-Build und Debug-APK-Artefakt dieses finalen M2.3-Stands grün
 - [x] M2.3-Konkurrenz-/25-Rollen-Neubewertung in 75 Kategorien und formatierte Arbeitsmappe
 
-## Nächster Lauf – M2.4 Nachweisbare Spitzenreife
+## M2.4 – Evidence & Resilience
 
-- [ ] Migrationstests v1–v3 und vollständiger Prozess-Tod-/State-Restore einschließlich Ink
-- [ ] ViewModel/StateFlow statt Activity-gebundener Controller-Lebensdauer
+- [x] Controller-Lebensdauer in `LauncherViewModel` aus der Activity lösen
+- [x] Backup-/Audit-/SVG-Export über privaten No-Backup-Payload und Saved-State-Einmaltoken wiederaufnehmbar machen
+- [x] Pending-Export auf 8 MiB, einen Konsum, 24 Stunden, Typ- und Pfadvalidierung begrenzen
+- [x] alte UserHandle-basierte App-Schlüssel eindeutig auf stabile User-Seriennummern migrieren
+- [x] lokale App-Startsignale mit 512er-Limit, transparenter Verwendung und vollständigem Reset
+- [x] Workspace-Schema v6 mit begrenzten Lernsignalen und verborgenen Apps im validierten Backup
+- [x] App-Raum-Sortierungen Smart, A–Z, Häufig und Zuletzt
+- [x] lokal verborgene Apps mit eigener Verwaltungsansicht
+- [x] App-Aktionsraum um Store, Ordner, Sichtbarkeit und Android-Deinstallationsdialog erweitern
+- [x] einen user-selektierten SAF-Datei-Arbeitsraum ohne breite Speicherrechte integrieren
+- [x] Datei-Metadatenanalyse, lokale Suche/Sortierung, Create, Rename mit Undo und bestätigtes Delete
+- [x] zusätzliche Android-Systemwege für Hintergrund, Anzeige, Ton, Akku, Datenschutz, Accessibility, Standard-Apps und Speicher
+- [x] Widget-Reihenfolge und gültigkeitsgeprüftes Undo
+- [x] Pen-SVG-Export und endpoint-erhaltendes Resampling langer Striche
+- [x] Accessibility-Semantik für App-/Dock-Kacheln und Pen-Custom-Actions
+- [x] mehr als 50 lokale FAQ-Einträge einschließlich aller M2.4-Grenzen
+- [x] Unit-Tests für Pending Export, Migration, lokales Ranking, Datei-Planung und Pen-Integrität
+- [x] CI #30 mit Tests, Lint, Debug-/Release-Build, Permission-Budget und APK-Prüfsumme grün
+- [x] 7-Launcher-/90-Kategorien-Review, 25×90-Fachmatrix und formatierte XLSX-Arbeitsmappe
+
+## Nächster Lauf – M2.5 Measured Professional Beta
+
 - [ ] instrumentierte Tests für HOME, SAF, Widget-Abbruch/-Konfiguration und Stifteingabe auf API 29/33/36/37
-- [ ] TalkBack, Switch Access, Hardwaretastatur, Schrift 200 %, Reduced Motion und Kontrastprüfung
-- [ ] Foldable-Hinge-, Multi-Window-, 320-dp- und Screenshot-Testmatrix
-- [ ] vollständige Widget-Engine: freie Platzierung, Stacks, Restore-Mapping und Undo
-- [ ] instrumentierte Backup-/Restore-Tests mit Prozess-Tod, falschem Provider und Profil-/App-Konflikten
+- [ ] Prozess-Tod-/Saved-State-Testmatrix während Backup-, Audit-, SVG-, Kontakt-, Widget- und Tree-Picker
+- [ ] TalkBack, Switch Access, Hardwaretastatur, Schrift 200 %, Reduced Motion und Kontrast auf realen Geräten
+- [ ] Foldable-Hinge-, Multi-Window-, 320-dp- und Screenshot-Golden-Matrix
+- [ ] SAF-Provider-Lab für lokale, Cloud- und OEM-Provider einschließlich Grant-Verlust und destruktiver Semantik
+- [ ] vollständige Widget-Engine: freie Platzierung, Stacks und Restore-Mapping
+- [ ] vollständige Launcher-Parität: manuelle Ordner/Seiten, Drag/Drop, Dock-Reorder, Icon-Packs und Gesten
+- [ ] Private-Space-Container erst nach Hide/Show/Lock/Unlock und Leak-Tests
 - [ ] nativer API-37-Mehrfeld-Contact-Picker nach Upgrade auf compileSdk/targetSdk 37
 - [ ] Pen-Latenz-Benchmark, Historical Events, Geräte-Lab und AndroidX-Ink-Evaluation
-- [ ] `LocalModelBackend` in isolierter Service-/Prozessgrenze
-- [ ] Geräteprobe und optionaler kleiner GGUF-Modell-Pack über llama.cpp
-- [ ] Modellimport per SAF, Lizenzanzeige, Hashprüfung, Load/Cancel/Unload
+- [ ] Macrobenchmark-Budgets für Start, Jank, App-Raum, SAF, RSS, Akku, Ink und Badge-Updates
+- [ ] reproduzierbare Release-Signierung, SBOM, Dependency-/License-Scan und Upgrade/Rollback
+- [ ] unabhängiges Privacy-/Security-Review von Backup, Audit, SAF und lokalen Lernsignalen
+- [ ] vollständige Lokalisierung Deutsch/Englisch, RTL-/Plural-Tests und Diagnoseexport ohne Nutzdaten
+- [ ] erst hinter diesen Gates: `LocalModelBackend` in isolierter Service-/Prozessgrenze
+- [ ] Geräteprobe, lizenzgeprüfter GGUF-Import, Hashprüfung, Load/Cancel/Unload und Thermikschutz
 - [ ] lokale Zusammenfassung und strukturierte Befehle mit Schema-Validator
-- [ ] lokaler Embedding-Index für Apps, Shortcuts und explizit gewählte Dateien
-- [ ] manuelle Ordner/Seiten, Drag/Drop, Dock-Reorder und Icon-Pack-/Gesten-Parität
-- [ ] Notification Dots für Multi-User, Work/Private Profile und OEM-Restart härten
-- [ ] Macrobenchmark-/Baseline-Profile-Budgets für Start, Jank, RSS, Akku, Ink und Badge-Updates
-- [ ] unabhängiges Privacy-/Security-Review von Backup und Audit
-- [ ] Lokalisierung Deutsch/Englisch, RTL-/Plural-Tests und Diagnoseexport ohne Nutzdaten
+- [ ] lokaler, je Quelle löschbarer Embedding-Index für Apps, Shortcuts und explizit gewählte Dateien
 - [ ] 9,5-Gate erst nach Messwerten, Accessibility-/OEM-Lab und geschlossenen Führungs-Gaps neu prüfen
 
 ## M3 – Sichere Agenten und optionale APIs

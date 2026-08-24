@@ -1,6 +1,8 @@
 package cloud.kosch.aiandroid.data
 
 import android.content.Context
+import cloud.kosch.aiandroid.ai.LocalUsageModel
+import cloud.kosch.aiandroid.model.AppUsageSignal
 import cloud.kosch.aiandroid.model.DefaultWorkspace
 import cloud.kosch.aiandroid.model.BackupPreview
 import cloud.kosch.aiandroid.model.FolderKind
@@ -99,6 +101,10 @@ class WorkspaceStore(context: Context) {
         preferences.edit().putString(KEY_WIDGET_SIZES, widgetSizesJson(updated).toString()).apply()
     }
 
+    fun saveWidgetOrder(ids: List<Int>) {
+        saveWidgetIds(ids.filter { it > 0 })
+    }
+
     fun widgetSizes(): Map<Int, WidgetSizePreset> = runCatching {
         val root = JSONObject(preferences.getString(KEY_WIDGET_SIZES, "{}"))
         buildMap {
@@ -123,10 +129,41 @@ class WorkspaceStore(context: Context) {
         writeStringArray(KEY_PINNED_APPS, keys.distinct().take(MAX_PINNED_APPS))
     }
 
-    fun inkStrokes(): List<InkStroke> = runCatching {
-        val strokes = JSONArray(preferences.getString(KEY_PEN_STROKES, "[]"))
-        buildList {
-            repeat(strokes.length().coerceAtMost(MAX_INK_STROKES)) strokeLoop@{ strokeIndex ->
+    fun hiddenAppKeys(): List<String> = readStringArray(KEY_HIDDEN_APP_KEYS)
+
+    fun saveHiddenAppKeys(keys: List<String>) {
+        writeStringArray(KEY_HIDDEN_APP_KEYS, keys.distinct().take(MAX_HIDDEN_APPS))
+    }
+
+    fun appUsageSignals(): Map<String, AppUsageSignal> = runCatching {
+        val root = JSONObject(preferences.getString(KEY_APP_USAGE, "{}"))
+        buildMap {
+            root.keys().forEach { key ->
+                if (key.isBlank() || key.length > MAX_APP_KEY_LENGTH) return@forEach
+                val item = root.optJSONObject(key) ?: return@forEach
+                val count = item.optInt("count", 0).coerceIn(1, LocalUsageModel.MAX_LAUNCH_COUNT)
+                val lastUsed = item.optLong("lastUsed", 0L)
+                if (lastUsed <= 0L) return@forEach
+                put(key, AppUsageSignal(key, count, lastUsed))
+            }
+        }
+    }.getOrDefault(emptyMap())
+
+    fun recordAppUsage(appKey: String, nowEpochMillis: Long = System.currentTimeMillis()): Map<String, AppUsageSignal> {
+        val updated = LocalUsageModel.observe(appUsageSignals(), appKey, nowEpochMillis)
+        preferences.edit().putString(KEY_APP_USAGE, usageJson(updated).toString()).apply()
+        return updated
+    }
+
+    fun clearAppUsage() {
+        preferences.edit().putString(KEY_APP_USAGE, "{}").apply()
+    }
+
+    fun inkStrokes(): List<InkStroke> {
+        val loaded = runCatching {
+            val strokes = JSONArray(preferences.getString(KEY_PEN_STROKES, "[]"))
+            buildList {
+                repeat(strokes.length().coerceAtMost(MAX_INK_STROKES)) strokeLoop@{ strokeIndex ->
                 val strokeJson = strokes.optJSONObject(strokeIndex) ?: return@strokeLoop
                 val tool = runCatching {
                     InkTool.valueOf(strokeJson.optString("tool", InkTool.PEN.name))
@@ -146,31 +183,17 @@ class WorkspaceStore(context: Context) {
                         )
                     }
                 }
-                if (points.isNotEmpty()) add(InkStroke(tool, points))
+                    if (points.isNotEmpty()) add(InkStroke(tool, points))
+                }
             }
-        }
-    }.getOrDefault(emptyList())
+        }.getOrDefault(emptyList())
+        return InkStrokeNormalizer.normalize(loaded)
+    }
 
     fun saveInkStrokes(strokes: List<InkStroke>) {
-        val strokesJson = JSONArray()
-        strokes.takeLast(MAX_INK_STROKES).forEach { stroke ->
-            val pointsJson = JSONArray()
-            stroke.points.take(MAX_POINTS_PER_STROKE).forEach { point ->
-                pointsJson.put(
-                    JSONArray()
-                        .put(point.x.toDouble())
-                        .put(point.y.toDouble())
-                        .put(point.pressure.toDouble())
-                        .put(point.tiltRadians.toDouble()),
-                )
-            }
-            strokesJson.put(
-                JSONObject()
-                    .put("tool", stroke.tool.name)
-                    .put("points", pointsJson),
-            )
-        }
-        preferences.edit().putString(KEY_PEN_STROKES, strokesJson.toString()).apply()
+        preferences.edit()
+            .putString(KEY_PEN_STROKES, inkJson(InkStrokeNormalizer.normalize(strokes)).toString())
+            .apply()
     }
 
     fun folders(): List<LauncherFolder> = runCatching {
@@ -211,6 +234,30 @@ class WorkspaceStore(context: Context) {
             .apply()
     }
 
+    /** Idempotently repairs keys created before profile serial numbers became the stable prefix. */
+    fun migrateLegacyAppKeys(aliases: Map<String, String>): Boolean {
+        if (aliases.isEmpty()) return false
+        val oldPinned = pinnedAppKeys()
+        val oldHidden = hiddenAppKeys()
+        val oldFolders = folders()
+        val oldUsage = appUsageSignals()
+        val newPinned = AppKeyMigration.keys(oldPinned, aliases).take(MAX_PINNED_APPS)
+        val newHidden = AppKeyMigration.keys(oldHidden, aliases).take(MAX_HIDDEN_APPS)
+        val newFolders = oldFolders.map { folder ->
+            folder.copy(appKeys = AppKeyMigration.keys(folder.appKeys, aliases).take(MAX_FOLDER_APPS))
+        }
+        val newUsage = AppKeyMigration.usage(oldUsage, aliases)
+        if (oldPinned == newPinned && oldHidden == newHidden && oldFolders == newFolders && oldUsage == newUsage) {
+            return false
+        }
+        return preferences.edit()
+            .putString(KEY_PINNED_APPS, JSONArray(newPinned).toString())
+            .putString(KEY_HIDDEN_APP_KEYS, JSONArray(newHidden).toString())
+            .putString(KEY_FOLDERS, foldersJson(newFolders).toString())
+            .putString(KEY_APP_USAGE, usageJson(newUsage).toString())
+            .commit()
+    }
+
     fun createPortableSnapshot(nowEpochMillis: Long = System.currentTimeMillis()): ByteArray {
         val positionsJson = JSONObject()
         loadPositions().forEach { (scene, positions) ->
@@ -228,6 +275,8 @@ class WorkspaceStore(context: Context) {
             .put("homePage", loadHomePage().name)
             .put("recent", JSONArray(recentPackages()))
             .put("pinned", JSONArray(pinnedAppKeys()))
+            .put("hidden", JSONArray(hiddenAppKeys()))
+            .put("usage", usageJson(appUsageSignals()))
             .put("folders", foldersJson(folders()))
             .put("positions", positionsJson)
             .put("ink", inkJson(inkStrokes()))
@@ -247,6 +296,8 @@ class WorkspaceStore(context: Context) {
             putString(KEY_HOME_PAGE, snapshot.homePage.name)
             putString(KEY_RECENT, snapshot.recent.joinToString("|"))
             putString(KEY_PINNED_APPS, JSONArray(snapshot.pinned).toString())
+            putString(KEY_HIDDEN_APP_KEYS, JSONArray(snapshot.hidden).toString())
+            putString(KEY_APP_USAGE, usageJson(snapshot.usage).toString())
             putString(KEY_FOLDERS, foldersJson(snapshot.folders).toString())
             putBoolean(KEY_FOLDERS_INITIALIZED, true)
             putString(KEY_PEN_STROKES, inkJson(snapshot.inkStrokes).toString())
@@ -293,7 +344,8 @@ class WorkspaceStore(context: Context) {
         val root = runCatching { JSONObject(payload.toString(StandardCharsets.UTF_8)) }
             .getOrElse { throw IllegalArgumentException("Backup enthält kein gültiges JSON", it) }
         require(root.optString("format") == BACKUP_FORMAT) { "Unbekanntes Backup-Format" }
-        require(root.optInt("version", -1) == BACKUP_VERSION) { "Nicht unterstützte Backup-Version" }
+        val version = root.optInt("version", -1)
+        require(version in MIN_BACKUP_VERSION..BACKUP_VERSION) { "Nicht unterstützte Backup-Version" }
         val createdAt = root.optLong("createdAt", -1L)
         require(createdAt in 1L..(System.currentTimeMillis() + MAX_CLOCK_SKEW_MILLIS)) {
             "Ungültiger Erstellungszeitpunkt"
@@ -302,10 +354,32 @@ class WorkspaceStore(context: Context) {
         val homePage = enumValue<HomePage>(root.optString("homePage"), "Startbereich")
         val recent = validatedStrings(root.optJSONArray("recent"), MAX_RECENT, "Verlauf")
         val pinned = validatedStrings(root.optJSONArray("pinned"), MAX_PINNED_APPS, "Pins")
+        val hidden = if (version >= 2) {
+            validatedStrings(root.optJSONArray("hidden"), MAX_HIDDEN_APPS, "verborgenen Apps")
+        } else {
+            emptyList()
+        }
+        val usage = if (version >= 2) parseUsage(root.optJSONObject("usage"), createdAt) else emptyMap()
         val folders = parseFolders(root.optJSONArray("folders"))
         val positions = parsePositions(root.optJSONObject("positions"))
         val ink = parseInk(root.optJSONArray("ink"))
-        return DecodedSnapshot(scene, homePage, recent, pinned, folders, positions, ink, createdAt)
+        return DecodedSnapshot(scene, homePage, recent, pinned, hidden, usage, folders, positions, ink, createdAt)
+    }
+
+    private fun parseUsage(root: JSONObject?, createdAt: Long): Map<String, AppUsageSignal> {
+        if (root == null) return emptyMap()
+        require(root.length() <= LocalUsageModel.MAX_SIGNALS) { "Zu viele lokale Lernsignale" }
+        return buildMap {
+            root.keys().forEach { key ->
+                require(key.isNotBlank() && key.length <= MAX_APP_KEY_LENGTH) { "Ungültiger Lernsignal-Schlüssel" }
+                val item = root.optJSONObject(key) ?: error("Ungültiges Lernsignal")
+                val count = item.optInt("count", 0)
+                val lastUsed = item.optLong("lastUsed", 0L)
+                require(count in 1..LocalUsageModel.MAX_LAUNCH_COUNT) { "Ungültiger Lernsignal-Zähler" }
+                require(lastUsed in 1L..(createdAt + MAX_CLOCK_SKEW_MILLIS)) { "Ungültiger Lernsignal-Zeitpunkt" }
+                put(key, AppUsageSignal(key, count, lastUsed))
+            }
+        }
     }
 
     private fun parsePositions(root: JSONObject?): Map<SceneId, Map<String, TilePosition>> {
@@ -412,8 +486,23 @@ class WorkspaceStore(context: Context) {
         }
     }
 
+    private fun usageJson(usage: Map<String, AppUsageSignal>): JSONObject = JSONObject().apply {
+        usage.values
+            .sortedByDescending(AppUsageSignal::lastUsedEpochMillis)
+            .take(LocalUsageModel.MAX_SIGNALS)
+            .sortedBy(AppUsageSignal::key)
+            .forEach { signal ->
+                put(
+                    signal.key,
+                    JSONObject()
+                        .put("count", signal.launchCount.coerceIn(1, LocalUsageModel.MAX_LAUNCH_COUNT))
+                        .put("lastUsed", signal.lastUsedEpochMillis),
+                )
+            }
+    }
+
     private fun inkJson(strokes: List<InkStroke>): JSONArray = JSONArray().apply {
-        strokes.takeLast(MAX_INK_STROKES).forEach { stroke ->
+        InkStrokeNormalizer.normalize(strokes).forEach { stroke ->
             val points = JSONArray()
             stroke.points.take(MAX_POINTS_PER_STROKE).forEach { point ->
                 points.put(
@@ -455,6 +544,11 @@ class WorkspaceStore(context: Context) {
             editor.putString(KEY_WIDGET_SIZES, preferences.getString(KEY_WIDGET_SIZES, "{}"))
             editor.putInt(KEY_SCHEMA_VERSION, 5)
         }
+        if (current < 6) {
+            editor.putString(KEY_HIDDEN_APP_KEYS, preferences.getString(KEY_HIDDEN_APP_KEYS, "[]"))
+            editor.putString(KEY_APP_USAGE, preferences.getString(KEY_APP_USAGE, "{}"))
+            editor.putInt(KEY_SCHEMA_VERSION, 6)
+        }
         editor.apply()
     }
 
@@ -471,22 +565,26 @@ class WorkspaceStore(context: Context) {
         const val KEY_WIDGET_SIZES = "widget_sizes_v5"
         const val KEY_SCHEMA_VERSION = "schema_version"
         const val KEY_PINNED_APPS = "pinned_app_keys_v2"
+        const val KEY_HIDDEN_APP_KEYS = "hidden_app_keys_v6"
+        const val KEY_APP_USAGE = "app_usage_v6"
         const val KEY_FOLDERS = "launcher_folders_v2"
         const val KEY_FOLDERS_INITIALIZED = "launcher_folders_initialized_v3"
         const val KEY_PEN_STROKES = "pen_strokes_v3"
-        const val SCHEMA_VERSION = 5
+        const val SCHEMA_VERSION = 6
         const val MAX_RECENT = 16
         const val MAX_PINNED_APPS = 5
+        const val MAX_HIDDEN_APPS = 512
         const val MAX_FOLDERS = 12
         const val MAX_FOLDER_APPS = 32
-        const val MAX_INK_STROKES = 100
-        const val MAX_POINTS_PER_STROKE = 2_048
+        const val MAX_INK_STROKES = InkStrokeNormalizer.MAX_STROKES
+        const val MAX_POINTS_PER_STROKE = InkStrokeNormalizer.MAX_POINTS_PER_STROKE
         const val MAX_BACKUP_BYTES = 5 * 1024 * 1024
         const val MAX_APP_KEY_LENGTH = 250
         const val MAX_ID_LENGTH = 80
         const val MAX_TITLE_LENGTH = 80
         const val BACKUP_FORMAT = "cloud.kosch.workspace"
-        const val BACKUP_VERSION = 1
+        const val MIN_BACKUP_VERSION = 1
+        const val BACKUP_VERSION = 2
         const val MAX_CLOCK_SKEW_MILLIS = 24L * 60L * 60L * 1_000L
     }
 
@@ -495,6 +593,8 @@ class WorkspaceStore(context: Context) {
         val homePage: HomePage,
         val recent: List<String>,
         val pinned: List<String>,
+        val hidden: List<String>,
+        val usage: Map<String, AppUsageSignal>,
         val folders: List<LauncherFolder>,
         val positions: Map<SceneId, Map<String, TilePosition>>,
         val inkStrokes: List<InkStroke>,
@@ -506,6 +606,8 @@ class WorkspaceStore(context: Context) {
             positionCount = positions.values.sumOf(Map<String, TilePosition>::size),
             recentCount = recent.size,
             pinnedCount = pinned.size,
+            hiddenCount = hidden.size,
+            usageSignalCount = usage.size,
             folderCount = folders.size,
             inkStrokeCount = inkStrokes.size,
             createdAtEpochMillis = createdAtEpochMillis,

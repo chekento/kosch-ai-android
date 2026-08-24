@@ -17,7 +17,9 @@ import cloud.kosch.aiandroid.ai.LauncherCommand
 import cloud.kosch.aiandroid.ai.LocalAppClassifier
 import cloud.kosch.aiandroid.ai.LocalCommandPlanner
 import cloud.kosch.aiandroid.ai.LocalFileIntelligenceEngine
+import cloud.kosch.aiandroid.ai.LocalFileWorkspacePlanner
 import cloud.kosch.aiandroid.ai.LocalSmartOrganizer
+import cloud.kosch.aiandroid.ai.LocalUsageModel
 import cloud.kosch.aiandroid.ai.PhoneNumberParser
 import cloud.kosch.aiandroid.ai.SearchDocument
 import cloud.kosch.aiandroid.ai.SearchRanker
@@ -25,16 +27,20 @@ import cloud.kosch.aiandroid.ai.SmartAppDescriptor
 import cloud.kosch.aiandroid.ai.SmartCollection
 import cloud.kosch.aiandroid.data.AppCatalog
 import cloud.kosch.aiandroid.data.LocalAuditLog
+import cloud.kosch.aiandroid.data.InkSvgExporter
 import cloud.kosch.aiandroid.data.WorkspaceStore
 import cloud.kosch.aiandroid.model.AuditAction
 import cloud.kosch.aiandroid.model.AuditEvent
 import cloud.kosch.aiandroid.model.AuditOutcome
+import cloud.kosch.aiandroid.model.AppUsageSignal
 import cloud.kosch.aiandroid.model.BackupPreview
 import cloud.kosch.aiandroid.model.ContextSnapshot
 import cloud.kosch.aiandroid.model.DefaultWorkspace
 import cloud.kosch.aiandroid.model.LaunchableApp
 import cloud.kosch.aiandroid.model.LaunchableShortcut
 import cloud.kosch.aiandroid.model.FileInsight
+import cloud.kosch.aiandroid.model.FileWorkspaceEntry
+import cloud.kosch.aiandroid.model.FileWorkspaceSummary
 import cloud.kosch.aiandroid.model.HomePage
 import cloud.kosch.aiandroid.model.InkStroke
 import cloud.kosch.aiandroid.model.LauncherFolder
@@ -52,6 +58,7 @@ import cloud.kosch.aiandroid.system.NotificationAccess
 import cloud.kosch.aiandroid.system.NotificationBadgeRepository
 import cloud.kosch.aiandroid.system.SystemActionGateway
 import cloud.kosch.aiandroid.system.StylusMonitor
+import cloud.kosch.aiandroid.system.WorkspaceTreeManager
 import cloud.kosch.aiandroid.security.PortableBackupCodec
 import cloud.kosch.aiandroid.security.CapabilityAction
 import cloud.kosch.aiandroid.security.CapabilityPolicy
@@ -71,6 +78,7 @@ class LauncherController(context: Context) {
     private val commandPlanner = LocalCommandPlanner()
     private val contextEngine = LocalContextEngine(appContext)
     private val fileIntelligence = LocalFileIntelligenceEngine(appContext.contentResolver)
+    private val workspaceTree = WorkspaceTreeManager(appContext)
     private val systemActions = SystemActionGateway(appContext)
     private val appCatalog = AppCatalog(appContext, mainHandler, ::refreshApps)
     private val stylusMonitor = StylusMonitor(appContext, mainHandler, ::onStylusChanged)
@@ -117,6 +125,18 @@ class LauncherController(context: Context) {
         private set
     var fileInsight by mutableStateOf<FileInsight?>(null)
         private set
+    var fileWorkspaceVisible by mutableStateOf(false)
+        private set
+    var fileWorkspaceLoading by mutableStateOf(false)
+        private set
+    var fileWorkspacePath by mutableStateOf<List<FileWorkspaceEntry>>(emptyList())
+        private set
+    var fileWorkspaceEntries by mutableStateOf<List<FileWorkspaceEntry>>(emptyList())
+        private set
+    var fileWorkspaceSummary by mutableStateOf<FileWorkspaceSummary?>(null)
+        private set
+    var canUndoFileRename by mutableStateOf(false)
+        private set
     var widgetBoardVisible by mutableStateOf(false)
         private set
     var widgetIds by mutableStateOf(store.widgetIds())
@@ -136,6 +156,10 @@ class LauncherController(context: Context) {
     var recentPackages by mutableStateOf(store.recentPackages())
         private set
     var pinnedAppKeys by mutableStateOf(store.pinnedAppKeys())
+        private set
+    var hiddenAppKeys by mutableStateOf(store.hiddenAppKeys())
+        private set
+    var appUsageSignals by mutableStateOf(store.appUsageSignals())
         private set
     var folders by mutableStateOf(store.folders())
         private set
@@ -169,12 +193,17 @@ class LauncherController(context: Context) {
         private set
     var commandFocusRequest by mutableStateOf(0L)
         private set
+    var canUndoWidgetOrder by mutableStateOf(false)
+        private set
 
     private var undoPositions: Map<SceneId, Map<String, TilePosition>>? = null
+    private var undoWidgetOrder: List<Int>? = null
     private var stagedBackupEnvelope: String? = null
     private var stagedWorkspacePayload: ByteArray? = null
     private var backupRequestToken = 0L
     private var shortcutRequestToken = 0L
+    private var fileWorkspaceRequestToken = 0L
+    private var fileRenameUndo: FileRenameUndo? = null
     private var started = false
     private val badgeListener = NotificationBadgeRepository.Listener { counts ->
         mainHandler.post { notificationCounts = counts }
@@ -251,6 +280,13 @@ class LauncherController(context: Context) {
     fun saveInkStrokes(strokes: List<InkStroke>) {
         store.saveInkStrokes(strokes)
         audit(AuditAction.PEN_SAVE, AuditOutcome.SUCCESS)
+    }
+
+    fun inkSvg(): ByteArray = InkSvgExporter.export(store.inkStrokes())
+
+    fun recordInkExport(success: Boolean) {
+        audit(AuditAction.PEN_EXPORT, if (success) AuditOutcome.SUCCESS else AuditOutcome.FAILED)
+        notice = if (success) "Pen Space als SVG gespeichert" else "Pen-SVG wurde nicht gespeichert"
     }
 
     fun openFaq() {
@@ -440,6 +476,17 @@ class LauncherController(context: Context) {
         notice = "Lokales Audit vollständig gelöscht"
     }
 
+    fun clearPersonalization(confirmed: Boolean) {
+        if (CapabilityPolicy.rule(CapabilityAction.RESET_PERSONALIZATION).requiresConfirmation && !confirmed) {
+            notice = "Das Zurücksetzen der lokalen Lernsignale braucht eine Bestätigung"
+            return
+        }
+        store.clearAppUsage()
+        appUsageSignals = emptyMap()
+        audit(AuditAction.PERSONALIZATION_RESET, AuditOutcome.SUCCESS)
+        notice = "Lokale Lernsignale vollständig zurückgesetzt"
+    }
+
     fun auditCsv(): ByteArray = auditLog.exportCsv()
 
     fun recordAuditExport(success: Boolean) {
@@ -474,6 +521,7 @@ class LauncherController(context: Context) {
         folderSheetVisible -> true.also { closeFolder() }
         phoneVisible -> true.also { closePhone() }
         fileSheetVisible -> true.also { closeFileSheet() }
+        fileWorkspaceVisible -> true.also { closeFileWorkspace() }
         widgetBoardVisible -> true.also { closeWidgetBoard() }
         controlCenterVisible -> true.also { closeControlCenter() }
         providerChooserVisible -> true.also { closeProviderChooser() }
@@ -759,6 +807,153 @@ class LauncherController(context: Context) {
         }
     }
 
+    fun openFileWorkspace() {
+        controlCenterVisible = false
+        fileSheetVisible = false
+        fileWorkspaceVisible = true
+        if (workspaceTree.currentTreeUri == null) {
+            fileWorkspacePath = emptyList()
+            fileWorkspaceEntries = emptyList()
+            fileWorkspaceSummary = null
+            notice = "Wähle einen Arbeitsordner über Android aus"
+        } else {
+            loadFileWorkspaceRoot()
+        }
+    }
+
+    fun closeFileWorkspace() {
+        fileWorkspaceRequestToken += 1
+        fileWorkspaceVisible = false
+        fileWorkspaceLoading = false
+    }
+
+    fun adoptFileWorkspace(treeUri: Uri) {
+        val requestToken = ++fileWorkspaceRequestToken
+        fileWorkspaceVisible = true
+        fileWorkspaceLoading = true
+        executor.execute {
+            val result = runCatching {
+                workspaceTree.adopt(treeUri).getOrThrow()
+                workspaceSnapshotRoot()
+            }
+            mainHandler.post {
+                if (requestToken != fileWorkspaceRequestToken) return@post
+                fileWorkspaceLoading = false
+                result.onSuccess { snapshot ->
+                    applyFileWorkspaceSnapshot(snapshot)
+                    audit(AuditAction.FILE_WORKSPACE, AuditOutcome.SUCCESS)
+                    notice = "Arbeitsordner lokal geöffnet"
+                }.onFailure {
+                    audit(AuditAction.FILE_WORKSPACE, AuditOutcome.FAILED)
+                    notice = it.message ?: "Arbeitsordner konnte nicht geöffnet werden"
+                }
+            }
+        }
+    }
+
+    fun forgetFileWorkspace() {
+        val requestToken = ++fileWorkspaceRequestToken
+        fileWorkspaceLoading = true
+        executor.execute {
+            val result = workspaceTree.releaseCurrent()
+            mainHandler.post {
+                if (requestToken != fileWorkspaceRequestToken) return@post
+                fileWorkspaceLoading = false
+                result.onSuccess {
+                    fileWorkspacePath = emptyList()
+                    fileWorkspaceEntries = emptyList()
+                    fileWorkspaceSummary = null
+                    fileRenameUndo = null
+                    canUndoFileRename = false
+                    notice = "Arbeitsordner und Android-Freigabe vergessen"
+                }.onFailure {
+                    notice = it.message ?: "Arbeitsordner konnte nicht vollständig vergessen werden"
+                }
+            }
+        }
+    }
+
+    fun openFileWorkspaceDirectory(entry: FileWorkspaceEntry) {
+        if (!entry.isDirectory || fileWorkspaceLoading) return
+        loadFileWorkspaceDirectory(entry, push = true)
+    }
+
+    fun navigateFileWorkspaceUp() {
+        if (fileWorkspacePath.size <= 1 || fileWorkspaceLoading) return
+        loadFileWorkspaceDirectory(fileWorkspacePath[fileWorkspacePath.lastIndex - 1], push = false)
+    }
+
+    fun openFileWorkspaceEntry(entry: FileWorkspaceEntry) {
+        if (entry.isDirectory) {
+            openFileWorkspaceDirectory(entry)
+            return
+        }
+        systemActions.openDocument(entry.uri, entry.mimeType)
+            .onFailure { notice = "Für ${entry.displayName} ist keine App verfügbar" }
+    }
+
+    fun createFileWorkspaceDirectory(name: String, confirmed: Boolean) {
+        val current = fileWorkspacePath.lastOrNull() ?: return
+        if (CapabilityPolicy.rule(CapabilityAction.CREATE_DIRECTORY).requiresConfirmation && !confirmed) {
+            notice = "Der neue Ordner muss ausdrücklich bestätigt werden"
+            return
+        }
+        mutateFileWorkspace(
+            action = AuditAction.FILE_CREATE_DIRECTORY,
+            successNotice = "Ordner erstellt",
+        ) {
+            workspaceTree.createDirectory(current.uri, name).getOrThrow()
+        }
+    }
+
+    fun renameFileWorkspaceEntry(entry: FileWorkspaceEntry, name: String, confirmed: Boolean) {
+        if (!entry.canRename) {
+            notice = "Dieser Android-Anbieter erlaubt kein Umbenennen"
+            return
+        }
+        if (CapabilityPolicy.rule(CapabilityAction.RENAME_DOCUMENT).requiresConfirmation && !confirmed) {
+            notice = "Der neue Name muss ausdrücklich bestätigt werden"
+            return
+        }
+        mutateFileWorkspace(
+            action = AuditAction.FILE_RENAME,
+            successNotice = "${entry.displayName} umbenannt",
+        ) {
+            val renamedUri = workspaceTree.rename(entry.uri, name).getOrThrow()
+            fileRenameUndo = FileRenameUndo(renamedUri, entry.displayName)
+        }
+    }
+
+    fun undoFileWorkspaceRename() {
+        val undo = fileRenameUndo ?: return
+        mutateFileWorkspace(
+            action = AuditAction.FILE_RENAME,
+            successNotice = "Umbenennung rückgängig gemacht",
+        ) {
+            workspaceTree.rename(undo.renamedUri, undo.originalName).getOrThrow()
+            fileRenameUndo = null
+        }
+    }
+
+    fun deleteFileWorkspaceEntry(entry: FileWorkspaceEntry, confirmed: Boolean) {
+        if (!entry.canDelete) {
+            notice = "Dieser Android-Anbieter erlaubt kein Löschen"
+            return
+        }
+        if (CapabilityPolicy.rule(CapabilityAction.DELETE_DOCUMENT).requiresConfirmation && !confirmed) {
+            audit(AuditAction.FILE_DELETE, AuditOutcome.REJECTED)
+            notice = "Löschen braucht eine ausdrückliche Bestätigung"
+            return
+        }
+        mutateFileWorkspace(
+            action = AuditAction.FILE_DELETE,
+            successNotice = "${entry.displayName} gelöscht – der Anbieter bietet hier kein Undo",
+        ) {
+            workspaceTree.delete(entry.uri).getOrThrow()
+            if (fileRenameUndo?.renamedUri == entry.uri) fileRenameUndo = null
+        }
+    }
+
     fun openWidgetBoard() {
         widgetBoardVisible = true
     }
@@ -782,6 +977,32 @@ class LauncherController(context: Context) {
         widgetSizes = store.widgetSizes()
         notice = "Widget entfernt"
         audit(AuditAction.WIDGET_CHANGE, AuditOutcome.SUCCESS)
+    }
+
+    fun moveWidget(appWidgetId: Int, delta: Int) {
+        val from = widgetIds.indexOf(appWidgetId)
+        if (from < 0 || widgetIds.isEmpty()) return
+        val to = (from + delta).coerceIn(0, widgetIds.lastIndex)
+        if (from == to) return
+        undoWidgetOrder = widgetIds.toList()
+        widgetIds = widgetIds.toMutableList().apply {
+            add(to, removeAt(from))
+        }
+        store.saveWidgetOrder(widgetIds)
+        canUndoWidgetOrder = true
+        audit(AuditAction.WIDGET_CHANGE, AuditOutcome.SUCCESS)
+        notice = "Widget-Reihenfolge angepasst"
+    }
+
+    fun undoWidgetOrder() {
+        val previous = undoWidgetOrder ?: return
+        val current = widgetIds
+        widgetIds = previous.filter(widgetIds::contains) + widgetIds.filterNot(previous::contains)
+        store.saveWidgetOrder(widgetIds)
+        undoWidgetOrder = current
+        canUndoWidgetOrder = true
+        audit(AuditAction.WIDGET_CHANGE, AuditOutcome.SUCCESS)
+        notice = "Widget-Reihenfolge rückgängig gemacht"
     }
 
     fun widgetSize(appWidgetId: Int): WidgetSizePreset =
@@ -838,12 +1059,42 @@ class LauncherController(context: Context) {
         }
     }
 
+    fun isHidden(app: LaunchableApp): Boolean = app.key in hiddenAppKeys
+
+    fun toggleSelectedAppHidden() {
+        val app = selectedApp ?: return
+        val hiding = app.key !in hiddenAppKeys
+        hiddenAppKeys = if (hiding) {
+            (hiddenAppKeys + app.key).distinct()
+        } else {
+            hiddenAppKeys.filterNot { it == app.key }
+        }
+        if (hiding && app.key in pinnedAppKeys) {
+            pinnedAppKeys = pinnedAppKeys.filterNot { it == app.key }
+            store.savePinnedAppKeys(pinnedAppKeys)
+        }
+        store.saveHiddenAppKeys(hiddenAppKeys)
+        audit(AuditAction.APP_VISIBILITY, AuditOutcome.SUCCESS)
+        hideAppActions()
+        notice = if (hiding) {
+            "${app.label} verborgen – erreichbar über Apps → Verborgen"
+        } else {
+            "${app.label} wieder eingeblendet"
+        }
+    }
+
     fun smartDockApps(): List<LaunchableApp> {
-        val byKey = apps.associateBy(LaunchableApp::key)
+        val visibleApps = apps.filterNot { it.key in hiddenAppKeys }
+        val byKey = visibleApps.associateBy(LaunchableApp::key)
         return LocalSmartOrganizer.smartDockKeys(
-            apps = appDescriptors(),
+            apps = visibleApps.map { it.toSmartDescriptor() },
             pinnedKeys = pinnedAppKeys,
             recentPackages = recentPackages,
+            usageKeys = LocalUsageModel.rankKeys(
+                visibleApps.map(LaunchableApp::key),
+                appUsageSignals,
+                System.currentTimeMillis(),
+            ).filter(appUsageSignals::containsKey),
             scene = activeScene,
             limit = DOCK_SIZE,
         ).mapNotNull(byKey::get)
@@ -908,7 +1159,7 @@ class LauncherController(context: Context) {
 
     fun folderApps(folder: LauncherFolder): List<LaunchableApp> {
         val byKey = apps.associateBy(LaunchableApp::key)
-        return folder.appKeys.mapNotNull(byKey::get)
+        return folder.appKeys.mapNotNull(byKey::get).filterNot { it.key in hiddenAppKeys }
     }
 
     fun removeFolder(folderId: String) {
@@ -928,6 +1179,9 @@ class LauncherController(context: Context) {
             .onSuccess {
                 store.recordRecent(shortcut.packageName)
                 recentPackages = store.recentPackages()
+                selectedApp?.takeIf { it.packageName == shortcut.packageName }?.let { app ->
+                    appUsageSignals = store.recordAppUsage(app.key)
+                }
                 hideAppActions()
                 drawerVisible = false
                 audit(AuditAction.APP_SHORTCUT, AuditOutcome.SUCCESS)
@@ -944,6 +1198,30 @@ class LauncherController(context: Context) {
             .onFailure { notice = "App-Info konnte nicht geöffnet werden" }
     }
 
+    fun openSelectedAppStore() {
+        val app = selectedApp ?: return
+        systemActions.openStoreListing(app.packageName)
+            .onFailure { notice = "Store-Seite konnte nicht geöffnet werden" }
+    }
+
+    fun requestSelectedAppUninstall(confirmed: Boolean) {
+        val app = selectedApp ?: return
+        if (CapabilityPolicy.rule(CapabilityAction.REQUEST_UNINSTALL).requiresConfirmation && !confirmed) {
+            notice = "Die Deinstallation braucht eine ausdrückliche Bestätigung"
+            return
+        }
+        systemActions.requestUninstall(app.packageName)
+            .onSuccess {
+                hideAppActions()
+                audit(AuditAction.APP_UNINSTALL_REQUEST, AuditOutcome.SUCCESS)
+                notice = "Android prüft und bestätigt die Deinstallation"
+            }
+            .onFailure {
+                audit(AuditAction.APP_UNINSTALL_REQUEST, AuditOutcome.FAILED)
+                notice = "Deinstallationsdialog konnte nicht geöffnet werden"
+            }
+    }
+
     fun submitCommand(
         text: String,
         requestVoice: () -> Unit,
@@ -957,6 +1235,7 @@ class LauncherController(context: Context) {
             LauncherCommand.OpenDrawer -> openDrawer()
             LauncherCommand.StartVoice -> requestVoice()
             LauncherCommand.OpenFiles -> requestDocument()
+            LauncherCommand.OpenFileWorkspace -> openFileWorkspace()
             LauncherCommand.OpenControls -> openControlCenter()
             LauncherCommand.OpenWidgets -> openWidgetBoard()
             LauncherCommand.OpenFaq -> openFaq()
@@ -978,6 +1257,7 @@ class LauncherController(context: Context) {
             .onSuccess {
                 store.recordRecent(app.packageName)
                 recentPackages = store.recentPackages()
+                appUsageSignals = store.recordAppUsage(app.key)
                 drawerVisible = false
                 hideAppActions()
                 audit(AuditAction.APP_LAUNCH, AuditOutcome.SUCCESS)
@@ -993,9 +1273,15 @@ class LauncherController(context: Context) {
         collection: SmartCollection,
     ): List<LaunchableApp> {
         val providerPackages = AiProviderRegistry.installedProviderPackages(apps)
-        val filtered = apps.filter { app ->
+        val visibilityFiltered = if (collection == SmartCollection.HIDDEN) {
+            apps.filter { it.key in hiddenAppKeys }
+        } else {
+            apps.filterNot { it.key in hiddenAppKeys }
+        }
+        val effectiveCollection = if (collection == SmartCollection.HIDDEN) SmartCollection.ALL else collection
+        val filtered = visibilityFiltered.filter { app ->
             LocalAppClassifier.belongsTo(
-                collection = collection,
+                collection = effectiveCollection,
                 label = app.label,
                 packageName = app.packageName,
                 recentPackages = recentPackages,
@@ -1013,11 +1299,18 @@ class LauncherController(context: Context) {
                 )
             },
         ).mapNotNull { byKey[it.id] }
-        return if (collection == SmartCollection.RECENT && query.isBlank()) {
-            ranked.sortedBy { recentPackages.indexOf(it.packageName).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE }
-        } else {
-            ranked
+        if (collection == SmartCollection.RECENT && query.isBlank()) {
+            return ranked.sortedBy {
+                recentPackages.indexOf(it.packageName).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE
+            }
         }
+        if (query.isNotBlank()) return ranked
+        val byRankedKey = ranked.associateBy(LaunchableApp::key)
+        return LocalUsageModel.rankKeys(
+            ranked.map(LaunchableApp::key),
+            appUsageSignals,
+            System.currentTimeMillis(),
+        ).mapNotNull(byRankedKey::get)
     }
 
     fun installedProviderApp(provider: AiProviderProfile): LaunchableApp? =
@@ -1097,6 +1390,18 @@ class LauncherController(context: Context) {
             mainHandler.post {
                 loaded.onSuccess { catalog ->
                     apps = catalog.filterNot { it.packageName == appContext.packageName }
+                    val aliases = apps.flatMap { app ->
+                        app.legacyKeys.map { legacy -> legacy to app.key }
+                    }.groupBy { it.first }
+                        .mapNotNull { (legacy, candidates) ->
+                            candidates.map { it.second }.distinct().singleOrNull()?.let { legacy to it }
+                        }.toMap()
+                    if (store.migrateLegacyAppKeys(aliases)) {
+                        pinnedAppKeys = store.pinnedAppKeys()
+                        hiddenAppKeys = store.hiddenAppKeys()
+                        appUsageSignals = store.appUsageSignals()
+                        folders = store.folders()
+                    }
                     if (!store.areFoldersInitialized() && apps.isNotEmpty()) {
                         folders = LocalSmartOrganizer.proposeFolders(appDescriptors())
                         store.saveFolders(folders)
@@ -1110,6 +1415,99 @@ class LauncherController(context: Context) {
         }
     }
 
+    private fun loadFileWorkspaceRoot() {
+        val requestToken = ++fileWorkspaceRequestToken
+        fileWorkspaceLoading = true
+        executor.execute {
+            val result = runCatching(::workspaceSnapshotRoot)
+            mainHandler.post {
+                if (requestToken != fileWorkspaceRequestToken) return@post
+                fileWorkspaceLoading = false
+                result.onSuccess(::applyFileWorkspaceSnapshot)
+                    .onFailure {
+                        fileWorkspacePath = emptyList()
+                        fileWorkspaceEntries = emptyList()
+                        fileWorkspaceSummary = null
+                        notice = it.message ?: "Arbeitsordner ist nicht mehr erreichbar"
+                    }
+            }
+        }
+    }
+
+    private fun loadFileWorkspaceDirectory(entry: FileWorkspaceEntry, push: Boolean) {
+        val requestToken = ++fileWorkspaceRequestToken
+        val nextPath = if (push) {
+            (fileWorkspacePath + entry).distinctBy(FileWorkspaceEntry::documentId)
+        } else {
+            fileWorkspacePath.dropLast(1)
+        }
+        fileWorkspaceLoading = true
+        executor.execute {
+            val result = workspaceTree.listChildren(entry.uri).map { children ->
+                FileWorkspaceSnapshot(
+                    path = nextPath.ifEmpty { listOf(entry) },
+                    entries = children,
+                    summary = LocalFileWorkspacePlanner.analyze(children),
+                )
+            }
+            mainHandler.post {
+                if (requestToken != fileWorkspaceRequestToken) return@post
+                fileWorkspaceLoading = false
+                result.onSuccess(::applyFileWorkspaceSnapshot)
+                    .onFailure { notice = it.message ?: "Ordner konnte nicht geöffnet werden" }
+            }
+        }
+    }
+
+    private fun mutateFileWorkspace(
+        action: AuditAction,
+        successNotice: String,
+        mutation: () -> Unit,
+    ) {
+        val current = fileWorkspacePath.lastOrNull() ?: return
+        if (fileWorkspaceLoading) return
+        val requestToken = ++fileWorkspaceRequestToken
+        fileWorkspaceLoading = true
+        executor.execute {
+            val result = runCatching {
+                mutation()
+                val entries = workspaceTree.listChildren(current.uri).getOrThrow()
+                entries to LocalFileWorkspacePlanner.analyze(entries)
+            }
+            mainHandler.post {
+                if (requestToken != fileWorkspaceRequestToken) return@post
+                fileWorkspaceLoading = false
+                result.onSuccess { (entries, summary) ->
+                    fileWorkspaceEntries = entries
+                    fileWorkspaceSummary = summary
+                    canUndoFileRename = fileRenameUndo != null
+                    audit(action, AuditOutcome.SUCCESS)
+                    notice = successNotice
+                }.onFailure {
+                    audit(action, AuditOutcome.FAILED)
+                    notice = it.message ?: "Dateioperation ist fehlgeschlagen"
+                }
+            }
+        }
+    }
+
+    private fun workspaceSnapshotRoot(): FileWorkspaceSnapshot {
+        val root = workspaceTree.rootDirectory().getOrThrow()
+        val entries = workspaceTree.listChildren(root.uri).getOrThrow()
+        return FileWorkspaceSnapshot(
+            path = listOf(root),
+            entries = entries,
+            summary = LocalFileWorkspacePlanner.analyze(entries),
+        )
+    }
+
+    private fun applyFileWorkspaceSnapshot(snapshot: FileWorkspaceSnapshot) {
+        fileWorkspacePath = snapshot.path
+        fileWorkspaceEntries = snapshot.entries
+        fileWorkspaceSummary = snapshot.summary
+        canUndoFileRename = fileRenameUndo != null
+    }
+
     private fun rememberUndoPoint() {
         undoPositions = workspacePositions.mapValues { (_, positions) -> positions.toMap() }
         canUndoLayout = true
@@ -1121,6 +1519,8 @@ class LauncherController(context: Context) {
         workspacePositions = store.loadPositions()
         recentPackages = store.recentPackages()
         pinnedAppKeys = store.pinnedAppKeys()
+        hiddenAppKeys = store.hiddenAppKeys()
+        appUsageSignals = store.appUsageSignals()
         folders = store.folders()
         folderPreview = null
         previewPositions = null
@@ -1151,7 +1551,9 @@ class LauncherController(context: Context) {
         }
     }
 
-    private fun appDescriptors(): List<SmartAppDescriptor> = apps.map { it.toSmartDescriptor() }
+    private fun appDescriptors(): List<SmartAppDescriptor> = apps
+        .filterNot { it.key in hiddenAppKeys }
+        .map { it.toSmartDescriptor() }
 
     private fun LaunchableApp.toSmartDescriptor() = SmartAppDescriptor(
         key = key,
@@ -1172,4 +1574,15 @@ class LauncherController(context: Context) {
         const val DOCK_SIZE = 5
         const val MAX_BACKUP_ENVELOPE_BYTES = 8 * 1024 * 1024
     }
+
+    private data class FileWorkspaceSnapshot(
+        val path: List<FileWorkspaceEntry>,
+        val entries: List<FileWorkspaceEntry>,
+        val summary: FileWorkspaceSummary,
+    )
+
+    private data class FileRenameUndo(
+        val renamedUri: Uri,
+        val originalName: String,
+    )
 }

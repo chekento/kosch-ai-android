@@ -27,6 +27,7 @@ import androidx.compose.material.icons.rounded.Badge
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.ContactPhone
 import androidx.compose.material.icons.rounded.FolderOpen
+import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.History
 import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.Lock
@@ -101,6 +102,7 @@ fun ColumnScope.ProfessionalHubSurface(
         ProAction("Command Bar", "Ctrl/⌘ + K", Icons.Rounded.AutoAwesome, onAsk),
         ProAction("Alle Apps", "Ctrl/⌘ + Leertaste", Icons.Rounded.Apps, controller::openDrawer),
         ProAction("Datei-KI", "Gezielte SAF-Auswahl", Icons.Rounded.FolderOpen, requestDocument),
+        ProAction("Dateien", "Begrenzter SAF-Arbeitsraum", Icons.Rounded.Folder, controller::openFileWorkspace),
         ProAction("Kontakt", "Einmalig auswählen", Icons.Rounded.ContactPhone, requestContact),
         ProAction("Telefon", "System-Wähler", Icons.Rounded.Phone, controller::openPhone),
         ProAction("Widgets", "Android Host Board", Icons.Rounded.Widgets, controller::openWidgetBoard),
@@ -162,6 +164,26 @@ fun ColumnScope.ProfessionalHubSurface(
                         healthy = true,
                         modifier = Modifier.weight(1f),
                     )
+                }
+            }
+
+            item {
+                Surface(color = Sky.copy(alpha = 0.09f), shape = RoundedCornerShape(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(13.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = Sky)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Adaptive Local Core", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "${controller.appUsageSignals.size} lokale Nutzungssignale · ${controller.hiddenAppKeys.size} verborgene Apps · jederzeit löschbar",
+                                color = MutedMist,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
                 }
             }
 
@@ -297,7 +319,7 @@ fun BackupSheet(
                 Surface(color = RaisedSurface, shape = RoundedCornerShape(17.dp)) {
                     Column(Modifier.fillMaxWidth().padding(13.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Exportumfang", fontWeight = FontWeight.SemiBold)
-                        Text("Szene, Home-Seite, Layout, KoSch-Verlauf, Pins, Ordner und Pen-Striche", color = MutedMist, style = MaterialTheme.typography.bodySmall)
+                        Text("Szene, Home-Seite, Layout, Verlauf, Pins, verborgene Apps, lokale Lernsignale, Ordner und Pen-Striche", color = MutedMist, style = MaterialTheme.typography.bodySmall)
                         Text("Ohne Widgets, Dateifreigaben, Secrets, Benachrichtigungsdaten und Audit", color = Sky, style = MaterialTheme.typography.bodySmall)
                     }
                 }
@@ -375,7 +397,7 @@ fun BackupSheet(
                                 Spacer(Modifier.width(8.dp))
                                 Text("Backup validiert", fontWeight = FontWeight.SemiBold)
                             }
-                            Text("${preview.scene.title} · ${preview.homePage.title} · ${preview.folderCount} Ordner · ${preview.pinnedCount} Pins · ${preview.inkStrokeCount} Stiftstriche")
+                            Text("${preview.scene.title} · ${preview.homePage.title} · ${preview.folderCount} Ordner · ${preview.pinnedCount} Pins · ${preview.hiddenCount} verborgen · ${preview.usageSignalCount} Lernsignale · ${preview.inkStrokeCount} Stiftstriche")
                             preview.skippedItems.forEach { Text("• $it", color = MutedMist, style = MaterialTheme.typography.bodySmall) }
                         }
                     }

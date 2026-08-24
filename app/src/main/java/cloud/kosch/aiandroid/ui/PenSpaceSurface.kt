@@ -6,11 +6,14 @@ import android.graphics.Color as AndroidColor
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PointF
+import android.os.Bundle
 import android.util.AttributeSet
 import android.view.InputDevice
 import android.view.MotionEvent
 import android.view.PointerIcon
 import android.view.View
+import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +34,7 @@ import androidx.compose.material.icons.rounded.BorderColor
 import androidx.compose.material.icons.rounded.DeleteSweep
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Draw
+import androidx.compose.material.icons.rounded.FileDownload
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -52,6 +56,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import cloud.kosch.aiandroid.LauncherController
+import cloud.kosch.aiandroid.R
+import cloud.kosch.aiandroid.data.InkStrokeNormalizer
 import cloud.kosch.aiandroid.model.InkPoint
 import cloud.kosch.aiandroid.model.InkStroke
 import cloud.kosch.aiandroid.model.InkTool
@@ -69,6 +75,7 @@ import kotlin.math.hypot
 fun ColumnScope.PenSpaceSurface(
     controller: LauncherController,
     onAsk: () -> Unit,
+    onExport: () -> Unit,
 ) {
     var selectedTool by remember { mutableStateOf(InkTool.PEN) }
     var inkView by remember { mutableStateOf<PressureInkView?>(null) }
@@ -161,6 +168,11 @@ fun ColumnScope.PenSpaceSurface(
                     onClick = onAsk,
                     label = { Text("An Ask") },
                     leadingIcon = { Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                )
+                AssistChip(
+                    onClick = onExport,
+                    label = { Text("SVG Export") },
+                    leadingIcon = { Icon(Icons.Rounded.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 )
             }
 
@@ -262,7 +274,7 @@ class PressureInkView @JvmOverloads constructor(
 
     fun setInitialStrokes(value: List<InkStroke>) {
         if (strokes.isNotEmpty()) return
-        strokes += value.deepCopy()
+        strokes += InkStrokeNormalizer.normalize(value).deepCopy()
         invalidate()
     }
 
@@ -363,7 +375,7 @@ class PressureInkView @JvmOverloads constructor(
                 if (!erasing) {
                     val target = activePoints.orEmpty().toMutableList()
                     target += event.point(index)
-                    if (target.isNotEmpty()) strokes += InkStroke(selectedTool, target)
+                    InkStrokeNormalizer.normalizeStroke(InkStroke(selectedTool, target))?.let(strokes::add)
                     activePoints = null
                 }
                 if (!erasing || eraserChanged) notifyChanged()
@@ -404,6 +416,34 @@ class PressureInkView @JvmOverloads constructor(
     override fun performClick(): Boolean {
         super.performClick()
         return true
+    }
+
+    override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
+        super.onInitializeAccessibilityNodeInfo(info)
+        info.className = View::class.java.name
+        info.contentDescription = "Pen-Space-Zeichenfläche, ${strokes.size} Striche, Werkzeug ${selectedTool.title}"
+        if (undoStack.isNotEmpty()) {
+            info.addAction(
+                AccessibilityNodeInfo.AccessibilityAction(
+                    R.id.accessibility_action_undo_ink,
+                    "Letzten Stiftschritt rückgängig machen",
+                ),
+            )
+        }
+        if (strokes.isNotEmpty()) {
+            info.addAction(
+                AccessibilityNodeInfo.AccessibilityAction(
+                    R.id.accessibility_action_clear_ink,
+                    "Alle Stiftstriche löschen",
+                ),
+            )
+        }
+    }
+
+    override fun performAccessibilityAction(action: Int, arguments: Bundle?): Boolean = when (action) {
+        R.id.accessibility_action_undo_ink -> true.also { undo() }
+        R.id.accessibility_action_clear_ink -> true.also { clearInk() }
+        else -> super.performAccessibilityAction(action, arguments)
     }
 
     private fun drawGrid(canvas: Canvas) {
@@ -486,7 +526,13 @@ class PressureInkView @JvmOverloads constructor(
     }
 
     private fun notifyChanged() {
+        val normalized = InkStrokeNormalizer.normalize(strokes)
+        if (normalized != strokes) {
+            strokes.clear()
+            strokes += normalized
+        }
         onInkChanged(strokes.deepCopy())
+        sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED)
     }
 
     private fun List<InkStroke>.deepCopy(): List<InkStroke> = map { stroke ->
