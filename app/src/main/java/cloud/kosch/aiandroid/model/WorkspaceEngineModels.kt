@@ -75,19 +75,37 @@ sealed interface WorkspaceItemContent {
         val legacyTileId: String,
         val action: TileAction,
     ) : WorkspaceItemContent {
+        init {
+            require(legacyTileId.isNotBlank()) { "Action tile reference must not be blank" }
+        }
+
         override val kind = WorkspaceItemKind.ACTION_TILE
     }
 
     data class App(val appKey: String) : WorkspaceItemContent {
+        init {
+            require(appKey.isNotBlank()) { "App key must not be blank" }
+        }
+
         override val kind = WorkspaceItemKind.APP
     }
 
     data class Folder(val folderId: String) : WorkspaceItemContent {
+        init {
+            require(folderId.isNotBlank()) { "Folder id must not be blank" }
+        }
+
         override val kind = WorkspaceItemKind.FOLDER
     }
 
     /** Portable provider identity only. Android appWidgetId is intentionally not part of this model. */
     data class Widget(val providerComponent: String?) : WorkspaceItemContent {
+        init {
+            require(providerComponent == null || providerComponent.isNotBlank()) {
+                "Widget provider must be null for remap or a non-blank component"
+            }
+        }
+
         override val kind = WorkspaceItemKind.WIDGET
     }
 }
