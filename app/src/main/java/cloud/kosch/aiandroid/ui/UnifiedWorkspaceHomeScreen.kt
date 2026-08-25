@@ -25,9 +25,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apps
@@ -41,6 +44,7 @@ import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.KeyboardArrowLeft
 import androidx.compose.material.icons.rounded.KeyboardArrowRight
 import androidx.compose.material.icons.rounded.KeyboardArrowUp
+import androidx.compose.material.icons.rounded.KeyboardVoice
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material3.AlertDialog
@@ -69,16 +73,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.LauncherController
@@ -86,11 +95,9 @@ import cloud.kosch.aiandroid.WorkspaceHomeController
 import cloud.kosch.aiandroid.ai.SmartCollection
 import cloud.kosch.aiandroid.model.AppProfile
 import cloud.kosch.aiandroid.model.DefaultWorkspace
-import cloud.kosch.aiandroid.model.HomePage
 import cloud.kosch.aiandroid.model.LaunchableApp
 import cloud.kosch.aiandroid.model.LauncherFolder
 import cloud.kosch.aiandroid.model.TileAction
-import cloud.kosch.aiandroid.model.WorkspaceCellBounds
 import cloud.kosch.aiandroid.model.WorkspaceItem
 import cloud.kosch.aiandroid.model.WorkspaceItemContent
 import cloud.kosch.aiandroid.model.WorkspacePage
@@ -114,8 +121,14 @@ import java.util.Locale
 fun UnifiedWorkspaceHomeScreen(
     controller: LauncherController,
     home: WorkspaceHomeController,
+    requestVoiceInput: () -> Unit,
+    requestDocument: () -> Unit,
+    requestContact: () -> Unit,
 ) {
     val snackbarHost = remember { SnackbarHostState() }
+    val askFocusRequester = remember { FocusRequester() }
+    val keyboardController = LocalSoftwareKeyboardController.current
+    var askText by rememberSaveable { mutableStateOf("") }
     var editMode by remember { mutableStateOf(false) }
     var addVisible by remember { mutableStateOf(false) }
     var pageDialog by remember { mutableStateOf<PageDialogMode?>(null) }
@@ -132,6 +145,21 @@ fun UnifiedWorkspaceHomeScreen(
         controller.notice?.let {
             snackbarHost.showSnackbar(it)
             controller.consumeNotice()
+        }
+    }
+    LaunchedEffect(controller.commandFocusRequest) {
+        if (controller.commandFocusRequest > 0L) {
+            askFocusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+
+    val submitAsk: () -> Unit = {
+        val command = askText.trim()
+        if (command.isNotEmpty()) {
+            controller.submitCommand(command, requestVoiceInput, requestDocument, requestContact)
+            askText = ""
+            keyboardController?.hide()
         }
     }
 
@@ -170,17 +198,25 @@ fun UnifiedWorkspaceHomeScreen(
                     editMode = editMode,
                     onEditItem = { itemEditorId = it },
                     onOpenFolder = { folderPreviewId = it },
+                    onAsk = {
+                        askFocusRequester.requestFocus()
+                        keyboardController?.show()
+                    },
                 )
                 UnifiedHomeDock(
                     controller = controller,
-                    onOpenApps = {
-                        controller.switchHomePage(HomePage.PRO_DESK)
-                        controller.openDrawer()
-                    },
+                    onOpenApps = controller::openDrawer,
                     onAsk = {
-                        controller.switchHomePage(HomePage.PRO_DESK)
-                        controller.requestCommandFocus()
+                        askFocusRequester.requestFocus()
+                        keyboardController?.show()
                     },
+                )
+                UnifiedCommandDock(
+                    text = askText,
+                    onTextChange = { askText = it.take(MAX_COMMAND_LENGTH) },
+                    focusRequester = askFocusRequester,
+                    onSubmit = submitAsk,
+                    requestVoiceInput = requestVoiceInput,
                 )
             }
         }
@@ -266,12 +302,7 @@ private fun UnifiedHomeHeader(
             IconButton(onClick = onPageManage) {
                 Icon(Icons.Rounded.MoreVert, contentDescription = "Home-Seiten verwalten")
             }
-            IconButton(
-                onClick = {
-                    controller.switchHomePage(HomePage.PRO_DESK)
-                    controller.openControlCenter()
-                },
-            ) {
+            IconButton(onClick = controller::openControlCenter) {
                 Icon(Icons.Rounded.Tune, contentDescription = "Kontrollzentrum")
             }
         }
@@ -322,6 +353,7 @@ private fun UnifiedGrid(
     editMode: Boolean,
     onEditItem: (String) -> Unit,
     onOpenFolder: (String) -> Unit,
+    onAsk: () -> Unit,
 ) {
     val page = home.activePage
     BoxWithConstraints(
@@ -363,6 +395,7 @@ private fun UnifiedGrid(
                         item = item,
                         content = content,
                         controller = controller,
+                        onAsk = onAsk,
                     )
                     is WorkspaceItemContent.App -> AppHomeItem(
                         item = item,
@@ -393,6 +426,7 @@ private fun LegacyActionItem(
     item: WorkspaceItem,
     content: WorkspaceItemContent.ActionTile,
     controller: LauncherController,
+    onAsk: () -> Unit,
 ) {
     val tile = remember(content.scene, content.legacyTileId) {
         DefaultWorkspace.tiles(content.scene).firstOrNull { it.id == content.legacyTileId }
@@ -406,38 +440,14 @@ private fun LegacyActionItem(
             }
             .clickable {
                 when (content.action) {
-                    TileAction.ASK -> {
-                        controller.switchHomePage(HomePage.PRO_DESK)
-                        controller.requestCommandFocus()
-                    }
-                    TileAction.APPS -> {
-                        controller.switchHomePage(HomePage.PRO_DESK)
-                        controller.openDrawer()
-                    }
-                    TileAction.CONTEXT -> {
-                        controller.switchHomePage(HomePage.PRO_DESK)
-                        controller.showContextDetails()
-                    }
-                    TileAction.PROVIDERS -> {
-                        controller.switchHomePage(HomePage.PRO_DESK)
-                        controller.openProviderChooser()
-                    }
-                    TileAction.FOCUS -> {
-                        controller.switchHomePage(HomePage.PRO_DESK)
-                        controller.openDrawer(SmartCollection.WORK)
-                    }
-                    TileAction.MEDIA -> {
-                        controller.switchHomePage(HomePage.PRO_DESK)
-                        controller.openDrawer(SmartCollection.MEDIA)
-                    }
-                    TileAction.COMMUNICATION -> {
-                        controller.switchHomePage(HomePage.PRO_DESK)
-                        controller.openDrawer(SmartCollection.COMMUNICATION)
-                    }
-                    TileAction.TOOLS -> {
-                        controller.switchHomePage(HomePage.PRO_DESK)
-                        controller.openControlCenter()
-                    }
+                    TileAction.ASK -> onAsk()
+                    TileAction.APPS -> controller.openDrawer()
+                    TileAction.CONTEXT -> controller.showContextDetails()
+                    TileAction.PROVIDERS -> controller.openProviderChooser()
+                    TileAction.FOCUS -> controller.openDrawer(SmartCollection.WORK)
+                    TileAction.MEDIA -> controller.openDrawer(SmartCollection.MEDIA)
+                    TileAction.COMMUNICATION -> controller.openDrawer(SmartCollection.COMMUNICATION)
+                    TileAction.TOOLS -> controller.openControlCenter()
                 }
             },
         colors = CardDefaults.cardColors(containerColor = RaisedSurface.copy(alpha = 0.91f)),
@@ -573,6 +583,46 @@ private fun UnifiedHomeDock(
                 Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
                 Spacer(Modifier.width(6.dp))
                 Text("Ask")
+            }
+        }
+    }
+}
+
+@Composable
+private fun UnifiedCommandDock(
+    text: String,
+    onTextChange: (String) -> Unit,
+    focusRequester: FocusRequester,
+    onSubmit: () -> Unit,
+    requestVoiceInput: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(22.dp),
+        color = DeepSurface.copy(alpha = 0.95f),
+        tonalElevation = 4.dp,
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            OutlinedTextField(
+                value = text,
+                onValueChange = onTextChange,
+                modifier = Modifier.weight(1f).focusRequester(focusRequester),
+                label = { Text("⌘ Ask") },
+                placeholder = { Text("App öffnen, Szene wechseln oder KI wählen") },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                keyboardActions = KeyboardActions(onSend = { onSubmit() }),
+                trailingIcon = {
+                    IconButton(onClick = requestVoiceInput) {
+                        Icon(Icons.Rounded.KeyboardVoice, contentDescription = "Spracheingabe")
+                    }
+                },
+            )
+            IconButton(onClick = onSubmit, enabled = text.isNotBlank()) {
+                Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = "Ausführen")
             }
         }
     }
@@ -831,5 +881,6 @@ private fun InlineFolderSheet(
     }
 }
 
+private const val MAX_COMMAND_LENGTH = 4_096
 private enum class AddTab { APPS, FOLDERS }
 private enum class PageDialogMode { MANAGE }
