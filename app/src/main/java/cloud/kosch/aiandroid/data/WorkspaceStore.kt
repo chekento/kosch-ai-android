@@ -14,15 +14,18 @@ import cloud.kosch.aiandroid.model.LauncherFolder
 import cloud.kosch.aiandroid.model.SceneId
 import cloud.kosch.aiandroid.model.TilePosition
 import cloud.kosch.aiandroid.model.WidgetSizePreset
+import cloud.kosch.aiandroid.model.WorkspaceDocument
 import org.json.JSONArray
 import org.json.JSONObject
 import java.nio.charset.StandardCharsets
 
 class WorkspaceStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
+    private val workspaceV7 = WorkspaceV7Persistence(preferences)
 
     init {
         migrateIfNeeded()
+        workspaceV7.migrateIfAbsent(loadScene(), loadPositions())
     }
 
     fun loadScene(): SceneId = runCatching {
@@ -30,7 +33,14 @@ class WorkspaceStore(context: Context) {
     }.getOrDefault(SceneId.AI)
 
     fun saveScene(scene: SceneId) {
-        preferences.edit().putString(KEY_SCENE, scene.name).apply()
+        val mirroredV7 = encodedLegacyMirror(
+            activeScene = scene,
+            positions = loadPositions(),
+        )
+        preferences.edit().apply {
+            putString(KEY_SCENE, scene.name)
+            mirroredV7?.let { putString(WorkspaceV7Persistence.KEY_WORKSPACE_DOCUMENT, it) }
+        }.apply()
     }
 
     fun loadHomePage(): HomePage = runCatching {
@@ -51,16 +61,29 @@ class WorkspaceStore(context: Context) {
         }
     }
 
+    fun loadWorkspaceDocument(): WorkspaceDocument =
+        workspaceV7.loadOrLegacyFallback(loadScene(), loadPositions())
+
     fun savePositions(
         scene: SceneId,
         positions: Map<String, TilePosition>,
     ) {
+        val effectivePositions = loadPositions().toMutableMap().apply {
+            val updatedScene = get(scene).orEmpty().toMutableMap()
+            positions.forEach { (id, position) -> updatedScene[id] = position.clamped() }
+            put(scene, updatedScene)
+        }
+        val mirroredV7 = encodedLegacyMirror(
+            activeScene = loadScene(),
+            positions = effectivePositions,
+        )
         preferences.edit().apply {
             positions.forEach { (id, position) ->
                 val prefix = positionPrefix(scene, id)
                 putFloat("${prefix}_x", position.x)
                 putFloat("${prefix}_y", position.y)
             }
+            mirroredV7?.let { putString(WorkspaceV7Persistence.KEY_WORKSPACE_DOCUMENT, it) }
         }.apply()
     }
 
@@ -291,6 +314,10 @@ class WorkspaceStore(context: Context) {
 
     fun restorePortableSnapshot(payload: ByteArray): BackupPreview {
         val snapshot = decodeSnapshot(payload)
+        val mirroredV7 = encodedLegacyMirror(
+            activeScene = snapshot.scene,
+            positions = snapshot.positions,
+        )
         preferences.edit().apply {
             putString(KEY_SCENE, snapshot.scene.name)
             putString(KEY_HOME_PAGE, snapshot.homePage.name)
@@ -309,6 +336,7 @@ class WorkspaceStore(context: Context) {
                     putFloat("${prefix}_y", position.y)
                 }
             }
+            mirroredV7?.let { putString(WorkspaceV7Persistence.KEY_WORKSPACE_DOCUMENT, it) }
         }.commit().also { committed ->
             check(committed) { "Workspace restore could not be committed" }
         }
@@ -337,6 +365,18 @@ class WorkspaceStore(context: Context) {
     private fun writeStringArray(key: String, values: List<String>) {
         preferences.edit().putString(key, JSONArray(values).toString()).apply()
     }
+
+    private fun encodedLegacyMirror(
+        activeScene: SceneId,
+        positions: Map<SceneId, Map<String, TilePosition>>,
+    ): String? = runCatching {
+        WorkspaceV7LegacyMirror.seedOrUpdate(
+            storedDocument = workspaceV7.loadStoredOrNull(),
+            hasStoredRawValue = workspaceV7.hasStoredValue(),
+            activeScene = activeScene,
+            positions = positions,
+        )?.let(WorkspaceDocumentCodec::encode)
+    }.getOrNull()
 
     private fun decodeSnapshot(payload: ByteArray): DecodedSnapshot {
         require(payload.isNotEmpty()) { "Backup ist leer" }
