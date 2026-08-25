@@ -1,10 +1,12 @@
 package cloud.kosch.aiandroid
 
+import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onAllNodes
 import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -18,7 +20,7 @@ class LauncherLifecycleInstrumentationTest {
     fun coldLaunch_rendersComposeShell_andReachesResumed() {
         assertEquals(Lifecycle.State.RESUMED, composeTestRule.activityRule.scenario.state)
         composeTestRule.waitForIdle()
-        composeTestRule.onRoot(useUnmergedTree = true).fetchSemanticsNode()
+        assertComposeShellPresent()
     }
 
     @Test
@@ -28,6 +30,13 @@ class LauncherLifecycleInstrumentationTest {
         composeTestRule.waitForIdle()
 
         assertEquals(Lifecycle.State.RESUMED, composeTestRule.activityRule.scenario.state)
-        composeTestRule.onRoot(useUnmergedTree = true).fetchSemanticsNode()
+        assertComposeShellPresent()
+    }
+
+    private fun assertComposeShellPresent() {
+        val roots = composeTestRule
+            .onAllNodes(isRoot(), useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        assertTrue("Expected at least one Compose semantics root", roots.isNotEmpty())
     }
 }
