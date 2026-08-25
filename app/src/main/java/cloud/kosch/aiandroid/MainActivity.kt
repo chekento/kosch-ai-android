@@ -31,8 +31,8 @@ import cloud.kosch.aiandroid.system.DocumentGrantManager
 import cloud.kosch.aiandroid.system.ProfessionalShortcut
 import cloud.kosch.aiandroid.system.ProfessionalShortcutResolver
 import cloud.kosch.aiandroid.system.WidgetHostController
+import cloud.kosch.aiandroid.ui.DragDropWorkspaceHomeScreen
 import cloud.kosch.aiandroid.ui.LauncherRoot
-import cloud.kosch.aiandroid.ui.UnifiedWorkspaceHomeScreen
 import cloud.kosch.aiandroid.ui.components.CompanionFace
 import cloud.kosch.aiandroid.ui.theme.KoSchLauncherTheme
 import java.time.LocalDate
@@ -226,7 +226,7 @@ class MainActivity : ComponentActivity() {
                     val unifiedHomeVisible = unifiedHomeSelected && !legacyOverlayVisible
 
                     if (unifiedHomeVisible) {
-                        UnifiedWorkspaceHomeScreen(
+                        DragDropWorkspaceHomeScreen(
                             controller = controller,
                             home = launcherViewModel.homeWorkspace,
                             requestVoiceInput = ::requestVoiceInput,
