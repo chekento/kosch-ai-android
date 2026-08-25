@@ -48,6 +48,19 @@ android {
 
     testOptions {
         unitTests.isIncludeAndroidResources = false
+        animationsDisabled = true
+
+        managedDevices {
+            localDevices {
+                create("pixel2Api36") {
+                    device = "Pixel 2"
+                    apiLevel = 36
+                    systemImageSource = "aosp"
+                    require64Bit = true
+                    testedAbi = "x86_64"
+                }
+            }
+        }
     }
 }
 
@@ -67,6 +80,15 @@ dependencies {
     implementation(libs.androidx.core.ktx)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 
     testImplementation(libs.junit)
+
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
+    androidTestImplementation(libs.androidx.test.rules)
+    androidTestImplementation(libs.androidx.test.espresso.core)
 }
