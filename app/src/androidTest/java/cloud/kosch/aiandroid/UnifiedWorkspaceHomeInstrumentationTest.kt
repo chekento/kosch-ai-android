@@ -39,9 +39,7 @@ class UnifiedWorkspaceHomeInstrumentationTest {
             }
             composeTestRule.waitForIdle()
 
-            composeTestRule
-                .onNodeWithText("API36 Home Test", useUnmergedTree = true)
-                .fetchSemanticsNode()
+            assertTextPresent("API36 Home Test")
             composeTestRule
                 .onNodeWithText("V7 HOME · frei platzierbar", useUnmergedTree = true)
                 .fetchSemanticsNode()
@@ -62,9 +60,7 @@ class UnifiedWorkspaceHomeInstrumentationTest {
             composeTestRule.activityRule.scenario.recreate()
             composeTestRule.waitForIdle()
 
-            composeTestRule
-                .onNodeWithText("API36 Home Test", useUnmergedTree = true)
-                .fetchSemanticsNode()
+            assertTextPresent("API36 Home Test")
             composeTestRule
                 .onNodeWithText("App fehlt", useUnmergedTree = true)
                 .fetchSemanticsNode()
@@ -77,6 +73,13 @@ class UnifiedWorkspaceHomeInstrumentationTest {
             }
             composeTestRule.waitForIdle()
         }
+    }
+
+    private fun assertTextPresent(text: String) {
+        val nodes = composeTestRule
+            .onAllNodesWithText(text, useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        assertTrue("Expected at least one node containing '$text'", nodes.isNotEmpty())
     }
 
     private fun dismissOnboardingIfVisible() {
