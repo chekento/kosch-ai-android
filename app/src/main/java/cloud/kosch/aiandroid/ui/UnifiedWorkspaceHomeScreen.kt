@@ -205,7 +205,7 @@ fun UnifiedWorkspaceHomeScreen(
                 )
                 UnifiedHomeDock(
                     controller = controller,
-                    onOpenApps = controller::openDrawer,
+                    onOpenApps = { controller.openDrawer() },
                     onAsk = {
                         askFocusRequester.requestFocus()
                         keyboardController?.show()
