@@ -31,7 +31,9 @@ class AssistantAssetManifestTest {
         AssistantVisualState.entries
             .filterNot { it == AssistantVisualState.DISABLED }
             .forEach { state ->
-                val body = AssistantAssetCatalog.bodyFile(state)
+                val body = requireNotNull(AssistantAssetCatalog.bodyFile(state)) {
+                    "Non-disabled state has no body mapping: $state"
+                }
                 assertTrue("Missing body mapping for $state: $body", body in manifest.bodyPoseFiles)
                 assertTrue(
                     "Missing eye mapping for $state",
