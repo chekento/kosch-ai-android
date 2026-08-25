@@ -10,6 +10,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.kosch.aiandroid.data.WorkspaceStore
 import cloud.kosch.aiandroid.model.HomePage
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -21,7 +22,7 @@ class UnifiedWorkspaceHomeInstrumentationTest {
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun userHomePage_rendersCompanionAndSurvivesActivityRecreation() {
+    fun userHomePage_rendersCompanionKeepsHomeAcrossDrawerAndSurvivesRecreation() {
         composeTestRule.waitForIdle()
         dismissOnboardingIfVisible()
 
@@ -56,6 +57,24 @@ class UnifiedWorkspaceHomeInstrumentationTest {
                 .onAllNodesWithContentDescription("KoSch Assistant öffnen", useUnmergedTree = true)
                 .fetchSemanticsNodes()
             assertTrue("Expected Assistant companion on unified Home", assistantNodes.isNotEmpty())
+
+            composeTestRule
+                .onNodeWithContentDescription("Alle Apps", useUnmergedTree = true)
+                .performClick()
+            composeTestRule.waitForIdle()
+
+            val openDrawerViewModel = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
+            assertEquals(HomePage.WORKSPACE, openDrawerViewModel.controller.homePage)
+            composeTestRule
+                .onNodeWithText("App-Raum", useUnmergedTree = true)
+                .fetchSemanticsNode()
+
+            composeTestRule.runOnUiThread {
+                ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
+                    .controller.closeDrawer()
+            }
+            composeTestRule.waitForIdle()
+            assertTextPresent("API36 Home Test")
 
             composeTestRule.activityRule.scenario.recreate()
             composeTestRule.waitForIdle()
