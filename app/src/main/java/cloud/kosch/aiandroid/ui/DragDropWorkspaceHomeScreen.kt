@@ -31,7 +31,6 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
@@ -45,6 +44,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,7 +66,6 @@ import cloud.kosch.aiandroid.LauncherController
 import cloud.kosch.aiandroid.WorkspaceHomeController
 import cloud.kosch.aiandroid.model.AppProfile
 import cloud.kosch.aiandroid.model.LauncherFolder
-import cloud.kosch.aiandroid.model.WorkspaceCellBounds
 import cloud.kosch.aiandroid.model.WorkspaceItem
 import cloud.kosch.aiandroid.model.WorkspaceItemContent
 import cloud.kosch.aiandroid.model.WorkspacePageEditor
@@ -345,6 +344,8 @@ private fun DraggableArrangeItem(
             )
         }
     }
+    val latestCrossTarget by rememberUpdatedState(crossTarget)
+    val latestPreviewBounds by rememberUpdatedState(previewBounds)
 
     Box(Modifier.fillMaxSize()) {
         if (dragging && previewBounds != null && crossTarget == null) {
@@ -395,8 +396,8 @@ private fun DraggableArrangeItem(
                             dragging = false
                         },
                         onDragEnd = {
-                            val target = crossTarget
-                            val bounds = previewBounds
+                            val target = latestCrossTarget
+                            val bounds = latestPreviewBounds
                             if (bounds != null) {
                                 if (target == null) {
                                     home.moveItemTo(item.id, bounds)
