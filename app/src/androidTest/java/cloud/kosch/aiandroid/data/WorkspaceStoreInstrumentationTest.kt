@@ -22,11 +22,11 @@ class WorkspaceStoreInstrumentationTest {
         val originalHomePage = store.loadHomePage()
 
         try {
-            store.saveScene(SceneId.FOCUS)
+            store.saveScene(SceneId.WORK)
             store.saveHomePage(HomePage.SMART_SPACE)
 
             val reloaded = WorkspaceStore(context)
-            assertEquals(SceneId.FOCUS, reloaded.loadScene())
+            assertEquals(SceneId.WORK, reloaded.loadScene())
             assertEquals(HomePage.SMART_SPACE, reloaded.loadHomePage())
         } finally {
             store.saveScene(originalScene)
