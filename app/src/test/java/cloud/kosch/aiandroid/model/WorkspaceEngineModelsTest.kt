@@ -48,6 +48,33 @@ class WorkspaceEngineModelsTest {
     }
 
     @Test
+    fun portableContent_rejectsBlankReferencesButAllowsWidgetRemapPlaceholder() {
+        var appRejected = false
+        var folderRejected = false
+        var widgetRejected = false
+        try {
+            WorkspaceItemContent.App("   ")
+        } catch (_: IllegalArgumentException) {
+            appRejected = true
+        }
+        try {
+            WorkspaceItemContent.Folder("")
+        } catch (_: IllegalArgumentException) {
+            folderRejected = true
+        }
+        try {
+            WorkspaceItemContent.Widget("  ")
+        } catch (_: IllegalArgumentException) {
+            widgetRejected = true
+        }
+
+        assertTrue(appRejected)
+        assertTrue(folderRejected)
+        assertTrue(widgetRejected)
+        assertEquals(null, WorkspaceItemContent.Widget(null).providerComponent)
+    }
+
+    @Test
     fun normalizedDocument_recoversInvalidActivePageAndDeduplicatesLocalIds() {
         val page = WorkspacePage(
             id = "page:a",
