@@ -57,6 +57,7 @@ android {
                     apiLevel = 36
                     systemImageSource = "aosp"
                     require64Bit = true
+                    testedAbi = "x86_64"
                 }
             }
         }
