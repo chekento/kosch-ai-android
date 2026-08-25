@@ -702,38 +702,42 @@ class LauncherController(context: Context) {
                     ContactsContract.Data.MIMETYPE,
                     ContactsContract.Data.DATA1,
                 )
-                appContext.contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
-                    val nameIndex = cursor.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY)
-                    val mimeIndex = cursor.getColumnIndex(ContactsContract.Data.MIMETYPE)
-                    val dataIndex = cursor.getColumnIndex(ContactsContract.Data.DATA1)
+                val cursor = appContext.contentResolver.query(uri, projection, null, null, null)
+                    ?: error("Kontakt konnte nicht gelesen werden")
+                cursor.use {
+                    val nameIndex = it.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY)
+                    val mimeIndex = it.getColumnIndex(ContactsContract.Data.MIMETYPE)
+                    val dataIndex = it.getColumnIndex(ContactsContract.Data.DATA1)
                     var selected: SelectedContact? = null
-                    while (cursor.moveToNext() && selected == null) {
-                        val mime = mimeIndex.takeIf { it >= 0 }?.let(cursor::getString)
-                        val value = dataIndex.takeIf { it >= 0 }?.let(cursor::getString).orEmpty()
+                    while (it.moveToNext() && selected == null) {
+                        val mime = mimeIndex.takeIf { index -> index >= 0 }?.let(it::getString)
+                        val value = dataIndex.takeIf { index -> index >= 0 }?.let(it::getString).orEmpty()
                         if ((mime == null || mime == ContactsContract.CommonDataKinds.Phone.CONTENT_ITEM_TYPE) &&
                             PhoneNumberParser.sanitize(value) != null
                         ) {
                             selected = SelectedContact(
-                                displayName = nameIndex.takeIf { it >= 0 }?.let(cursor::getString)
+                                displayName = nameIndex.takeIf { index -> index >= 0 }?.let(it::getString)
                                     ?.trim().orEmpty().ifBlank { "Ausgewählter Kontakt" },
                                 phoneNumber = value,
                             )
                         }
                     }
                     selected
-                } ?: error("Kontakt konnte nicht gelesen werden")
+                }
             }
             mainHandler.post {
-                result.onSuccess { contact ->
-                    if (contact == null) {
+                when (val resolution = cloud.kosch.aiandroid.ai.ContactPickSemantics.resolve(result)) {
+                    is cloud.kosch.aiandroid.ai.ContactPickResolution.Accepted -> {
+                        selectContact(resolution.contact)
+                    }
+                    cloud.kosch.aiandroid.ai.ContactPickResolution.Rejected -> {
                         audit(AuditAction.CONTACT_PICKER, AuditOutcome.REJECTED)
                         notice = "Der gewählte Kontakt enthält keine nutzbare Telefonnummer"
-                    } else {
-                        selectContact(contact)
                     }
-                }.onFailure {
-                    audit(AuditAction.CONTACT_PICKER, AuditOutcome.FAILED)
-                    notice = "Kontakt konnte nicht sicher übernommen werden"
+                    is cloud.kosch.aiandroid.ai.ContactPickResolution.Failed -> {
+                        audit(AuditAction.CONTACT_PICKER, AuditOutcome.FAILED)
+                        notice = "Kontakt konnte nicht sicher übernommen werden"
+                    }
                 }
             }
         }
