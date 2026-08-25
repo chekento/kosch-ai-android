@@ -64,6 +64,9 @@ class WorkspaceStore(context: Context) {
     fun loadWorkspaceDocument(): WorkspaceDocument =
         workspaceV7.loadOrLegacyFallback(loadScene(), loadPositions())
 
+    fun saveWorkspaceDocument(document: WorkspaceDocument): Boolean =
+        workspaceV7.save(document.normalized())
+
     fun savePositions(
         scene: SceneId,
         positions: Map<String, TilePosition>,
@@ -303,6 +306,7 @@ class WorkspaceStore(context: Context) {
             .put("folders", foldersJson(folders()))
             .put("positions", positionsJson)
             .put("ink", inkJson(inkStrokes()))
+            .put("workspaceV7", WorkspaceDocumentCodec.toJson(loadWorkspaceDocument()))
             .put(
                 "excluded",
                 JSONArray(listOf("widgetHostIds", "documentGrants", "credentials", "notificationData", "auditLog")),
@@ -314,10 +318,11 @@ class WorkspaceStore(context: Context) {
 
     fun restorePortableSnapshot(payload: ByteArray): BackupPreview {
         val snapshot = decodeSnapshot(payload)
-        val mirroredV7 = encodedLegacyMirror(
-            activeScene = snapshot.scene,
-            positions = snapshot.positions,
-        )
+        val encodedWorkspace = snapshot.workspaceDocument?.let(WorkspaceDocumentCodec::encode)
+            ?: encodedLegacyMirror(
+                activeScene = snapshot.scene,
+                positions = snapshot.positions,
+            )
         preferences.edit().apply {
             putString(KEY_SCENE, snapshot.scene.name)
             putString(KEY_HOME_PAGE, snapshot.homePage.name)
@@ -336,7 +341,7 @@ class WorkspaceStore(context: Context) {
                     putFloat("${prefix}_y", position.y)
                 }
             }
-            mirroredV7?.let { putString(WorkspaceV7Persistence.KEY_WORKSPACE_DOCUMENT, it) }
+            encodedWorkspace?.let { putString(WorkspaceV7Persistence.KEY_WORKSPACE_DOCUMENT, it) }
         }.commit().also { committed ->
             check(committed) { "Workspace restore could not be committed" }
         }
@@ -403,7 +408,26 @@ class WorkspaceStore(context: Context) {
         val folders = parseFolders(root.optJSONArray("folders"))
         val positions = parsePositions(root.optJSONObject("positions"))
         val ink = parseInk(root.optJSONArray("ink"))
-        return DecodedSnapshot(scene, homePage, recent, pinned, hidden, usage, folders, positions, ink, createdAt)
+        val workspaceDocument = if (version >= 3) {
+            val workspaceJson = root.optJSONObject("workspaceV7")
+                ?: throw IllegalArgumentException("v7-Workspace fehlt im Backup")
+            WorkspaceDocumentCodec.decode(workspaceJson.toString())
+        } else {
+            null
+        }
+        return DecodedSnapshot(
+            scene,
+            homePage,
+            recent,
+            pinned,
+            hidden,
+            usage,
+            folders,
+            positions,
+            ink,
+            workspaceDocument,
+            createdAt,
+        )
     }
 
     private fun parseUsage(root: JSONObject?, createdAt: Long): Map<String, AppUsageSignal> {
@@ -624,7 +648,7 @@ class WorkspaceStore(context: Context) {
         const val MAX_TITLE_LENGTH = 80
         const val BACKUP_FORMAT = "cloud.kosch.workspace"
         const val MIN_BACKUP_VERSION = 1
-        const val BACKUP_VERSION = 2
+        const val BACKUP_VERSION = 3
         const val MAX_CLOCK_SKEW_MILLIS = 24L * 60L * 60L * 1_000L
     }
 
@@ -638,6 +662,7 @@ class WorkspaceStore(context: Context) {
         val folders: List<LauncherFolder>,
         val positions: Map<SceneId, Map<String, TilePosition>>,
         val inkStrokes: List<InkStroke>,
+        val workspaceDocument: WorkspaceDocument?,
         val createdAtEpochMillis: Long,
     ) {
         fun preview() = BackupPreview(
@@ -652,7 +677,7 @@ class WorkspaceStore(context: Context) {
             inkStrokeCount = inkStrokes.size,
             createdAtEpochMillis = createdAtEpochMillis,
             skippedItems = listOf(
-                "Widgets müssen wegen gerätegebundener Host-IDs neu hinzugefügt werden",
+                "Widget-Host-IDs bleiben gerätegebunden; portable Widget-Metadaten werden separat remapped",
                 "Dateifreigaben, Zugangsdaten, Benachrichtigungsdaten und Audit bleiben auf diesem Gerät",
             ),
         )
