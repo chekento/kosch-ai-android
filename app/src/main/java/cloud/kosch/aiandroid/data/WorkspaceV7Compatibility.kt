@@ -30,13 +30,13 @@ object WorkspaceV7Compatibility {
         val normalized = document.normalized()
         if (positions.isEmpty()) return normalized
         val pageId = WorkspaceStableIds.scenePage(scene)
-        val updatedPages = normalized.pages.map { page ->
-            if (page.id != pageId) return@map page
+        val updatedPages = normalized.pages.map pageLoop@{ page ->
+            if (page.id != pageId) return@pageLoop page
             page.copy(
-                items = page.items.map { item ->
-                    val actionTile = item.content as? WorkspaceItemContent.ActionTile ?: return@map item
-                    if (actionTile.scene != scene) return@map item
-                    val position = positions[actionTile.legacyTileId] ?: return@map item
+                items = page.items.map itemLoop@{ item ->
+                    val actionTile = item.content as? WorkspaceItemContent.ActionTile ?: return@itemLoop item
+                    if (actionTile.scene != scene) return@itemLoop item
+                    val position = positions[actionTile.legacyTileId] ?: return@itemLoop item
                     item.copy(
                         bounds = WorkspaceCellBounds.fromNormalizedTopLeft(
                             x = position.x,
