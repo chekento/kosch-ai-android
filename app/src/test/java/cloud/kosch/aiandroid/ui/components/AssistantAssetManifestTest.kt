@@ -85,13 +85,12 @@ class AssistantAssetManifestTest {
     }
 
     @Test
-    fun anotherPortalTheme_doesNotBelongToDefaultManifest() {
+    fun anotherPortalTheme_canCoexistWithoutBlockingDefaultManifest() {
         val anotherTheme = "assistant/common/fx/portal_professional_000.webp"
         val audit = manifest.audit(manifest.requiredPaths + anotherTheme)
 
-        // A different common theme may coexist and must be handled by its own manifest.
-        // Until manifest auditing is theme-scoped, this assertion protects against accidental activation.
-        assertFalse(audit.activationReady)
-        assertTrue(anotherTheme in audit.unexpectedPaths)
+        assertTrue(audit.exportComplete)
+        assertTrue(audit.unexpectedPaths.isEmpty())
+        assertFalse(audit.activationReady) // Default v1 is still intentionally uncalibrated.
     }
 }
