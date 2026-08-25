@@ -17,6 +17,12 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.data.PendingDocumentKind
 import cloud.kosch.aiandroid.data.PendingDocumentStore
 import cloud.kosch.aiandroid.model.HomePage
@@ -27,6 +33,7 @@ import cloud.kosch.aiandroid.system.ProfessionalShortcutResolver
 import cloud.kosch.aiandroid.system.WidgetHostController
 import cloud.kosch.aiandroid.ui.LauncherRoot
 import cloud.kosch.aiandroid.ui.UnifiedWorkspaceHomeScreen
+import cloud.kosch.aiandroid.ui.components.CompanionFace
 import cloud.kosch.aiandroid.ui.theme.KoSchLauncherTheme
 import java.time.LocalDate
 
@@ -201,28 +208,40 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             KoSchLauncherTheme {
-                if (controller.homePage == HomePage.WORKSPACE && !controller.onboardingVisible) {
-                    UnifiedWorkspaceHomeScreen(
-                        controller = controller,
-                        home = launcherViewModel.homeWorkspace,
-                    )
-                } else {
-                    LauncherRoot(
-                        controller = controller,
-                        requestHomeRole = ::requestHomeRole,
-                        requestVoiceInput = ::requestVoiceInput,
-                        requestDocument = ::requestDocument,
-                        requestFileWorkspace = ::requestFileWorkspace,
-                        requestContact = ::requestContact,
-                        requestWidget = ::requestWidget,
-                        requestBackupExport = ::requestBackupExport,
-                        requestBackupImport = ::requestBackupImport,
-                        requestAuditExport = ::requestAuditExport,
-                        requestInkExport = ::requestInkExport,
-                        createWidgetView = widgetHostController::createView,
-                        deleteWidget = ::deleteWidget,
-                        forgetDocument = ::forgetDocument,
-                    )
+                Box {
+                    val unifiedHomeVisible = controller.homePage == HomePage.WORKSPACE && !controller.onboardingVisible
+                    if (unifiedHomeVisible) {
+                        UnifiedWorkspaceHomeScreen(
+                            controller = controller,
+                            home = launcherViewModel.homeWorkspace,
+                        )
+                    } else {
+                        LauncherRoot(
+                            controller = controller,
+                            requestHomeRole = ::requestHomeRole,
+                            requestVoiceInput = ::requestVoiceInput,
+                            requestDocument = ::requestDocument,
+                            requestFileWorkspace = ::requestFileWorkspace,
+                            requestContact = ::requestContact,
+                            requestWidget = ::requestWidget,
+                            requestBackupExport = ::requestBackupExport,
+                            requestBackupImport = ::requestBackupImport,
+                            requestAuditExport = ::requestAuditExport,
+                            requestInkExport = ::requestInkExport,
+                            createWidgetView = widgetHostController::createView,
+                            deleteWidget = ::deleteWidget,
+                            forgetDocument = ::forgetDocument,
+                        )
+                    }
+                    if (unifiedHomeVisible) {
+                        CompanionFace(
+                            onClick = ::requestVoiceInput,
+                            modifier = Modifier
+                                .align(Alignment.BottomEnd)
+                                .padding(end = 18.dp, bottom = 88.dp)
+                                .size(width = 76.dp, height = 68.dp),
+                        )
+                    }
                 }
             }
         }
@@ -265,15 +284,15 @@ class MainActivity : ComponentActivity() {
         ) ?: return super.onKeyShortcut(keyCode, event)
         controller.closeTopSurface()
         when (shortcut) {
-            ProfessionalShortcut.COMMAND -> controller.requestCommandFocus()
-            ProfessionalShortcut.APPS -> controller.openDrawer()
+            ProfessionalShortcut.COMMAND -> routeLegacySurface(controller::requestCommandFocus)
+            ProfessionalShortcut.APPS -> routeLegacySurface(controller::openDrawer)
             ProfessionalShortcut.PRO_DESK -> controller.openProDesk()
-            ProfessionalShortcut.CONTROL_CENTER -> controller.openControlCenter()
-            ProfessionalShortcut.PHONE -> controller.openPhone()
+            ProfessionalShortcut.CONTROL_CENTER -> routeLegacySurface(controller::openControlCenter)
+            ProfessionalShortcut.PHONE -> routeLegacySurface(controller::openPhone)
             ProfessionalShortcut.FILES -> requestDocument()
-            ProfessionalShortcut.FILE_WORKSPACE -> controller.openFileWorkspace()
-            ProfessionalShortcut.BACKUP -> controller.openBackup()
-            ProfessionalShortcut.AUDIT -> controller.openAudit()
+            ProfessionalShortcut.FILE_WORKSPACE -> routeLegacySurface(controller::openFileWorkspace)
+            ProfessionalShortcut.BACKUP -> routeLegacySurface(controller::openBackup)
+            ProfessionalShortcut.AUDIT -> routeLegacySurface(controller::openAudit)
             ProfessionalShortcut.PEN_SPACE -> controller.openPenSpace()
         }
         return true
@@ -323,6 +342,13 @@ class MainActivity : ComponentActivity() {
         pendingAuditExportToken?.let { outState.putString(STATE_PENDING_AUDIT_EXPORT, it) }
         pendingInkExportToken?.let { outState.putString(STATE_PENDING_INK_EXPORT, it) }
         super.onSaveInstanceState(outState)
+    }
+
+    private fun routeLegacySurface(action: () -> Unit) {
+        if (controller.homePage == HomePage.WORKSPACE) {
+            controller.switchHomePage(HomePage.PRO_DESK)
+        }
+        action()
     }
 
     private fun requestHomeRole() {
