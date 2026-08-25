@@ -55,7 +55,7 @@ jobs:
           test -s app/src/main/baseline-prof.txt
 
       - name: Verify, lint and assemble
-        run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug assembleRelease --stacktrace
+        run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug assembleRelease assembleDebugAndroidTest --stacktrace
 
       - name: Verify packaged permission budget
         run: |
@@ -74,10 +74,27 @@ jobs:
           sha256sum KoSch-AI-Launcher-M2.5-debug.apk > KoSch-AI-Launcher-M2.5-debug.apk.sha256
           sha256sum -c KoSch-AI-Launcher-M2.5-debug.apk.sha256
 
+      - name: Prepare instrumentation test package
+        run: |
+          mkdir -p dist-instrumentation
+          cp app/build/outputs/apk/debug/app-debug.apk dist-instrumentation/KoSch-AI-Launcher-debug.apk
+          cp app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk dist-instrumentation/KoSch-AI-Launcher-debug-androidTest.apk
+          cd dist-instrumentation
+          sha256sum KoSch-AI-Launcher-debug.apk KoSch-AI-Launcher-debug-androidTest.apk > SHA256SUMS
+          sha256sum -c SHA256SUMS
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: kosch-ai-launcher-m2.5-debug
           path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload instrumentation package
+        uses: actions/upload-artifact@v4
+        with:
+          name: kosch-ai-launcher-instrumentation
+          path: dist-instrumentation/
           if-no-files-found: error
           retention-days: 14
