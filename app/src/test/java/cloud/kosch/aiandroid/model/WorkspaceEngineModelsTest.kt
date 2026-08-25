@@ -8,6 +8,18 @@ import org.junit.Test
 
 class WorkspaceEngineModelsTest {
     @Test
+    fun grid_rejectsUnboundedDimensions() {
+        var failed = false
+        try {
+            WorkspaceGridSpec(columns = 65, rows = 12)
+        } catch (_: IllegalArgumentException) {
+            failed = true
+        }
+
+        assertTrue(failed)
+    }
+
+    @Test
     fun boundsClamp_spansAndCoordinatesStayInsideGrid() {
         val grid = WorkspaceGridSpec(columns = 12, rows = 10)
 
@@ -56,7 +68,6 @@ class WorkspaceEngineModelsTest {
         )
 
         val normalized = WorkspaceDocument(
-            schemaVersion = 3,
             activePageId = "missing",
             pages = listOf(page, page.copy(title = "duplicate")),
         ).normalized()
@@ -67,6 +78,22 @@ class WorkspaceEngineModelsTest {
         assertEquals("Home 1", normalized.pages.single().title)
         assertEquals(1, normalized.pages.single().items.size)
         assertEquals(WorkspaceCellBounds(0, 10, 12, 2), normalized.pages.single().items.single().bounds)
+    }
+
+    @Test
+    fun normalizedDocument_rejectsUnsupportedSchemaInsteadOfDowngradingIt() {
+        var failed = false
+        try {
+            WorkspaceDocument(
+                schemaVersion = WORKSPACE_SCHEMA_VERSION + 1,
+                activePageId = "page:a",
+                pages = listOf(WorkspacePage("page:a", "A", 0)),
+            ).normalized()
+        } catch (_: IllegalArgumentException) {
+            failed = true
+        }
+
+        assertTrue(failed)
     }
 
     @Test
