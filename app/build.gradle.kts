@@ -49,6 +49,17 @@ android {
     testOptions {
         unitTests.isIncludeAndroidResources = false
         animationsDisabled = true
+
+        managedDevices {
+            localDevices {
+                create("pixel2Api36") {
+                    device = "Pixel 2"
+                    apiLevel = 36
+                    systemImageSource = "aosp"
+                    require64Bit = true
+                }
+            }
+        }
     }
 }
 
