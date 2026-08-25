@@ -5,6 +5,7 @@ import cloud.kosch.aiandroid.model.TilePosition
 import cloud.kosch.aiandroid.model.WorkspaceCellBounds
 import cloud.kosch.aiandroid.model.WorkspaceItem
 import cloud.kosch.aiandroid.model.WorkspaceItemContent
+import cloud.kosch.aiandroid.model.WorkspacePage
 import cloud.kosch.aiandroid.model.WorkspaceStableIds
 import cloud.kosch.aiandroid.model.WorkspaceV7Migration
 import org.junit.Assert.assertEquals
@@ -75,5 +76,36 @@ class WorkspaceV7LegacyMirrorTest {
             .items
             .single { (it.content as? WorkspaceItemContent.ActionTile)?.legacyTileId == "ask" }
         assertEquals(WorkspaceCellBounds(6, 6, 6, 6), ask.bounds)
+    }
+
+    @Test
+    fun fullLegacyState_doesNotHijackActiveUserHomePage() {
+        val initial = WorkspaceV7Migration.fromLegacyScenePositions(SceneId.AI, emptyMap())
+        val customPage = WorkspacePage(
+            id = "page:user:desk",
+            title = "Desk",
+            order = initial.pages.size,
+            sceneAdapter = null,
+            items = listOf(
+                WorkspaceItem(
+                    id = "item:user:app",
+                    bounds = WorkspaceCellBounds(0, 0, 2, 2),
+                    content = WorkspaceItemContent.App("0:cloud.kosch.custom"),
+                ),
+            ),
+        )
+        val enriched = initial.copy(
+            activePageId = customPage.id,
+            pages = initial.pages + customPage,
+        ).normalized()
+
+        val updated = WorkspaceV7LegacyMirror.fullLegacyState(
+            document = enriched,
+            activeScene = SceneId.WORK,
+            positions = emptyMap(),
+        )
+
+        assertEquals(customPage.id, updated.activePageId)
+        assertEquals(customPage, updated.pages.first { it.id == customPage.id })
     }
 }
