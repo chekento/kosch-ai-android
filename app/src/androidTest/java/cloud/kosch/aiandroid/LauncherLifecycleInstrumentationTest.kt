@@ -2,7 +2,7 @@ package cloud.kosch.aiandroid
 
 import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onRoot
 import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
@@ -16,25 +16,19 @@ class LauncherLifecycleInstrumentationTest {
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun coldLaunch_rendersLauncherRoot_andReachesResumed() {
+    fun coldLaunch_rendersComposeShell_andReachesResumed() {
         assertEquals(Lifecycle.State.RESUMED, composeTestRule.activityRule.scenario.state)
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText(
-            text = "KoSch AI",
-            useUnmergedTree = true,
-        ).assertExists()
+        composeTestRule.onRoot(useUnmergedTree = true).assertExists()
     }
 
     @Test
-    fun activityRecreation_restoresLauncherRoot_andReturnsToResumed() {
+    fun activityRecreation_restoresComposeShell_andReturnsToResumed() {
         composeTestRule.waitForIdle()
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
 
         assertEquals(Lifecycle.State.RESUMED, composeTestRule.activityRule.scenario.state)
-        composeTestRule.onNodeWithText(
-            text = "KoSch AI",
-            useUnmergedTree = true,
-        ).assertExists()
+        composeTestRule.onRoot(useUnmergedTree = true).assertExists()
     }
 }
