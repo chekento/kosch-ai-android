@@ -33,13 +33,10 @@ import kotlinx.coroutines.withContext
 /**
  * Assistant avatar boundary.
  *
- * The historical name is retained to keep existing call sites stable. When a valid matrix-defined
- * body WebP exists in `src/main/assets/assistant/...`, it is rendered. Missing, malformed or
- * over-budget assets transparently fall back to the proven Canvas avatar.
- *
- * Eye and mouth files are already decoded by [AssistantAssetRuntime], but are intentionally not
- * composited in this stage: their 128 px face-anchor still needs calibration against the exported
- * 384 px body masters. Rendering a guessed anchor would be worse than the stable fallback.
+ * The historical name is retained to keep existing call sites stable. Matrix-defined sprites are
+ * activated only after the complete v1 pack is present and its eye/mouth placement has been measured
+ * against the exported 384 px body canvas. Partial, malformed, oversized, uncalibrated or missing
+ * packs stay on the proven Canvas avatar.
  */
 @Composable
 fun AssistantAvatarFallback(
@@ -50,12 +47,21 @@ fun AssistantAvatarFallback(
     val runtime = remember(context.applicationContext) {
         AssistantAssetRuntime(context.applicationContext)
     }
+    val inspector = remember(context.applicationContext) {
+        AssistantAssetPackInspector(context.applicationContext)
+    }
     val sprite by produceState<AssistantSpriteFrame?>(
         initialValue = null,
         key1 = runtime,
         key2 = state,
     ) {
-        value = withContext(Dispatchers.IO) { runtime.loadState(state) }
+        value = withContext(Dispatchers.IO) {
+            if (inspector.auditDefault().activationReady) {
+                runtime.loadState(state)
+            } else {
+                null
+            }
+        }
     }
 
     val body = sprite?.body
