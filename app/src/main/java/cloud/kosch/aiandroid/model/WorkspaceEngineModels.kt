@@ -3,6 +3,7 @@ package cloud.kosch.aiandroid.model
 import kotlin.math.roundToInt
 
 const val WORKSPACE_SCHEMA_VERSION = 7
+private const val MAX_WORKSPACE_GRID_EXTENT = 64
 
 /** Logical grid stored independently from physical pixels so layouts remain deterministic across windows. */
 data class WorkspaceGridSpec(
@@ -10,8 +11,8 @@ data class WorkspaceGridSpec(
     val rows: Int = 12,
 ) {
     init {
-        require(columns > 0) { "Workspace grid needs at least one column" }
-        require(rows > 0) { "Workspace grid needs at least one row" }
+        require(columns in 1..MAX_WORKSPACE_GRID_EXTENT) { "Workspace grid column count is out of range" }
+        require(rows in 1..MAX_WORKSPACE_GRID_EXTENT) { "Workspace grid row count is out of range" }
     }
 }
 
@@ -112,6 +113,9 @@ data class WorkspaceDocument(
     val pages: List<WorkspacePage>,
 ) {
     fun normalized(): WorkspaceDocument {
+        require(schemaVersion == WORKSPACE_SCHEMA_VERSION) {
+            "Unsupported workspace schema $schemaVersion"
+        }
         val seenItemIds = mutableSetOf<String>()
         val uniquePages = pages
             .filter { it.id.isNotBlank() }
@@ -130,7 +134,6 @@ data class WorkspaceDocument(
         val validActive = activePageId.takeIf { candidate -> uniquePages.any { it.id == candidate } }
             ?: uniquePages.first().id
         return copy(
-            schemaVersion = WORKSPACE_SCHEMA_VERSION,
             activePageId = validActive,
             pages = uniquePages,
         )
