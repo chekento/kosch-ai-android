@@ -285,7 +285,7 @@ class MainActivity : ComponentActivity() {
         controller.closeTopSurface()
         when (shortcut) {
             ProfessionalShortcut.COMMAND -> routeLegacySurface(controller::requestCommandFocus)
-            ProfessionalShortcut.APPS -> routeLegacySurface(controller::openDrawer)
+            ProfessionalShortcut.APPS -> routeLegacySurface { controller.openDrawer() }
             ProfessionalShortcut.PRO_DESK -> controller.openProDesk()
             ProfessionalShortcut.CONTROL_CENTER -> routeLegacySurface(controller::openControlCenter)
             ProfessionalShortcut.PHONE -> routeLegacySurface(controller::openPhone)
