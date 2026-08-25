@@ -19,12 +19,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import cloud.kosch.aiandroid.data.PendingDocumentKind
 import cloud.kosch.aiandroid.data.PendingDocumentStore
+import cloud.kosch.aiandroid.model.HomePage
 import cloud.kosch.aiandroid.system.HomeRoleController
 import cloud.kosch.aiandroid.system.DocumentGrantManager
 import cloud.kosch.aiandroid.system.ProfessionalShortcut
 import cloud.kosch.aiandroid.system.ProfessionalShortcutResolver
 import cloud.kosch.aiandroid.system.WidgetHostController
 import cloud.kosch.aiandroid.ui.LauncherRoot
+import cloud.kosch.aiandroid.ui.UnifiedWorkspaceHomeScreen
 import cloud.kosch.aiandroid.ui.theme.KoSchLauncherTheme
 import java.time.LocalDate
 
@@ -199,22 +201,29 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             KoSchLauncherTheme {
-                LauncherRoot(
-                    controller = controller,
-                    requestHomeRole = ::requestHomeRole,
-                    requestVoiceInput = ::requestVoiceInput,
-                    requestDocument = ::requestDocument,
-                    requestFileWorkspace = ::requestFileWorkspace,
-                    requestContact = ::requestContact,
-                    requestWidget = ::requestWidget,
-                    requestBackupExport = ::requestBackupExport,
-                    requestBackupImport = ::requestBackupImport,
-                    requestAuditExport = ::requestAuditExport,
-                    requestInkExport = ::requestInkExport,
-                    createWidgetView = widgetHostController::createView,
-                    deleteWidget = ::deleteWidget,
-                    forgetDocument = ::forgetDocument,
-                )
+                if (controller.homePage == HomePage.WORKSPACE && !controller.onboardingVisible) {
+                    UnifiedWorkspaceHomeScreen(
+                        controller = controller,
+                        home = launcherViewModel.homeWorkspace,
+                    )
+                } else {
+                    LauncherRoot(
+                        controller = controller,
+                        requestHomeRole = ::requestHomeRole,
+                        requestVoiceInput = ::requestVoiceInput,
+                        requestDocument = ::requestDocument,
+                        requestFileWorkspace = ::requestFileWorkspace,
+                        requestContact = ::requestContact,
+                        requestWidget = ::requestWidget,
+                        requestBackupExport = ::requestBackupExport,
+                        requestBackupImport = ::requestBackupImport,
+                        requestAuditExport = ::requestAuditExport,
+                        requestInkExport = ::requestInkExport,
+                        createWidgetView = widgetHostController::createView,
+                        deleteWidget = ::deleteWidget,
+                        forgetDocument = ::forgetDocument,
+                    )
+                }
             }
         }
     }
