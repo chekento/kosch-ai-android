@@ -59,21 +59,26 @@ fun CompanionFace(
 
     var ttsEngine by remember { mutableStateOf<TextToSpeech?>(null) }
     var ttsReady by remember { mutableStateOf(false) }
+    val speechRuntimeEnabled = assistant?.settings?.enabled == true && assistant.settings.speechOutputEnabled
 
-    DisposableEffect(context, assistant) {
-        if (assistant == null) {
+    DisposableEffect(context, assistant, speechRuntimeEnabled) {
+        if (assistant == null || !speechRuntimeEnabled) {
+            ttsEngine = null
+            ttsReady = false
             onDispose { }
         } else {
             var engineReference: TextToSpeech? = null
             val engine = TextToSpeech(context.applicationContext) { status ->
-                val current = engineReference ?: return@TextToSpeech
-                val ready = if (status == TextToSpeech.SUCCESS) {
-                    val language = current.setLanguage(Locale.getDefault())
-                    language != TextToSpeech.LANG_MISSING_DATA && language != TextToSpeech.LANG_NOT_SUPPORTED
-                } else {
-                    false
+                val current = engineReference
+                if (current != null) {
+                    val ready = if (status == TextToSpeech.SUCCESS) {
+                        val language = current.setLanguage(Locale.getDefault())
+                        language != TextToSpeech.LANG_MISSING_DATA && language != TextToSpeech.LANG_NOT_SUPPORTED
+                    } else {
+                        false
+                    }
+                    mainHandler.post { ttsReady = ready }
                 }
-                mainHandler.post { ttsReady = ready }
             }
             engineReference = engine
             engine.setOnUtteranceProgressListener(
