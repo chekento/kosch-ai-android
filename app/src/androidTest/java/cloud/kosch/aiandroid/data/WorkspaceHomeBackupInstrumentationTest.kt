@@ -21,7 +21,7 @@ class WorkspaceHomeBackupInstrumentationTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val store = WorkspaceStore(context)
         val original = store.loadWorkspaceDocument()
-        var payload: ByteArray? = null
+        var payloadToWipe: ByteArray? = null
         try {
             var custom = WorkspacePageEditor.createUserPage(
                 original,
@@ -49,7 +49,8 @@ class WorkspaceHomeBackupInstrumentationTest {
                 freshController.document.pages.first { it.id == "page:test:portable-home" }.items.size,
             )
 
-            payload = store.createPortableSnapshot()
+            val payload = store.createPortableSnapshot()
+            payloadToWipe = payload
             val root = JSONObject(payload.toString(StandardCharsets.UTF_8))
             assertEquals(3, root.getInt("version"))
             assertTrue(root.has("workspaceV7"))
@@ -64,7 +65,7 @@ class WorkspaceHomeBackupInstrumentationTest {
             assertTrue(restoredPage.items.any { it.content is WorkspaceItemContent.Folder })
             assertFalse(root.optJSONArray("excluded")?.toString().orEmpty().contains("workspaceV7"))
         } finally {
-            payload?.fill(0)
+            payloadToWipe?.fill(0)
             store.saveWorkspaceDocument(original)
         }
     }
@@ -74,14 +75,15 @@ class WorkspaceHomeBackupInstrumentationTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val store = WorkspaceStore(context)
         val payload = store.createPortableSnapshot()
-        var tampered: ByteArray? = null
+        var tamperedToWipe: ByteArray? = null
         try {
             val root = JSONObject(payload.toString(StandardCharsets.UTF_8))
             val workspace = root.getJSONObject("workspaceV7")
             val firstPage = workspace.getJSONArray("pages").getJSONObject(0)
             val firstItem = firstPage.getJSONArray("items").getJSONObject(0)
             firstItem.put("appWidgetId", 12345)
-            tampered = root.toString().toByteArray(StandardCharsets.UTF_8)
+            val tampered = root.toString().toByteArray(StandardCharsets.UTF_8)
+            tamperedToWipe = tampered
 
             try {
                 store.previewPortableSnapshot(tampered)
@@ -91,7 +93,7 @@ class WorkspaceHomeBackupInstrumentationTest {
             }
         } finally {
             payload.fill(0)
-            tampered?.fill(0)
+            tamperedToWipe?.fill(0)
         }
     }
 }
