@@ -151,6 +151,55 @@ object WorkspacePageEditor {
         return normalized.copy(pages = pages).normalized()
     }
 
+    fun moveItemToPage(
+        document: WorkspaceDocument,
+        sourcePageId: String,
+        targetPageId: String,
+        itemId: String,
+        requestedBounds: WorkspaceCellBounds? = null,
+    ): WorkspaceDocument {
+        val normalized = document.normalized()
+        if (sourcePageId == targetPageId) {
+            val sourceItem = normalized.pages
+                .firstOrNull { it.id == sourcePageId }
+                ?.items
+                ?.firstOrNull { it.id == itemId }
+                ?: throw IllegalArgumentException("Workspace item does not exist")
+            return moveItem(
+                normalized,
+                sourcePageId,
+                itemId,
+                requestedBounds ?: sourceItem.bounds,
+            )
+        }
+
+        val sourcePage = normalized.pages.firstOrNull { it.id == sourcePageId }
+            ?: throw IllegalArgumentException("Source workspace page does not exist")
+        val targetPage = normalized.pages.firstOrNull { it.id == targetPageId }
+            ?: throw IllegalArgumentException("Target workspace page does not exist")
+        require(sourcePage.sceneAdapter == null) { "Items cannot be dragged out of legacy scene pages" }
+        require(targetPage.sceneAdapter == null) { "Items cannot be dropped on legacy scene pages" }
+        val item = sourcePage.items.firstOrNull { it.id == itemId }
+            ?: throw IllegalArgumentException("Workspace item does not exist")
+        val targetBounds = nearestAvailableBounds(
+            grid = normalized.grid,
+            items = targetPage.items,
+            requested = (requestedBounds ?: item.bounds).copy(
+                columnSpan = item.bounds.columnSpan,
+                rowSpan = item.bounds.rowSpan,
+            ),
+        ) ?: return normalized
+
+        val pages = normalized.pages.map { page ->
+            when (page.id) {
+                sourcePageId -> page.copy(items = page.items.filterNot { it.id == itemId })
+                targetPageId -> page.copy(items = page.items + item.copy(bounds = targetBounds))
+                else -> page
+            }
+        }
+        return normalized.copy(activePageId = targetPageId, pages = pages).normalized()
+    }
+
     fun removeItem(document: WorkspaceDocument, pageId: String, itemId: String): WorkspaceDocument {
         val normalized = document.normalized()
         require(normalized.pages.any { it.id == pageId }) { "Workspace page does not exist" }
