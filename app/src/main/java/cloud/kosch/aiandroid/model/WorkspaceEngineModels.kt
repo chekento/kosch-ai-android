@@ -112,6 +112,7 @@ data class WorkspaceDocument(
     val pages: List<WorkspacePage>,
 ) {
     fun normalized(): WorkspaceDocument {
+        val seenItemIds = mutableSetOf<String>()
         val uniquePages = pages
             .filter { it.id.isNotBlank() }
             .distinctBy(WorkspacePage::id)
@@ -121,8 +122,7 @@ data class WorkspaceDocument(
                     title = page.title.trim().ifBlank { "Home ${index + 1}" },
                     order = index,
                     items = page.items
-                        .filter { it.id.isNotBlank() }
-                        .distinctBy(WorkspaceItem::id)
+                        .filter { it.id.isNotBlank() && seenItemIds.add(it.id) }
                         .map { it.copy(bounds = it.bounds.clamped(grid)) },
                 )
             }
@@ -155,8 +155,10 @@ data class DeviceWidgetBinding(
 object WorkspaceStableIds {
     fun scenePage(scene: SceneId): String = "page:scene:${scene.name.lowercase()}"
 
-    fun legacySceneTile(scene: SceneId, legacyTileId: String): String =
-        "item:v6:${scene.name.lowercase()}:${legacyTileId.trim()}"
+    fun legacySceneTile(scene: SceneId, legacyTileId: String): String {
+        require(legacyTileId.isNotBlank()) { "Legacy tile id must not be blank" }
+        return "item:v6:${scene.name.lowercase()}:${legacyTileId.trim()}"
+    }
 }
 
 /** Pure v6 → v7 adapter. Persistence writes are intentionally handled by WorkspaceStore later. */
