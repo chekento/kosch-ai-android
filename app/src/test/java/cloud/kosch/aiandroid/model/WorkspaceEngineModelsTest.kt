@@ -70,6 +70,26 @@ class WorkspaceEngineModelsTest {
     }
 
     @Test
+    fun normalizedDocument_deduplicatesItemIdsAcrossPages() {
+        val duplicate = WorkspaceItem(
+            id = "item:global",
+            bounds = WorkspaceCellBounds(0, 0, 1, 1),
+            content = WorkspaceItemContent.App("app:key"),
+        )
+        val normalized = WorkspaceDocument(
+            activePageId = "page:a",
+            pages = listOf(
+                WorkspacePage("page:a", "A", 0, items = listOf(duplicate)),
+                WorkspacePage("page:b", "B", 1, items = listOf(duplicate.copy(bounds = WorkspaceCellBounds(2, 2, 1, 1)))),
+            ),
+        ).normalized()
+
+        assertEquals(1, normalized.pages.sumOf { it.items.size })
+        assertEquals("item:global", normalized.pages.first().items.single().id)
+        assertTrue(normalized.pages[1].items.isEmpty())
+    }
+
+    @Test
     fun normalizedDocument_neverProducesZeroPages() {
         val normalized = WorkspaceDocument(
             activePageId = "missing",
