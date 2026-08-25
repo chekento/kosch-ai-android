@@ -7,14 +7,19 @@ import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.model.AssistantVisualState
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
@@ -22,10 +27,52 @@ import cloud.kosch.aiandroid.ui.theme.Mint
 import cloud.kosch.aiandroid.ui.theme.Mist
 import cloud.kosch.aiandroid.ui.theme.Sky
 import cloud.kosch.aiandroid.ui.theme.Warm
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
-/** Canvas fallback used until the matrix-defined WebP sprite set is exported into the APK. */
+/**
+ * Assistant avatar boundary.
+ *
+ * The historical name is retained to keep existing call sites stable. When a valid matrix-defined
+ * body WebP exists in `src/main/assets/assistant/...`, it is rendered. Missing, malformed or
+ * over-budget assets transparently fall back to the proven Canvas avatar.
+ *
+ * Eye and mouth files are already decoded by [AssistantAssetRuntime], but are intentionally not
+ * composited in this stage: their 128 px face-anchor still needs calibration against the exported
+ * 384 px body masters. Rendering a guessed anchor would be worse than the stable fallback.
+ */
 @Composable
 fun AssistantAvatarFallback(
+    state: AssistantVisualState,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val runtime = remember(context.applicationContext) {
+        AssistantAssetRuntime(context.applicationContext)
+    }
+    val sprite by produceState<AssistantSpriteFrame?>(
+        initialValue = null,
+        key1 = runtime,
+        key2 = state,
+    ) {
+        value = withContext(Dispatchers.IO) { runtime.loadState(state) }
+    }
+
+    val body = sprite?.body
+    if (body != null) {
+        Image(
+            bitmap = body.image,
+            contentDescription = null,
+            modifier = modifier,
+            contentScale = ContentScale.Fit,
+        )
+    } else {
+        AssistantCanvasFallback(state = state, modifier = modifier)
+    }
+}
+
+@Composable
+private fun AssistantCanvasFallback(
     state: AssistantVisualState,
     modifier: Modifier = Modifier,
 ) {
@@ -93,8 +140,18 @@ fun AssistantAvatarFallback(
         val leftX = size.width * 0.17f
         val rightX = size.width * 0.58f
         val eyeRadius = CornerRadius(eyeHeight / 2f, eyeHeight / 2f)
-        drawRoundRect(Mist.copy(alpha = if (state == AssistantVisualState.DISABLED) 0.42f else 1f), Offset(leftX, eyeY), Size(eyeWidth, eyeHeight), eyeRadius)
-        drawRoundRect(Mist.copy(alpha = if (state == AssistantVisualState.DISABLED) 0.42f else 1f), Offset(rightX, eyeY), Size(eyeWidth, eyeHeight), eyeRadius)
+        drawRoundRect(
+            Mist.copy(alpha = if (state == AssistantVisualState.DISABLED) 0.42f else 1f),
+            Offset(leftX, eyeY),
+            Size(eyeWidth, eyeHeight),
+            eyeRadius,
+        )
+        drawRoundRect(
+            Mist.copy(alpha = if (state == AssistantVisualState.DISABLED) 0.42f else 1f),
+            Offset(rightX, eyeY),
+            Size(eyeWidth, eyeHeight),
+            eyeRadius,
+        )
 
         if (effectiveBlink > 0.25f) {
             val pupilRadius = eyeHeight * 0.22f
