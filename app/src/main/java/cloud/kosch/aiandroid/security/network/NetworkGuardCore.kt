@@ -199,6 +199,8 @@ sealed interface PacketParseOutcome {
 object PacketMetadataParser {
     private const val IPV4_MIN_HEADER = 20
     private const val IPV6_HEADER = 40
+    private const val TCP_MIN_HEADER = 20
+    private const val UDP_HEADER = 8
     private const val MAX_EXTENSION_HEADERS = 8
 
     fun parse(packet: ByteArray): PacketParseOutcome {
@@ -224,10 +226,10 @@ object PacketMetadataParser {
         val source = NetworkAddress.fromBytes(packet.copyOfRange(12, 16))
         val destination = NetworkAddress.fromBytes(packet.copyOfRange(16, 20))
         val protocol = protocolFor(protocolNumber, ipv6 = false)
-        val ports = if (nonInitialFragment) null else readPorts(packet, ihl, totalLength, protocol)
+        val ports = if (nonInitialFragment) null else readValidatedPorts(packet, ihl, totalLength, protocol)
 
         if ((protocol == TrafficProtocol.TCP || protocol == TrafficProtocol.UDP) && !nonInitialFragment && ports == null) {
-            return PacketParseOutcome.Malformed("truncated transport header")
+            return PacketParseOutcome.Malformed("invalid or truncated transport header")
         }
         return PacketParseOutcome.Parsed(
             PacketMetadata(
@@ -297,9 +299,9 @@ object PacketMetadataParser {
         }
 
         val protocol = protocolFor(nextHeader, ipv6 = true)
-        val ports = if (nonInitialFragment) null else readPorts(packet, offset, totalLength, protocol)
+        val ports = if (nonInitialFragment) null else readValidatedPorts(packet, offset, totalLength, protocol)
         if ((protocol == TrafficProtocol.TCP || protocol == TrafficProtocol.UDP) && !nonInitialFragment && ports == null) {
-            return PacketParseOutcome.Malformed("truncated transport header")
+            return PacketParseOutcome.Malformed("invalid or truncated transport header")
         }
         return PacketParseOutcome.Parsed(
             PacketMetadata(
@@ -316,15 +318,32 @@ object PacketMetadataParser {
         )
     }
 
-    private fun readPorts(
+    private fun readValidatedPorts(
         packet: ByteArray,
         offset: Int,
         totalLength: Int,
         protocol: TrafficProtocol,
     ): Pair<Int, Int>? {
-        if (protocol != TrafficProtocol.TCP && protocol != TrafficProtocol.UDP) return null
-        if (offset < 0 || offset + 4 > totalLength || offset + 4 > packet.size) return null
-        return u16(packet, offset) to u16(packet, offset + 2)
+        if (offset < 0 || offset > totalLength || totalLength > packet.size) return null
+        val available = totalLength - offset
+        return when (protocol) {
+            TrafficProtocol.TCP -> {
+                if (available < TCP_MIN_HEADER || offset + TCP_MIN_HEADER > packet.size) return null
+                val dataOffsetBytes = ((u8(packet, offset + 12) ushr 4) and 0x0f) * 4
+                if (dataOffsetBytes < TCP_MIN_HEADER || dataOffsetBytes > available) return null
+                u16(packet, offset) to u16(packet, offset + 2)
+            }
+
+            TrafficProtocol.UDP -> {
+                if (available < UDP_HEADER || offset + UDP_HEADER > packet.size) return null
+                val udpLength = u16(packet, offset + 4)
+                // UDP length 0 is reserved for IPv6 jumbograms; jumbogram parsing is intentionally unsupported for now.
+                if (udpLength < UDP_HEADER || udpLength > available) return null
+                u16(packet, offset) to u16(packet, offset + 2)
+            }
+
+            else -> null
+        }
     }
 
     private fun protocolFor(number: Int, ipv6: Boolean): TrafficProtocol = when (number) {
