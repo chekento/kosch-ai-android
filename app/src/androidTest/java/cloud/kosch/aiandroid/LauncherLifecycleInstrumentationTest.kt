@@ -1,6 +1,5 @@
 package cloud.kosch.aiandroid
 
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onRoot
 import androidx.lifecycle.Lifecycle
@@ -19,7 +18,7 @@ class LauncherLifecycleInstrumentationTest {
     fun coldLaunch_rendersComposeShell_andReachesResumed() {
         assertEquals(Lifecycle.State.RESUMED, composeTestRule.activityRule.scenario.state)
         composeTestRule.waitForIdle()
-        composeTestRule.onRoot(useUnmergedTree = true).assertExists()
+        composeTestRule.onRoot(useUnmergedTree = true).fetchSemanticsNode()
     }
 
     @Test
@@ -29,6 +28,6 @@ class LauncherLifecycleInstrumentationTest {
         composeTestRule.waitForIdle()
 
         assertEquals(Lifecycle.State.RESUMED, composeTestRule.activityRule.scenario.state)
-        composeTestRule.onRoot(useUnmergedTree = true).assertExists()
+        composeTestRule.onRoot(useUnmergedTree = true).fetchSemanticsNode()
     }
 }
