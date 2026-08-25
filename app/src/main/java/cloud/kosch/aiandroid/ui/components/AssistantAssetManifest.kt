@@ -41,8 +41,10 @@ data class AssistantAssetManifest(
     val requiredPaths: Set<String> by lazy { bodyPaths + overlayPaths + portalPaths }
 
     fun audit(presentWebpPaths: Set<String>): AssistantAssetPackAudit {
+        val assistantPrefix = "assistant/$assistantId/"
+        val portalPrefix = "assistant/common/fx/portal_${portalThemeId}_"
         val relevantPresent = presentWebpPaths.filterTo(linkedSetOf()) {
-            it.startsWith("assistant/$assistantId/") || it.startsWith("assistant/common/fx/")
+            it.startsWith(assistantPrefix) || it.startsWith(portalPrefix)
         }
         return AssistantAssetPackAudit(
             expectedPaths = requiredPaths,
