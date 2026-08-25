@@ -13,7 +13,7 @@ enum class TrafficProtocol {
     OTHER,
 }
 
-data class NetworkAddress private constructor(
+class NetworkAddress private constructor(
     val family: IpFamily,
     private val octets: List<Int>,
 ) {
@@ -23,6 +23,11 @@ data class NetworkAddress private constructor(
     }
 
     fun asByteArray(): ByteArray = ByteArray(octets.size) { octets[it].toByte() }
+
+    override fun equals(other: Any?): Boolean =
+        other is NetworkAddress && family == other.family && octets == other.octets
+
+    override fun hashCode(): Int = 31 * family.hashCode() + octets.hashCode()
 
     override fun toString(): String = InetAddress.getByAddress(asByteArray()).hostAddress.orEmpty()
 
@@ -36,13 +41,91 @@ data class NetworkAddress private constructor(
             return NetworkAddress(family, bytes.map { it.toInt() and 0xff })
         }
 
+        /**
+         * Parses numeric IP literals without ever invoking hostname/DNS resolution.
+         * Zone identifiers are deliberately unsupported because firewall rules are portable address rules.
+         */
         fun parseNumeric(value: String): NetworkAddress {
             val trimmed = value.trim()
             require(trimmed.isNotEmpty()) { "IP address is empty" }
-            require(trimmed.all { it.isDigit() || it == '.' || it == ':' || it.lowercaseChar() in 'a'..'f' }) {
-                "Only numeric IPv4/IPv6 addresses are accepted"
+            require('%' !in trimmed) { "IPv6 zone identifiers are not supported" }
+            return if (':' in trimmed) {
+                fromBytes(parseIpv6Bytes(trimmed))
+            } else {
+                fromBytes(parseIpv4Bytes(trimmed))
             }
-            return fromBytes(InetAddress.getByName(trimmed).address)
+        }
+
+        private fun parseIpv4Bytes(value: String): ByteArray {
+            val parts = value.split('.')
+            require(parts.size == 4) { "IPv4 address must contain four octets" }
+            return ByteArray(4) { index ->
+                val part = parts[index]
+                require(part.isNotEmpty() && part.length <= 3 && part.all(Char::isDigit)) {
+                    "IPv4 octet is invalid"
+                }
+                val number = part.toIntOrNull()
+                    ?: throw IllegalArgumentException("IPv4 octet is invalid")
+                require(number in 0..255) { "IPv4 octet is out of range" }
+                number.toByte()
+            }
+        }
+
+        private fun parseIpv6Bytes(rawValue: String): ByteArray {
+            require(rawValue.isNotEmpty() && ':' in rawValue) { "IPv6 address is invalid" }
+            require(!rawValue.contains(":::")) { "IPv6 compression is invalid" }
+
+            val value = normalizeEmbeddedIpv4(rawValue)
+            val compressionIndex = value.indexOf("::")
+            if (compressionIndex >= 0) {
+                require(value.indexOf("::", compressionIndex + 2) < 0) {
+                    "IPv6 address contains multiple compression markers"
+                }
+            }
+
+            val groups = if (compressionIndex >= 0) {
+                val left = parseIpv6Groups(value.substring(0, compressionIndex))
+                val right = parseIpv6Groups(value.substring(compressionIndex + 2))
+                require(left.size + right.size < 8) { "IPv6 compression must replace at least one group" }
+                left + List(8 - left.size - right.size) { 0 } + right
+            } else {
+                parseIpv6Groups(value).also {
+                    require(it.size == 8) { "IPv6 address must contain eight groups without compression" }
+                }
+            }
+
+            require(groups.size == 8) { "IPv6 address has an invalid group count" }
+            return ByteArray(16).also { bytes ->
+                groups.forEachIndexed { index, group ->
+                    bytes[index * 2] = ((group ushr 8) and 0xff).toByte()
+                    bytes[index * 2 + 1] = (group and 0xff).toByte()
+                }
+            }
+        }
+
+        private fun normalizeEmbeddedIpv4(value: String): String {
+            if ('.' !in value) return value
+            val lastColon = value.lastIndexOf(':')
+            require(lastColon >= 0 && lastColon < value.lastIndex) { "Embedded IPv4 address is invalid" }
+            val ipv4 = parseIpv4Bytes(value.substring(lastColon + 1))
+            val high = ((ipv4[0].toInt() and 0xff) shl 8) or (ipv4[1].toInt() and 0xff)
+            val low = ((ipv4[2].toInt() and 0xff) shl 8) or (ipv4[3].toInt() and 0xff)
+            return buildString {
+                append(value.substring(0, lastColon + 1))
+                append(high.toString(16))
+                append(':')
+                append(low.toString(16))
+            }
+        }
+
+        private fun parseIpv6Groups(value: String): List<Int> {
+            if (value.isEmpty()) return emptyList()
+            return value.split(':').map { group ->
+                require(group.length in 1..4 && group.all { it.isDigit() || it.lowercaseChar() in 'a'..'f' }) {
+                    "IPv6 group is invalid"
+                }
+                group.toInt(16)
+            }
         }
     }
 }
