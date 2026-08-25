@@ -40,7 +40,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,7 +55,7 @@ import cloud.kosch.aiandroid.AssistantSessionController
 import cloud.kosch.aiandroid.LauncherController
 import cloud.kosch.aiandroid.model.AssistantMessageRole
 import cloud.kosch.aiandroid.model.AssistantVisualState
-import cloud.kosch.aiandroid.ui.components.CompanionFace
+import cloud.kosch.aiandroid.ui.components.AssistantAvatarFallback
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 import cloud.kosch.aiandroid.ui.theme.Mint
 import cloud.kosch.aiandroid.ui.theme.MutedMist
@@ -73,35 +72,39 @@ fun AssistantHost(
     requestContact: () -> Unit,
     requestSpeech: (String) -> Boolean,
     stopSpeech: () -> Unit,
+    showFloatingTrigger: Boolean = true,
 ) {
-    Box(Modifier.fillMaxSize()) {
-        if (assistant.settings.enabled) {
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 104.dp)
-                    .size(width = 76.dp, height = 68.dp)
-                    .semantics { contentDescription = "KoSch Assistent öffnen" },
-                color = DeepSurface.copy(alpha = 0.97f),
-                shape = RoundedCornerShape(23.dp),
-                tonalElevation = 10.dp,
-            ) {
-                CompanionFace(
+    if (showFloatingTrigger) {
+        Box(Modifier.fillMaxSize()) {
+            if (assistant.settings.enabled) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 104.dp)
+                        .size(width = 76.dp, height = 68.dp)
+                        .clickable(onClick = assistant::open)
+                        .semantics { contentDescription = "KoSch Assistent öffnen" },
+                    color = DeepSurface.copy(alpha = 0.97f),
+                    shape = RoundedCornerShape(23.dp),
+                    tonalElevation = 10.dp,
+                ) {
+                    AssistantAvatarFallback(
+                        state = assistant.visualState,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            } else {
+                AssistChip(
                     onClick = assistant::open,
-                    modifier = Modifier.fillMaxSize(),
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = 104.dp),
+                    label = { Text("Assistant aus") },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                    },
                 )
             }
-        } else {
-            AssistChip(
-                onClick = assistant::open,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 16.dp, bottom = 104.dp),
-                label = { Text("Assistant aus") },
-                leadingIcon = {
-                    Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
-                },
-            )
         }
     }
 
@@ -155,7 +158,10 @@ private fun AssistantSheet(
                     color = RaisedSurface,
                     shape = RoundedCornerShape(22.dp),
                 ) {
-                    CompanionFace(onClick = {}, modifier = Modifier.fillMaxSize())
+                    AssistantAvatarFallback(
+                        state = assistant.visualState,
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text("KoSch Assistant", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
@@ -174,7 +180,7 @@ private fun AssistantSheet(
 
             AssistantToggleRow(
                 title = "Assistant aktiv",
-                body = "Aus bedeutet: kein Avatar, keine Spracheingabe und kein laufender Chat.",
+                body = "Aus bedeutet: kein Assistant-Voice und kein laufender Chat. Der Ask-Dock bleibt als Launcher-Steuerung verfügbar.",
                 checked = assistant.settings.enabled,
                 onCheckedChange = assistant::setEnabled,
             )
