@@ -2,7 +2,6 @@ package cloud.kosch.aiandroid
 
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodes
 import androidx.lifecycle.Lifecycle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
