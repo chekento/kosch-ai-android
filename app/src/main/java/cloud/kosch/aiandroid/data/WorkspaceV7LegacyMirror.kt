@@ -8,13 +8,13 @@ import cloud.kosch.aiandroid.model.WorkspaceV7Migration
 /**
  * Pure planning layer for the temporary v6 -> v7 dual-write period.
  *
- * The existing launcher stays authoritative while Stage A is being proven. A valid v7 document is updated
- * without dropping v7-only items. If a raw v7 value exists but cannot be decoded, callers get null so the
- * unknown/future value can be preserved rather than overwritten by an older build.
+ * Legacy scene writes keep their action-tile pages synchronized without hijacking a user-created v7 Home page.
+ * If a raw v7 value exists but cannot be decoded, callers get null so the unknown/future value is preserved.
  */
 object WorkspaceV7LegacyMirror {
     fun sceneUpdate(document: WorkspaceDocument, scene: SceneId): WorkspaceDocument =
-        WorkspaceV7Compatibility.activateLegacyScene(document, scene)
+        if (activePageIsLegacy(document)) WorkspaceV7Compatibility.activateLegacyScene(document, scene)
+        else document.normalized()
 
     fun positionUpdate(
         document: WorkspaceDocument,
@@ -27,7 +27,10 @@ object WorkspaceV7LegacyMirror {
         activeScene: SceneId,
         positions: Map<SceneId, Map<String, TilePosition>>,
     ): WorkspaceDocument {
-        var updated = WorkspaceV7Compatibility.activateLegacyScene(document, activeScene)
+        var updated = document.normalized()
+        if (activePageIsLegacy(updated)) {
+            updated = WorkspaceV7Compatibility.activateLegacyScene(updated, activeScene)
+        }
         SceneId.entries.forEach { scene ->
             updated = WorkspaceV7Compatibility.applyLegacyScenePositions(
                 document = updated,
@@ -51,5 +54,10 @@ object WorkspaceV7LegacyMirror {
         storedDocument != null -> fullLegacyState(storedDocument, activeScene, positions)
         hasStoredRawValue -> null
         else -> WorkspaceV7Migration.fromLegacyScenePositions(activeScene, positions)
+    }
+
+    private fun activePageIsLegacy(document: WorkspaceDocument): Boolean {
+        val normalized = document.normalized()
+        return normalized.pages.firstOrNull { it.id == normalized.activePageId }?.sceneAdapter != null
     }
 }
