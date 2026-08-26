@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.security.NetworkEngineState
@@ -45,6 +46,8 @@ import cloud.kosch.aiandroid.ui.theme.RaisedSurface
 import cloud.kosch.aiandroid.ui.theme.Sky
 import cloud.kosch.aiandroid.ui.theme.Violet
 import cloud.kosch.aiandroid.ui.theme.Warm
+
+internal const val SECURITY_NETWORK_LIST_TEST_TAG = "security-network-list"
 
 private data class SecurityMetric(
     val title: String,
@@ -111,7 +114,10 @@ fun ColumnScope.SecurityNetworkCenterSurface(
         shape = RoundedCornerShape(30.dp),
     ) {
         LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .testTag(SECURITY_NETWORK_LIST_TEST_TAG)
+                .padding(horizontal = 16.dp),
             contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
