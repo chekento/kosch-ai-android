@@ -50,6 +50,12 @@
             android:exported="false"
             android:screenOrientation="unspecified" />
 
+        <activity
+            android:name=".WorkspaceWidgetPlacementActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:screenOrientation="unspecified" />
+
         <service
             android:name=".system.KoSchNotificationListenerService"
             android:exported="true"
