@@ -101,18 +101,15 @@ object N2EngineStateMachine {
     private fun onFailure(current: N2EngineSnapshot, reason: N2StopReason): N2EngineSnapshot = when (current.phase) {
         N2EnginePhase.STARTING,
         N2EnginePhase.ACTIVE,
-        N2EnginePhase.STOPPING,
-        -> failSafe(current, reason)
+        N2EnginePhase.STOPPING -> failSafe(current, reason)
 
         N2EnginePhase.INACTIVE,
-        N2EnginePhase.FAILED_SAFE,
-        -> current.copy(phase = N2EnginePhase.FAILED_SAFE, stopReason = reason)
+        N2EnginePhase.FAILED_SAFE -> current.copy(phase = N2EnginePhase.FAILED_SAFE, stopReason = reason)
     }
 
     private fun requestStop(current: N2EngineSnapshot, reason: N2StopReason): N2EngineSnapshot = when (current.phase) {
         N2EnginePhase.STARTING,
-        N2EnginePhase.ACTIVE,
-        -> current.copy(phase = N2EnginePhase.STOPPING, stopReason = reason)
+        N2EnginePhase.ACTIVE -> current.copy(phase = N2EnginePhase.STOPPING, stopReason = reason)
 
         N2EnginePhase.STOPPING -> current
         N2EnginePhase.FAILED_SAFE -> current
@@ -121,13 +118,11 @@ object N2EngineStateMachine {
 
     private fun onCleanupComplete(current: N2EngineSnapshot): N2EngineSnapshot = when (current.phase) {
         N2EnginePhase.STOPPING,
-        N2EnginePhase.FAILED_SAFE,
-        -> N2EngineSnapshot(activationGeneration = current.activationGeneration)
+        N2EnginePhase.FAILED_SAFE -> N2EngineSnapshot(activationGeneration = current.activationGeneration)
 
         N2EnginePhase.INACTIVE -> current
         N2EnginePhase.STARTING,
-        N2EnginePhase.ACTIVE,
-        -> failSafe(current, N2StopReason.UNEXPECTED_EVENT)
+        N2EnginePhase.ACTIVE -> failSafe(current, N2StopReason.UNEXPECTED_EVENT)
     }
 
     private fun failSafe(current: N2EngineSnapshot, reason: N2StopReason) = current.copy(
