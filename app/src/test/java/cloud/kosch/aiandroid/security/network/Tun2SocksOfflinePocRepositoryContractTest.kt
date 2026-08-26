@@ -58,6 +58,9 @@ class Tun2SocksOfflinePocRepositoryContractTest {
 
         assertTrue(script.contains(Tun2SocksOfflinePocContract.UPSTREAM_COMMIT))
         assertTrue(script.contains(Tun2SocksOfflinePocContract.X_MOBILE_VERSION))
+        assertTrue(script.contains(Tun2SocksOfflinePocContract.X_MOBILE_COMMIT))
+        assertTrue(script.contains("X_MOBILE_REV_SUFFIX"))
+        assertTrue(script.contains("x_mobile_commit="))
         assertTrue(script.contains("GOPROXY=off"))
         assertTrue(script.contains("GOSUMDB=off"))
         assertTrue(script.contains("apply --check"))
