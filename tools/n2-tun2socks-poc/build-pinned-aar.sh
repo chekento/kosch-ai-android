@@ -8,6 +8,7 @@ PINNED_COMMIT="8dda19e8e4613e014f0b12f3e624fdff5e5f23b3"
 PINNED_GO="go1.26.3"
 PINNED_MODULE="github.com/xjasonlyu/tun2socks/v2"
 PINNED_X_MOBILE="v0.0.0-20260821190718-4776eadac327"
+PINNED_X_MOBILE_COMMIT="4776eadac327bcb80cebc7413c91f8b4abf8ffa1"
 BOUND_PACKAGE="$PINNED_MODULE/koschmobile"
 ANDROID_API="29"
 
@@ -51,6 +52,13 @@ GOMOBILE_MODULE_VERSION="$(mobile_tool_version "$GOMOBILE_PATH")"
 GOBIND_MODULE_VERSION="$(mobile_tool_version "$GOBIND_PATH")"
 [[ "$GOMOBILE_MODULE_VERSION" == "$PINNED_X_MOBILE" ]] || fail "gomobile must come from $PINNED_X_MOBILE, got ${GOMOBILE_MODULE_VERSION:-unknown}"
 [[ "$GOBIND_MODULE_VERSION" == "$PINNED_X_MOBILE" ]] || fail "gobind must come from $PINNED_X_MOBILE, got ${GOBIND_MODULE_VERSION:-unknown}"
+
+# The Go pseudo-version carries only the source revision prefix. source.lock records the reviewed full
+# commit mapping, while the binary SHA-256 values below identify the actual installed tool binaries.
+X_MOBILE_REV_SUFFIX="${PINNED_X_MOBILE##*-}"
+[[ "$PINNED_X_MOBILE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || fail "x/mobile full commit lock is malformed"
+[[ "${PINNED_X_MOBILE_COMMIT:0:${#X_MOBILE_REV_SUFFIX}}" == "$X_MOBILE_REV_SUFFIX" ]] || \
+  fail "x/mobile full commit lock does not match pseudo-version revision $X_MOBILE_REV_SUFFIX"
 
 # No command after this point may resolve modules from the network.
 export GOPROXY=off
@@ -134,6 +142,7 @@ commit=$PINNED_COMMIT
 go_module=$PINNED_MODULE
 go_version=$GO_VERSION
 x_mobile_version=$PINNED_X_MOBILE
+x_mobile_commit=$PINNED_X_MOBILE_COMMIT
 gomobile_module_version=$GOMOBILE_MODULE_VERSION
 gobind_module_version=$GOBIND_MODULE_VERSION
 gomobile_sha256=$GOMOBILE_SHA
