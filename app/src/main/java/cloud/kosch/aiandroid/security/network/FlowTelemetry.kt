@@ -168,7 +168,7 @@ class BoundedFlowTable(private val capacity: Int = 2_048) {
 
     @Synchronized
     fun snapshot(): List<FlowSnapshot> = flows.values
-        .map(MutableFlow::snapshot)
+        .map { flow -> flow.snapshot() }
         .sortedByDescending(FlowSnapshot::lastSeenEpochMillis)
 
     @Synchronized
