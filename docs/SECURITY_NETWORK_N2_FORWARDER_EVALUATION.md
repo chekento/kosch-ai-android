@@ -30,6 +30,14 @@ Pinned upstream evidence reviewed at tag `v2.7.0`:
 
 These properties make the source a better semantic fit for **N2 direct forwarding** than a SOCKS-only engine.
 
+### Important start-failure finding
+
+The pinned `engine.Start()` API does not return its internal startup error to the Android caller. It calls `log.Fatalf(...)` when startup fails, and the project's logger is built on zap.
+
+KoSch must therefore **not** bind and call the upstream `Engine.Start()` unchanged in a production VPN process. The POC must prove a recoverable start boundary, for example through a narrowly reviewed wrapper/fork that returns startup errors instead of using a fatal log path.
+
+This is encoded as `START_FAILURE_CONTAINMENT_UNVERIFIED` and is an activation blocker.
+
 ### What is still unverified for KoSch
 
 The following remain hard blockers for activation:
@@ -37,6 +45,7 @@ The following remain hard blockers for activation:
 - reproducible Android embedding/build path inside this app;
 - ABI/package-size impact;
 - explicit `VpnService.protect(...)` strategy for every upstream TCP and UDP socket created by the forwarder;
+- recoverable start-failure propagation without process-fatal behavior;
 - deterministic stop behavior after partial startup;
 - return-path behavior after network migration;
 - no-black-hole behavior if native start or forwarding fails;
@@ -56,6 +65,7 @@ Pinned upstream evidence reviewed at tag `2.17.1`:
 - documented TUN-FD C/JNI API;
 - IPv4/IPv6 support;
 - TCP and UDP support;
+- C start functions return an error status;
 - explicit quit API.
 
 However, HEV is explicitly a **tunnel over a SOCKS5 proxy**. Requiring a SOCKS5 upstream would pull proxy-routing semantics into N2, while the roadmap intentionally reserves proxy/upstream selection for **N4**.
@@ -81,7 +91,7 @@ A candidate can enter an **isolated engineering POC** only when its pinned sourc
 - IPv4 and IPv6;
 - TCP and UDP.
 
-Prototype eligibility **does not authorize VPN activation**.
+Prototype eligibility **does not authorize VPN activation**. Recoverable start behavior is intentionally allowed to remain an open POC question, because the POC is where that boundary must be engineered and tested.
 
 ### Activation eligibility
 
@@ -89,6 +99,7 @@ A candidate can become activation-eligible only after all source-fit requirement
 
 - Android embedding verified;
 - upstream socket escape uses `VpnService.protect(...)`;
+- startup failures are recoverable without terminating the app process;
 - deterministic stop API/lifecycle verified;
 - no-black-hole behavior verified;
 - physical-device evidence verified.
@@ -114,6 +125,8 @@ The first native/embedding POC may package and locally exercise a pinned forward
 - tun2socks MIT license at tag: `https://github.com/xjasonlyu/tun2socks/blob/v2.7.0/LICENSE`
 - tun2socks FD device source: `https://github.com/xjasonlyu/tun2socks/tree/v2.7.0/core/device/fdbased`
 - tun2socks direct source: `https://github.com/xjasonlyu/tun2socks/blob/v2.7.0/proxy/direct/direct.go`
+- tun2socks engine start/stop source: `https://github.com/xjasonlyu/tun2socks/blob/v2.7.0/engine/engine.go`
+- tun2socks Android AAR discussion: `https://github.com/xjasonlyu/tun2socks/issues/123`
 - HEV release/tag: `https://github.com/heiher/hev-socks5-tunnel/releases/tag/2.17.1`
 - HEV README/API: `https://github.com/heiher/hev-socks5-tunnel/blob/2.17.1/README.md`
 - HEV MIT license: `https://github.com/heiher/hev-socks5-tunnel/blob/2.17.1/LICENSE`
