@@ -50,9 +50,10 @@ class WorkspaceDragDropInstrumentationTest {
             }
             composeTestRule.waitForIdle()
 
-            composeTestRule.onNodeWithText("Anordnen", useUnmergedTree = true).performClick()
+            composeTestRule.onNodeWithText("Home Studio", useUnmergedTree = true).performClick()
             composeTestRule.waitForIdle()
-            composeTestRule.onNodeWithText("Homescreen anordnen", useUnmergedTree = true).fetchSemanticsNode()
+            composeTestRule.onNodeWithText("Ziehen · skalieren · Seiten verwalten · automatisch anordnen", useUnmergedTree = true)
+                .fetchSemanticsNode()
 
             composeTestRule
                 .onNodeWithContentDescription("App. Ziehen zum Verschieben", useUnmergedTree = true)
