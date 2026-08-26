@@ -10,9 +10,13 @@ This directory defines a reproducible, traffic-inert experiment for evaluating `
 - tag: `v2.7.0`
 - commit: `8dda19e8e4613e014f0b12f3e624fdff5e5f23b3`
 - upstream Go directive: `go1.26.3`
+- `golang.org/x/mobile`: `v0.0.0-20260821190718-4776eadac327`
+- x/mobile commit: `4776eadac327bcb80cebc7413c91f8b4abf8ffa1`
 - Android minimum API for the POC artifact: `29`
 
-`source.lock` is authoritative. The builder refuses any different source HEAD or Go toolchain.
+`source.lock` is authoritative. The builder refuses any different source HEAD, Go toolchain, `gomobile` module version or `gobind` module version.
+
+The x/mobile pin matters because the current `gomobile bind` implementation requires `golang.org/x/mobile/bind` to be resolvable from the module being bound. The POC therefore adds the exact pinned x/mobile version only inside its disposable worktree before binding; it does not change the upstream checkout or the Android app dependency graph.
 
 ## What the KoSch patch changes
 
@@ -28,27 +32,33 @@ The intended Android implementation of `SocketProtector.Protect(fd)` is `VpnServ
 
 ## Offline build
 
-The build script does **not** clone or download anything. Supply a clean local checkout whose HEAD is the pinned commit and pre-install the exact Go toolchain plus a `gomobile` binary.
+The build script does **not** clone or download anything. Supply a clean local checkout whose HEAD is the pinned commit and pre-install:
+
+- Go `go1.26.3`;
+- `gomobile` from x/mobile `v0.0.0-20260821190718-4776eadac327`;
+- `gobind` from the same x/mobile version;
+- Android SDK/NDK required by gomobile;
+- a Go module cache containing tun2socks and x/mobile dependencies.
 
 ```bash
 tools/n2-tun2socks-poc/build-pinned-aar.sh /path/to/tun2socks-v2.7.0
 ```
 
-The script forces:
+Before the module graph is touched, the script forces:
 
 ```text
 GOPROXY=off
 GOSUMDB=off
 ```
 
-Therefore every Go dependency must already exist in the local module cache. Missing cached dependencies are a hard failure rather than a reason to access the network.
+It then adds the pinned x/mobile requirement in the disposable worktree and explicitly resolves `golang.org/x/mobile/bind`. Missing cached dependencies are a hard failure rather than a reason to access the network.
 
 The output directory contains:
 
 - `tun2socks-kosch-v2.7.0-poc.aar`
 - `tun2socks-kosch-v2.7.0-poc.evidence`
 
-The evidence report records the upstream commit, Go version, SHA-256 of the `gomobile` executable, KoSch patch and generated AAR, plus the containment flags used by `Tun2SocksOfflinePocContract`.
+The evidence report records the upstream commit, Go version, x/mobile version, detected gomobile/gobind module versions, SHA-256 of both tool binaries, KoSch patch and generated AAR, plus the containment flags used by `Tun2SocksOfflinePocContract`.
 
 ## Hard containment boundary
 
