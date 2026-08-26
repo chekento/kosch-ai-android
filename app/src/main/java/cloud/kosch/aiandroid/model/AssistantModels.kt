@@ -27,5 +27,6 @@ data class AssistantSettings(
     val enabled: Boolean = false,
     val voiceInputEnabled: Boolean = true,
     val speechOutputEnabled: Boolean = false,
+    val reducedMotion: Boolean = false,
     val assistantId: String = "default",
 )

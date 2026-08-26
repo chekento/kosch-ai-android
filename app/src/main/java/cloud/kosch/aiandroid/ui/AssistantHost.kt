@@ -1,5 +1,6 @@
 package cloud.kosch.aiandroid.ui
 
+import android.animation.ValueAnimator
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -74,6 +75,7 @@ fun AssistantHost(
     stopSpeech: () -> Unit,
     showFloatingTrigger: Boolean = true,
 ) {
+    val effectiveReducedMotion = assistant.settings.reducedMotion || !ValueAnimator.areAnimatorsEnabled()
     if (showFloatingTrigger) {
         Box(Modifier.fillMaxSize()) {
             if (assistant.settings.enabled) {
@@ -90,6 +92,8 @@ fun AssistantHost(
                 ) {
                     AssistantAvatarFallback(
                         state = assistant.visualState,
+                        speechSignal = assistant.speechSignal,
+                        reducedMotion = effectiveReducedMotion,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -117,6 +121,7 @@ fun AssistantHost(
             requestContact = requestContact,
             requestSpeech = requestSpeech,
             stopSpeech = stopSpeech,
+            effectiveReducedMotion = effectiveReducedMotion,
         )
     }
 }
@@ -131,6 +136,7 @@ private fun AssistantSheet(
     requestContact: () -> Unit,
     requestSpeech: (String) -> Boolean,
     stopSpeech: () -> Unit,
+    effectiveReducedMotion: Boolean,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var input by remember { mutableStateOf("") }
@@ -160,6 +166,8 @@ private fun AssistantSheet(
                 ) {
                     AssistantAvatarFallback(
                         state = assistant.visualState,
+                        speechSignal = assistant.speechSignal,
+                        reducedMotion = effectiveReducedMotion,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -182,7 +190,10 @@ private fun AssistantSheet(
                 title = "Assistant aktiv",
                 body = "Aus bedeutet: kein Assistant-Voice und kein laufender Chat. Der Ask-Dock bleibt als Launcher-Steuerung verfügbar.",
                 checked = assistant.settings.enabled,
-                onCheckedChange = assistant::setEnabled,
+                onCheckedChange = { enabled ->
+                    if (!enabled) stopSpeech()
+                    assistant.setEnabled(enabled)
+                },
             )
             AssistantToggleRow(
                 title = "Voice Input",
@@ -193,10 +204,20 @@ private fun AssistantSheet(
             )
             AssistantToggleRow(
                 title = "Antworten vorlesen",
-                body = "Android Text-to-Speech; standardmäßig ausgeschaltet.",
+                body = "Android Text-to-Speech; Mundbewegung folgt Textbereichen und lokalem Audiopegel.",
                 checked = assistant.settings.speechOutputEnabled,
                 enabled = assistant.settings.enabled,
-                onCheckedChange = assistant::setSpeechOutputEnabled,
+                onCheckedChange = { enabled ->
+                    if (!enabled) stopSpeech()
+                    assistant.setSpeechOutputEnabled(enabled)
+                },
+            )
+            AssistantToggleRow(
+                title = "Bewegung reduzieren",
+                body = "Stoppt Schweben, Blickwanderung und Effektloops. Zustände und vereinfachte Sprachbewegung bleiben erkennbar; Androids Systemeinstellung gilt zusätzlich.",
+                checked = assistant.settings.reducedMotion,
+                enabled = assistant.settings.enabled,
+                onCheckedChange = assistant::setReducedMotion,
             )
 
             Surface(color = Mint.copy(alpha = 0.09f), shape = RoundedCornerShape(16.dp)) {
@@ -268,19 +289,19 @@ private fun AssistantSheet(
                 ),
                 trailingIcon = {
                     Row {
-                        if (assistant.visualState == AssistantVisualState.SPEAKING) {
+                        if (assistant.speechSignal.active) {
                             IconButton(
-                                onClick = {
-                                    stopSpeech()
-                                    assistant.speechFinished()
-                                },
+                                onClick = stopSpeech,
                             ) {
                                 Icon(Icons.Rounded.Stop, contentDescription = "Vorlesen stoppen")
                             }
                         }
                         IconButton(
                             enabled = assistant.settings.enabled && assistant.settings.voiceInputEnabled,
-                            onClick = { assistant.requestVoice(requestVoiceInput) },
+                            onClick = {
+                                stopSpeech()
+                                assistant.requestVoice(requestVoiceInput)
+                            },
                         ) {
                             Icon(Icons.Rounded.KeyboardVoice, contentDescription = "Spracheingabe")
                         }
@@ -313,7 +334,12 @@ private fun AssistantSheet(
                     Spacer(Modifier.width(6.dp))
                     Text("Senden")
                 }
-                TextButton(onClick = assistant::clearSession) {
+                TextButton(
+                    onClick = {
+                        stopSpeech()
+                        assistant.clearSession()
+                    },
+                ) {
                     Icon(Icons.Rounded.DeleteOutline, contentDescription = null)
                     Spacer(Modifier.width(4.dp))
                     Text("Chat löschen")

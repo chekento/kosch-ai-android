@@ -245,6 +245,18 @@ HOME-Rolle, vorausschauende Zurück-Navigation, Edge-to-edge, `LauncherApps`, pr
 
 ## KI, freie Modelle und optionale APIs
 
+### Wie privat ist der optionale KoSch Assistant?
+
+Er ist standardmäßig aus. Seine Einstellungen werden lokal gespeichert; bis zu 80 Chatnachrichten bleiben nur in der laufenden ViewModel-Sitzung und sind weder SharedPreferences- noch Backup-Inhalt. Spracheingabe startet ausschließlich nach Tippen über Androids sichtbare Speech-UI. Der Launcher besitzt dafür kein `RECORD_AUDIO`-Recht, kein Wake-Word und kein Hintergrundmikrofon.
+
+### Warum erscheint der Assistant auch ohne fertiges Sprite-Paket?
+
+Der aktuelle sichere Renderer zeichnet einen vollständigen prozeduralen Roboter: ausgeschaltet bleibt nur das Bodenportal sichtbar, Aktivierung und Deaktivierung verwenden Spawn beziehungsweise exakte Rückwärtsbewegung, und Körper, Blick, Blinzeln, Zustand und Mund sind getrennt gesteuert. Der WebP-Renderer aktiviert sich erst mit allen 150 Matrixdateien und vermessenen Augen-/Mundankern. Fehlende, zu große, falsch dimensionierte oder nicht dekodierbare Assets dürfen HOME nicht abstürzen lassen.
+
+### Wie synchronisiert KoSch den Mund mit Android Text-to-Speech?
+
+Wenn die TTS-Engine Textbereiche meldet, werden diese lokal in den festgelegten 15-Viseme-Satz übersetzt. Aus optional bereitgestellten TTS-PCM-Blöcken berechnet KoSch nur einen flüchtigen normalisierten Pegel für die Öffnung. Das ist keine Mikrofonaufnahme und wird nicht gespeichert. Fehlen beide Signale, bleibt der Mund konservativ geschlossen. Stoppen, Ausschalten oder der Wechsel zur Spracheingabe beendet den Sprachzustand sofort; Reduced Motion stoppt dekorative Schleifen, nicht die klare Zustandsanzeige.
+
 ### Was ist der Local Core?
 
 Ein offline arbeitender Planner für App- und Systembefehle, lokale Suche, Szenen, Dock-/Ordnerlogik, Layoutvorschläge und begrenzte Dateihinweise. Er ist reproduzierbar und bleibt verfügbar, wenn kein Modell, Konto oder Netzwerk existiert.

@@ -46,6 +46,12 @@ class AssistantAssetManifestTest {
                 AssistantAssetCatalog.mouthVisemeFile(viseme) in manifest.mouthVisemeFiles,
             )
         }
+        AssistantEyeShape.entries.forEach { eye ->
+            assertTrue(AssistantAssetCatalog.eyeFile(eye) in manifest.eyeOverlayFiles)
+        }
+        AssistantMouthEmotion.entries.forEach { mouth ->
+            assertTrue(AssistantAssetCatalog.mouthEmotionFile(mouth) in manifest.mouthEmotionFiles)
+        }
     }
 
     @Test

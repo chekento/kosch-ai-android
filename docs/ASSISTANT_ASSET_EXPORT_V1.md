@@ -112,4 +112,4 @@ Prefer transforms/interpolation for micro-motion where it preserves visual quali
 
 ## Stage boundary
 
-This B-B stage establishes inventory, completeness and calibration gates. It does **not** claim that the 150 final WebPs have already been exported. Eye/mouth compositing and viseme-timed lipsync belong to the following B-C stage after real anchor measurements are committed.
+This B-B stage establishes inventory, completeness and calibration gates. It does **not** claim that the 150 final WebPs have already been exported. The B-C runtime now contains fail-safe eye/mouth compositing, deterministic micro-motion and TTS range/PCM-driven mouth signals, but the WebP path deliberately remains inactive until real anchors and the complete export are committed. See `ASSISTANT_RUNTIME_BC.md`.

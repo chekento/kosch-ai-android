@@ -10,6 +10,8 @@ The KoSch Assistant is an **optional** launcher companion. It is designed to rem
 - settings persist, transcript does not;
 - Android system speech recognition is launched only after an explicit tap;
 - Android Text-to-Speech is optional, disabled by default and not initialized while Assistant or speech output is disabled;
+- TTS range callbacks and synthesized PCM level drive an ephemeral 15-viseme mouth signal where the selected engine supports them;
+- reduced motion is independently selectable and Android's disabled-animator setting is also respected;
 - local launcher commands are interpreted by `KoSch Local Core`;
 - free-form generative requests remain in the Assistant session and expose an explicit provider-selection handoff;
 - no hidden provider call and no claim that the offline APK contains an LLM.
@@ -35,6 +37,7 @@ Only these Assistant settings are persisted in `kosch_assistant_settings`:
 - enabled/disabled;
 - voice input enabled/disabled;
 - speech output enabled/disabled;
+- reduced motion enabled/disabled;
 - assistant ID.
 
 Chat text is session memory owned by `LauncherViewModel` and is neither written to SharedPreferences nor included in portable workspace backup.
@@ -52,7 +55,9 @@ The runtime-facing states are:
 7. `OFFLINE`
 8. `ERROR`
 
-The APK currently uses a state-aware Canvas fallback. This makes missing or not-yet-exported sprites non-fatal and keeps the HOME shell usable.
+The APK currently uses a state-aware procedural full-robot fallback with a portal-only disabled state, appearance/reverse-disappearance, independent gaze/blink, state poses and speech mouth motion. This makes missing or not-yet-exported sprites non-fatal and keeps the HOME shell usable.
+
+The matrix WebP compositor is implemented but activates only after all 150 files and measured eye/mouth anchors pass the manifest gate. It draws the loaded body, eye and mouth layers together; a corrupt active frame returns to the complete procedural fallback instead of showing a partial face.
 
 ## Supplied Assistant Matrix contract
 
@@ -88,8 +93,8 @@ The runtime catalog follows the project asset matrix so the Default Assistant ca
 - an embedded generative LLM;
 - hidden direct cloud API calls;
 - persistent conversation history;
-- viseme-timed lip sync;
+- studio-grade phoneme forced alignment;
 - full sprite export from the supplied overview artwork;
 - autonomous Android actions.
 
-Those belong to the measured follow-up in issue #17. The future local generative route must enter through an isolated `LocalModelBackend` and preserve the same opt-in, privacy, cancellation and provider-choice boundaries.
+Final asset export, calibrated activation and the embedded model remain in issue #17. The B-C behavior and TTS signal runtime are documented in `ASSISTANT_RUNTIME_BC.md`. The future local generative route must enter through an isolated `LocalModelBackend` and preserve the same opt-in, privacy, cancellation and provider-choice boundaries.

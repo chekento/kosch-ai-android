@@ -7,9 +7,7 @@ object AssistantAssetCatalog {
     const val DEFAULT_ASSISTANT_ID = "default"
     const val DEFAULT_THEME_ID = "default"
 
-    val visemes = listOf(
-        "sil", "pp", "ff", "th", "dd", "kk", "ch", "ss", "nn", "rr", "aa", "e", "ih", "oh", "ou",
-    )
+    val visemes = AssistantViseme.entries.map(AssistantViseme::code)
 
     fun bodyFile(
         state: AssistantVisualState,
@@ -28,17 +26,25 @@ object AssistantAssetCatalog {
     fun eyeFile(
         state: AssistantVisualState,
         assistantId: String = DEFAULT_ASSISTANT_ID,
-    ): String = when (state) {
-        AssistantVisualState.DISABLED,
-        AssistantVisualState.IDLE,
-        AssistantVisualState.WORKING,
-        -> "asst_${assistantId}_eye_center.webp"
-        AssistantVisualState.LISTENING -> "asst_${assistantId}_eye_focus.webp"
-        AssistantVisualState.THINKING -> "asst_${assistantId}_eye_up_right.webp"
-        AssistantVisualState.SPEAKING -> "asst_${assistantId}_eye_happy.webp"
-        AssistantVisualState.OFFLINE -> "asst_${assistantId}_eye_worried.webp"
-        AssistantVisualState.ERROR -> "asst_${assistantId}_eye_confused.webp"
-    }
+    ): String = eyeFile(
+        eye = when (state) {
+            AssistantVisualState.DISABLED,
+            AssistantVisualState.IDLE,
+            AssistantVisualState.WORKING,
+            -> AssistantEyeShape.CENTER
+            AssistantVisualState.LISTENING -> AssistantEyeShape.FOCUS
+            AssistantVisualState.THINKING -> AssistantEyeShape.UP_RIGHT
+            AssistantVisualState.SPEAKING -> AssistantEyeShape.HAPPY
+            AssistantVisualState.OFFLINE -> AssistantEyeShape.WORRIED
+            AssistantVisualState.ERROR -> AssistantEyeShape.CONFUSED
+        },
+        assistantId = assistantId,
+    )
+
+    fun eyeFile(
+        eye: AssistantEyeShape,
+        assistantId: String = DEFAULT_ASSISTANT_ID,
+    ): String = "asst_${assistantId}_eye_${eye.assetSuffix}.webp"
 
     fun mouthVisemeFile(
         viseme: String,
@@ -46,6 +52,24 @@ object AssistantAssetCatalog {
     ): String {
         require(viseme in visemes) { "Unbekanntes Visem: $viseme" }
         return "asst_${assistantId}_mouth_viseme_${viseme}.webp"
+    }
+
+    fun mouthVisemeFile(
+        viseme: AssistantViseme,
+        assistantId: String = DEFAULT_ASSISTANT_ID,
+    ): String = mouthVisemeFile(viseme.code, assistantId)
+
+    fun mouthEmotionFile(
+        emotion: AssistantMouthEmotion,
+        assistantId: String = DEFAULT_ASSISTANT_ID,
+    ): String = "asst_${assistantId}_mouth_${emotion.assetSuffix}.webp"
+
+    fun mouthFile(
+        mouth: AssistantMouthShape,
+        assistantId: String = DEFAULT_ASSISTANT_ID,
+    ): String = when (mouth) {
+        is AssistantMouthShape.Viseme -> mouthVisemeFile(mouth.value, assistantId)
+        is AssistantMouthShape.Emotion -> mouthEmotionFile(mouth.value, assistantId)
     }
 
     fun spawnFiles(assistantId: String = DEFAULT_ASSISTANT_ID): List<String> =

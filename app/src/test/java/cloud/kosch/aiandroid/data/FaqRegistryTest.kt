@@ -8,7 +8,7 @@ import org.junit.Test
 class FaqRegistryTest {
     @Test
     fun `faq covers the launcher safety and pen surface broadly`() {
-        assertTrue(FaqRegistry.entries.size >= 57)
+        assertTrue(FaqRegistry.entries.size >= 60)
         assertTrue(FaqRegistry.entries.any { it.id == "escape" })
         assertTrue(FaqRegistry.entries.any { it.id == "pen-space" })
         assertTrue(FaqRegistry.entries.any { it.id == "private-space" })
@@ -26,6 +26,9 @@ class FaqRegistryTest {
         assertTrue(FaqRegistry.entries.any { it.id == "messages" })
         assertTrue(FaqRegistry.entries.any { it.id == "work-profile-pause" })
         assertTrue(FaqRegistry.entries.any { it.id == "system-note" })
+        assertTrue(FaqRegistry.entries.any { it.id == "assistant-opt-in" })
+        assertTrue(FaqRegistry.entries.any { it.id == "assistant-visual-runtime" })
+        assertTrue(FaqRegistry.entries.any { it.id == "assistant-lipsync" })
     }
 
     @Test
