@@ -7,6 +7,7 @@ PATCH_FILE="$POC_DIR/patches/0001-kosch-safe-mobile-bridge.patch"
 PINNED_COMMIT="8dda19e8e4613e014f0b12f3e624fdff5e5f23b3"
 PINNED_GO="go1.26.3"
 PINNED_MODULE="github.com/xjasonlyu/tun2socks/v2"
+PINNED_X_MOBILE="v0.0.0-20260821190718-4776eadac327"
 ANDROID_API="29"
 
 SOURCE_DIR="${1:-}"
@@ -17,12 +18,16 @@ fail() {
   exit 1
 }
 
+mobile_tool_version() {
+  go version -m "$1" | awk '$1 == "mod" && $2 == "golang.org/x/mobile" { print $3; exit }'
+}
+
 [[ -n "$SOURCE_DIR" ]] || fail "usage: $0 /path/to/tun2socks-v2.7.0 [output-dir]"
 SOURCE_DIR="$(cd "$SOURCE_DIR" && pwd)"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 
-for tool in git go gomobile sha256sum; do
+for tool in git go gomobile gobind sha256sum; do
   command -v "$tool" >/dev/null 2>&1 || fail "required tool not found: $tool"
 done
 
@@ -38,6 +43,17 @@ MODULE="$(awk '$1 == "module" { print $2; exit }' "$SOURCE_DIR/go.mod")"
 
 GO_VERSION="$(go env GOVERSION)"
 [[ "$GO_VERSION" == "$PINNED_GO" ]] || fail "Go toolchain must be exactly $PINNED_GO, got $GO_VERSION"
+
+GOMOBILE_PATH="$(command -v gomobile)"
+GOBIND_PATH="$(command -v gobind)"
+GOMOBILE_MODULE_VERSION="$(mobile_tool_version "$GOMOBILE_PATH")"
+GOBIND_MODULE_VERSION="$(mobile_tool_version "$GOBIND_PATH")"
+[[ "$GOMOBILE_MODULE_VERSION" == "$PINNED_X_MOBILE" ]] || fail "gomobile must come from $PINNED_X_MOBILE, got ${GOMOBILE_MODULE_VERSION:-unknown}"
+[[ "$GOBIND_MODULE_VERSION" == "$PINNED_X_MOBILE" ]] || fail "gobind must come from $PINNED_X_MOBILE, got ${GOBIND_MODULE_VERSION:-unknown}"
+
+# No command after this point may resolve modules from the network.
+export GOPROXY=off
+export GOSUMDB=off
 
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/kosch-tun2socks-poc.XXXXXX")"
 cleanup() {
@@ -62,13 +78,15 @@ fi
 ARTIFACT="$OUTPUT_DIR/tun2socks-kosch-v2.7.0-poc.aar"
 REPORT="$OUTPUT_DIR/tun2socks-kosch-v2.7.0-poc.evidence"
 
-# Deliberately force an offline module build. Missing cached modules are a hard failure;
-# this script never downloads dependencies as part of the evidence-producing build.
-export GOPROXY=off
-export GOSUMDB=off
-
 (
   cd "$WORK_DIR"
+
+  # Current gomobile requires golang.org/x/mobile/bind to be resolvable from the
+  # module being bound. Add the exact module version that produced gomobile/gobind.
+  # GOPROXY=off above guarantees this succeeds only from the pre-populated cache.
+  go mod edit -require="golang.org/x/mobile@$PINNED_X_MOBILE"
+  go list -mod=mod golang.org/x/mobile/bind >/dev/null
+
   gomobile bind \
     -target=android \
     -androidapi "$ANDROID_API" \
@@ -79,17 +97,21 @@ export GOSUMDB=off
 [[ -s "$ARTIFACT" ]] || fail "gomobile did not produce an AAR"
 ARTIFACT_SHA="$(sha256sum "$ARTIFACT" | awk '{print $1}')"
 PATCH_SHA="$(sha256sum "$PATCH_FILE" | awk '{print $1}')"
-GOMOBILE_PATH="$(command -v gomobile)"
 GOMOBILE_SHA="$(sha256sum "$GOMOBILE_PATH" | awk '{print $1}')"
+GOBIND_SHA="$(sha256sum "$GOBIND_PATH" | awk '{print $1}')"
 
 cat >"$REPORT" <<EOF
-format=kosch-n2-offline-aar-evidence-v1
+format=kosch-n2-offline-aar-evidence-v2
 upstream=https://github.com/xjasonlyu/tun2socks
 version=v2.7.0
 commit=$PINNED_COMMIT
 go_module=$PINNED_MODULE
 go_version=$GO_VERSION
+x_mobile_version=$PINNED_X_MOBILE
+gomobile_module_version=$GOMOBILE_MODULE_VERSION
+gobind_module_version=$GOBIND_MODULE_VERSION
 gomobile_sha256=$GOMOBILE_SHA
+gobind_sha256=$GOBIND_SHA
 patch_sha256=$PATCH_SHA
 android_min_api=$ANDROID_API
 network_during_build=false
