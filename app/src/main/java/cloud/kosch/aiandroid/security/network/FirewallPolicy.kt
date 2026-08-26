@@ -31,6 +31,9 @@ data class FirewallFlowContext(
 ) {
     init {
         require(remotePort == null || remotePort in 0..65535) { "Remote port is invalid" }
+        require(
+            protocol == TrafficProtocol.TCP || protocol == TrafficProtocol.UDP || remotePort == null,
+        ) { "Only TCP/UDP firewall flow contexts may contain ports" }
         require(ownerUid == null || ownerUid >= 0) { "Owner UID is invalid" }
         require(packageName == null || (packageName.isNotBlank() && packageName.length <= 255)) {
             "Package name is invalid"
