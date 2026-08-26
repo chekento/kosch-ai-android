@@ -1,6 +1,5 @@
 package cloud.kosch.aiandroid
 
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -19,15 +18,15 @@ class SecurityNetworkActivityInstrumentationTest {
     fun securityActivity_rendersTrafficNeutralContract_andSurvivesRecreation() {
         composeTestRule.waitForIdle()
 
-        composeTestRule.onNodeWithText("Security & Network").assertExists()
-        composeTestRule.onNodeWithText("Autorisierung ≠ aktives VPN").assertExists()
-        composeTestRule.onNodeWithText("N1-Datenbilanz").assertExists()
+        composeTestRule.onNodeWithText("Security & Network").fetchSemanticsNode()
+        composeTestRule.onNodeWithText("Autorisierung ≠ aktives VPN").fetchSemanticsNode()
+        composeTestRule.onNodeWithText("N1-Datenbilanz").fetchSemanticsNode()
 
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
 
-        composeTestRule.onNodeWithText("Security & Network").assertExists()
-        composeTestRule.onNodeWithText("Autorisierung ≠ aktives VPN").assertExists()
+        composeTestRule.onNodeWithText("Security & Network").fetchSemanticsNode()
+        composeTestRule.onNodeWithText("Autorisierung ≠ aktives VPN").fetchSemanticsNode()
     }
 
     @Test
@@ -39,13 +38,13 @@ class SecurityNetworkActivityInstrumentationTest {
             .performClick()
         composeTestRule.waitForIdle()
 
-        composeTestRule.onNodeWithText("Security & Network · N1").assertExists()
-        composeTestRule.onNodeWithText("Verstanden").assertExists()
+        composeTestRule.onNodeWithText("Security & Network · N1").fetchSemanticsNode()
+        composeTestRule.onNodeWithText("Verstanden").fetchSemanticsNode()
     }
 
     @Test
     fun backControl_isAlwaysDiscoverable() {
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithContentDescription("Zurück zum Launcher").assertExists()
+        composeTestRule.onNodeWithContentDescription("Zurück zum Launcher").fetchSemanticsNode()
     }
 }
