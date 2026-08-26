@@ -13,9 +13,27 @@ The launcher should feel powerful before it feels technical: immediate access to
 - Duplicate a complete user page with fresh portable item IDs (core landed in this track)
 - Resize Home items with deterministic collision avoidance (core landed in this track)
 - Auto-arrange/compact a user page without changing item order or content (core landed in this track)
-- Surface duplicate, resize, auto-arrange and undo in a dedicated Home Studio editing experience
+- Surface duplicate, resize, auto-arrange and undo in a dedicated Home Studio editing experience (landed in this track)
 - Multi-select for move/remove/group where accessibility semantics remain explicit
 - Page overview with reorder, rename, duplicate, hide/show and default-page selection
+
+## P0 – Extensive Settings Center
+
+The launcher gets a real configuration center rather than a small preferences page. The architecture is tracked in `docs/SETTINGS_CENTER_ARCHITECTURE.md`.
+
+- Versioned portable `LauncherSettingsDocument` with explicit normalization and migration path (model landed in this track)
+- At least 22 primary Settings sections: Home/Grid, Pages, Apps, Dock, Folders, Widgets, Appearance, Themes, Assistant, AI, APIs, Voice, Gestures, Search, Notifications, Pen, Automation, Accessibility, Privacy, Backup, System, Advanced
+- Settings search across every subtab
+- Global defaults with page-level and object-level overrides where the setting is meaningful
+- Explicit `inherit default` state for every scoped override
+- Preview / Apply / Discard / Undo for grid, theme, layout, icon-pack and other disruptive visual changes
+- Reset by setting, group, tab or complete launcher
+- Favorites / pinned settings and recently changed settings
+- Partial import/export with dry-run and conflict preview
+- API/provider configuration separated from credential secret material
+- Secrets, OAuth tokens, widget host IDs, URI grants and other device-bound capabilities excluded from portable settings
+- First live tabs: Home/Grid, Appearance and Assistant
+- Follow with Theme Import/Export, Gesture Matrix, AI/API Provider Settings, Widget/Folder/App inspectors and Backup scopes
 
 ## P0 – Widgets become first-class Home items
 
@@ -44,6 +62,7 @@ The launcher should feel powerful before it feels technical: immediate access to
 - Voice and live-chat entry from Home without forcing a network provider
 - Local-first command planning; provider routing is always explicit when data leaves the device
 - Contextual suggestions that never rearrange the user’s Home without preview/apply
+- Assistant visibility, scale, anchor, motion, gaze, emotion, lip sync, voice and per-page behavior configurable in Settings Center
 
 ## P1 – Visual quality
 
@@ -61,8 +80,16 @@ The launcher should feel powerful before it feels technical: immediate access to
 - Persistent multi-step undo/redo history
 - Optional LCARS, Minimal Work, Living AI and Cyberdeck programs without making any one theme a core dependency
 
+## Configuration scope model
+
+Visual and interaction settings should use a predictable inheritance chain where meaningful:
+
+**Global launcher default → Page override → Folder/Widget/App-item override**
+
+Temporary context/session behavior is not allowed to silently overwrite persistent user choices. Every override must expose an explicit `inherit default` option so the configuration can be simplified again.
+
 ## Product gates
 
 Security/firewall work may block a release when it affects privacy or correctness, but it runs as a parallel gate. It does not replace launcher work. Every milestone should ship at least one user-visible launcher improvement unless the milestone is explicitly a release-hardening gate.
 
-The next user-visible sequence is therefore: Home Studio UI → v7 widget placement → icon packs/gestures → assistant/living-surface integration → deeper theme/creator tools.
+The next user-visible sequence is therefore: Home Studio → Settings Center foundation → v7 widget placement → icon packs/gestures → assistant/living-surface integration → deeper theme/creator tools.
