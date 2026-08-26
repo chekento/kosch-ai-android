@@ -41,7 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.LauncherController
-import cloud.kosch.aiandroid.data.FaqRegistry
+import cloud.kosch.aiandroid.data.UnifiedFaqRegistry
 import cloud.kosch.aiandroid.model.FaqCategory
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 import cloud.kosch.aiandroid.ui.theme.Mint
@@ -55,7 +55,7 @@ fun FaqSheet(controller: LauncherController) {
     var query by remember { mutableStateOf("") }
     var category by remember { mutableStateOf<FaqCategory?>(null) }
     var expandedId by remember { mutableStateOf<String?>("first-start") }
-    val results = remember(query, category) { FaqRegistry.search(query, category) }
+    val results = remember(query, category) { UnifiedFaqRegistry.search(query, category) }
 
     ModalBottomSheet(
         onDismissRequest = controller::closeFaq,
@@ -87,7 +87,7 @@ fun FaqSheet(controller: LauncherController) {
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text("FAQ & Hilfe", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                    Text("${FaqRegistry.entries.size} lokale Antworten · keine Websuche", color = MutedMist)
+                    Text("${UnifiedFaqRegistry.entries.size} lokale Antworten · keine Websuche", color = MutedMist)
                 }
                 IconButton(onClick = controller::closeFaq) {
                     Icon(Icons.Rounded.Close, contentDescription = "FAQ schließen")
