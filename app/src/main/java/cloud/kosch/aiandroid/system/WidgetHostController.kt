@@ -37,6 +37,13 @@ class WidgetHostController(context: Context) {
 
     fun isValid(appWidgetId: Int): Boolean = manager.getAppWidgetInfo(appWidgetId) != null
 
+    /** Portable component identity only; callers must never serialize the Android host id beside it. */
+    fun providerComponent(appWidgetId: Int): String? = manager
+        .getAppWidgetInfo(appWidgetId)
+        ?.provider
+        ?.flattenToString()
+        ?.takeIf(String::isNotBlank)
+
     fun createView(context: Context, appWidgetId: Int, preset: WidgetSizePreset): View? {
         val info = manager.getAppWidgetInfo(appWidgetId) ?: return null
         return host.createView(context, appWidgetId, info).apply {
