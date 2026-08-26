@@ -3,6 +3,7 @@ package cloud.kosch.aiandroid.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DragIndicator
@@ -80,9 +82,9 @@ import cloud.kosch.aiandroid.ui.theme.Warm
 import kotlin.math.roundToInt
 
 /**
- * Keeps the proven v7 Home intact and adds a focused direct-manipulation surface on top of it.
+ * Direct-manipulation Home Studio for the portable v7 workspace.
  * Finger, mouse and Android stylus pointer drags all arrive through Compose pointer input. The existing
- * item editor remains the non-drag keyboard/TalkBack path.
+ * item editor remains the non-drag keyboard/TalkBack path while Home Studio adds fast page and size tools.
  */
 @Composable
 fun DragDropWorkspaceHomeScreen(
@@ -105,7 +107,7 @@ fun DragDropWorkspaceHomeScreen(
         if (home.isUserPage()) {
             AssistChip(
                 onClick = { arrangeVisible = true },
-                label = { Text("Anordnen") },
+                label = { Text("Home Studio") },
                 leadingIcon = { Icon(Icons.Rounded.DragIndicator, contentDescription = null) },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -129,6 +131,8 @@ private fun WorkspaceArrangeDialog(
     home: WorkspaceHomeController,
     onDismiss: () -> Unit,
 ) {
+    var selectedItemId by remember(home.activePage.id) { mutableStateOf<String?>(null) }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
@@ -155,9 +159,9 @@ private fun WorkspaceArrangeDialog(
                         }
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Homescreen anordnen", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        Text("Home Studio", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Ziehen · am Raster einrasten · über Seitenkante auf andere Home-Seite",
+                            "Ziehen · skalieren · Seiten verwalten · automatisch anordnen",
                             color = MutedMist,
                             style = MaterialTheme.typography.labelMedium,
                         )
@@ -166,11 +170,15 @@ private fun WorkspaceArrangeDialog(
                         Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "Letzten Homescreen-Schritt rückgängig")
                     }
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Anordnen schließen")
+                        Icon(Icons.Rounded.Close, contentDescription = "Home Studio schließen")
                     }
                 }
 
                 ArrangeUserPageRail(home)
+
+                if (home.isUserPage()) {
+                    HomeStudioPageActions(home)
+                }
 
                 if (!home.isUserPage()) {
                     Surface(
@@ -186,14 +194,92 @@ private fun WorkspaceArrangeDialog(
                     ArrangeCanvas(
                         controller = controller,
                         home = home,
+                        selectedItemId = selectedItemId,
+                        onSelectItem = { selectedItemId = it },
                         modifier = Modifier.fillMaxWidth().weight(1f),
                     )
                 }
 
+                selectedItemId?.let { itemId ->
+                    HomeStudioSelectionBar(
+                        home = home,
+                        itemId = itemId,
+                    )
+                }
+
                 Text(
-                    "Tastatur/TalkBack: Anordnen schließen und im normalen Edit-Modus ein Element antippen; die Pfeilsteuerung bleibt vollständig erhalten.",
+                    "Tipp wählt ein Element für Größen-Presets. Ziehen verschiebt es. Tastatur/TalkBack: Home Studio schließen und im normalen Edit-Modus die Pfeilsteuerung verwenden.",
                     color = MutedMist,
                     style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun HomeStudioPageActions(home: WorkspaceHomeController) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AssistChip(
+            onClick = home::duplicateActivePage,
+            label = { Text("Seite duplizieren") },
+            leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+        )
+        AssistChip(
+            onClick = home::compactActivePage,
+            label = { Text("Auto-Anordnen") },
+            leadingIcon = { Icon(Icons.Rounded.DragIndicator, contentDescription = null) },
+        )
+        if (home.canUndo) {
+            AssistChip(
+                onClick = home::undo,
+                label = { Text("Rückgängig") },
+                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = null) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeStudioSelectionBar(
+    home: WorkspaceHomeController,
+    itemId: String,
+) {
+    val item = home.activePage.items.firstOrNull { it.id == itemId } ?: return
+    val presets = listOf(
+        HomeStudioSizePreset("Kompakt", 2, 2),
+        HomeStudioSizePreset("Breit", 4, 2),
+        HomeStudioSizePreset("Groß", 4, 4),
+        HomeStudioSizePreset("XL", 6, 4),
+    )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = DeepSurface.copy(alpha = 0.96f),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, Sky.copy(alpha = 0.22f)),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Größe ${item.bounds.columnSpan}×${item.bounds.rowSpan}",
+                color = MutedMist,
+                style = MaterialTheme.typography.labelMedium,
+            )
+            presets.forEach { preset ->
+                FilterChip(
+                    selected = item.bounds.columnSpan == preset.columns && item.bounds.rowSpan == preset.rows,
+                    onClick = { home.resizeItem(itemId, preset.columns, preset.rows) },
+                    label = { Text(preset.title) },
                 )
             }
         }
@@ -235,6 +321,8 @@ private fun ArrangeUserPageRail(home: WorkspaceHomeController) {
 private fun ArrangeCanvas(
     controller: LauncherController,
     home: WorkspaceHomeController,
+    selectedItemId: String?,
+    onSelectItem: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val page = home.activePage
@@ -283,6 +371,8 @@ private fun ArrangeCanvas(
                     item = item,
                     controller = controller,
                     home = home,
+                    selected = item.id == selectedItemId,
+                    onSelect = { onSelectItem(item.id) },
                     cellWidthPx = cellWidthPx,
                     cellHeightPx = cellHeightPx,
                     cellWidth = cellWidth,
@@ -300,6 +390,8 @@ private fun DraggableArrangeItem(
     item: WorkspaceItem,
     controller: LauncherController,
     home: WorkspaceHomeController,
+    selected: Boolean,
+    onSelect: () -> Unit,
     cellWidthPx: Float,
     cellHeightPx: Float,
     cellWidth: androidx.compose.ui.unit.Dp,
@@ -373,11 +465,15 @@ private fun DraggableArrangeItem(
                 .padding(3.dp)
                 .semantics(mergeDescendants = true) {
                     role = Role.Button
-                    contentDescription = arrangeDescription(item, controller)
+                    contentDescription = arrangeDescription(item, controller) + if (selected) ". Ausgewählt" else ". Tippen für Größenoptionen"
                 }
+                .clickable(onClick = onSelect)
                 .pointerInput(item.id, item.bounds, previousPageId, nextPageId) {
                     detectDragGestures(
-                        onDragStart = { dragging = true },
+                        onDragStart = {
+                            dragging = true
+                            onSelect()
+                        },
                         onDrag = { change, delta ->
                             change.consume()
                             dragOffset += delta
@@ -424,9 +520,20 @@ private fun DraggableArrangeItem(
                     )
                 },
             colors = CardDefaults.cardColors(
-                containerColor = if (dragging) Sky.copy(alpha = 0.20f) else RaisedSurface.copy(alpha = 0.96f),
+                containerColor = when {
+                    dragging -> Sky.copy(alpha = 0.20f)
+                    selected -> Violet.copy(alpha = 0.20f)
+                    else -> RaisedSurface.copy(alpha = 0.96f)
+                },
             ),
-            border = BorderStroke(1.dp, if (dragging) Sky else Mint.copy(alpha = 0.34f)),
+            border = BorderStroke(
+                1.dp,
+                when {
+                    dragging -> Sky
+                    selected -> Violet
+                    else -> Mint.copy(alpha = 0.34f)
+                },
+            ),
             shape = RoundedCornerShape(18.dp),
         ) {
             ArrangeItemContent(item, controller, crossTarget)
@@ -464,7 +571,7 @@ private fun ArrangeItemContent(
                 Icon(Icons.Rounded.Folder, contentDescription = null, tint = Violet)
                 Text(folder?.title ?: "Ordner fehlt", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium)
             }
-            is WorkspaceItemContent.Widget -> Text("Widget · Remap", color = Warm, style = MaterialTheme.typography.labelSmall)
+            is WorkspaceItemContent.Widget -> Text("Widget · Zuordnung erforderlich", color = Warm, style = MaterialTheme.typography.labelSmall)
             is WorkspaceItemContent.ActionTile -> Unit
         }
         if (crossTarget != null) {
@@ -503,3 +610,9 @@ private fun arrangeDescription(item: WorkspaceItem, controller: LauncherControll
     is WorkspaceItemContent.Widget -> "Widget. Ziehen zum Verschieben"
     is WorkspaceItemContent.ActionTile -> "Geschützte Aktion"
 }
+
+private data class HomeStudioSizePreset(
+    val title: String,
+    val columns: Int,
+    val rows: Int,
+)
