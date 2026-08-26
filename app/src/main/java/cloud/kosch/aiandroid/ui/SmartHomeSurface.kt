@@ -1,5 +1,6 @@
 package cloud.kosch.aiandroid.ui
 
+import android.content.Intent
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.PushPin
+import androidx.compose.material.icons.rounded.Security
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -61,6 +63,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
@@ -70,6 +73,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import cloud.kosch.aiandroid.LauncherController
+import cloud.kosch.aiandroid.SecurityNetworkActivity
 import cloud.kosch.aiandroid.data.WorkspaceCollectionEditor
 import cloud.kosch.aiandroid.model.HomePage
 import cloud.kosch.aiandroid.model.FolderKind
@@ -83,6 +87,7 @@ import cloud.kosch.aiandroid.ui.theme.Violet
 
 @Composable
 fun HomePageSelector(controller: LauncherController) {
+    val context = LocalContext.current
     val pages = HomePage.entries.filter { page ->
         page != HomePage.PEN_SPACE || controller.stylusState.present || controller.homePage == HomePage.PEN_SPACE
     }
@@ -114,6 +119,16 @@ fun HomePageSelector(controller: LauncherController) {
                 },
             )
         }
+        FilterChip(
+            selected = false,
+            onClick = {
+                context.startActivity(Intent(context, SecurityNetworkActivity::class.java))
+            },
+            label = { Text("Security & Network") },
+            leadingIcon = {
+                Icon(Icons.Rounded.Security, contentDescription = null, modifier = Modifier.size(17.dp))
+            },
+        )
     }
 }
 
