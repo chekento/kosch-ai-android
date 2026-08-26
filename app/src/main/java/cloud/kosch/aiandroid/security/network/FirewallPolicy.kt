@@ -16,6 +16,10 @@ data class PortRange(
     operator fun contains(port: Int): Boolean = port in first..last
 }
 
+/**
+ * Explicit live-flow input for N3 evaluation.
+ * Direction is never inferred from aggregated telemetry because a flow snapshot can contain both directions.
+ */
 data class FirewallFlowContext(
     val direction: TrafficDirection,
     val protocol: TrafficProtocol,
@@ -35,18 +39,6 @@ data class FirewallFlowContext(
         require(!packageAttributionAmbiguous || packageName == null) {
             "Ambiguous package attribution cannot claim one package"
         }
-    }
-
-    companion object {
-        fun from(snapshot: FlowSnapshot): FirewallFlowContext = FirewallFlowContext(
-            direction = if (snapshot.outboundPackets > 0) TrafficDirection.OUTBOUND else TrafficDirection.INBOUND,
-            protocol = snapshot.key.protocol,
-            remoteAddress = snapshot.key.remoteAddress,
-            remotePort = snapshot.key.remotePort,
-            ownerUid = snapshot.key.ownerUid,
-            packageName = snapshot.packageName,
-            packageAttributionAmbiguous = snapshot.packageAttributionAmbiguous,
-        )
     }
 }
 
@@ -103,7 +95,9 @@ data class FirewallEvaluation(
     val matchedRuleId: String?,
 ) {
     init {
-        require((matchedRuleId == null) == (verdict == FirewallVerdict.ALLOW) || matchedRuleId != null)
+        require(verdict != FirewallVerdict.BLOCK || matchedRuleId != null) {
+            "Blocking requires an explicit matched rule"
+        }
     }
 }
 
