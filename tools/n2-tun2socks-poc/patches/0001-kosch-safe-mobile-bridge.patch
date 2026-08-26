@@ -26,7 +26,8 @@ index f0c1170..1111111 100644
 +	mandatory  atomic.Value
  }
  
- // New creates a new Dialer with the given initial SocketOptions.
+-// New creates a new Dialer with the given initial socket options.
++// New creates a new Dialer with the given initial socket options.
 @@ -44,6 +55,16 @@ func (d *Dialer) RegisterSockOpt(opt SocketOption) {
  	d.optsMu.Unlock()
  }
@@ -39,7 +40,7 @@ index f0c1170..1111111 100644
 +	d.mandatory.Store([]SocketOption(nil))
 +}
  
- // Reset removes all registered SocketOptions from the Dialer.
+ // Reset removes all registered socket options from the Dialer.
  func (d *Dialer) Reset() {
 @@ -53,6 +74,12 @@ func (d *Dialer) Reset() {
  }
