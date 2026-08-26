@@ -9,6 +9,7 @@ PINNED_GO="go1.26.3"
 PINNED_MODULE="github.com/xjasonlyu/tun2socks/v2"
 PINNED_X_MOBILE="v0.0.0-20260821190718-4776eadac327"
 PINNED_X_MOBILE_COMMIT="4776eadac327bcb80cebc7413c91f8b4abf8ffa1"
+PINNED_NDK="28.2.13676358"
 BOUND_PACKAGE="$PINNED_MODULE/koschmobile"
 ANDROID_API="29"
 
@@ -29,7 +30,7 @@ SOURCE_DIR="$(cd "$SOURCE_DIR" && pwd)"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 
-for tool in git go gomobile gobind sha256sum unzip jar; do
+for tool in git go gomobile gobind sha256sum unzip jar awk grep; do
   command -v "$tool" >/dev/null 2>&1 || fail "required tool not found: $tool"
 done
 
@@ -52,6 +53,12 @@ GOMOBILE_MODULE_VERSION="$(mobile_tool_version "$GOMOBILE_PATH")"
 GOBIND_MODULE_VERSION="$(mobile_tool_version "$GOBIND_PATH")"
 [[ "$GOMOBILE_MODULE_VERSION" == "$PINNED_X_MOBILE" ]] || fail "gomobile must come from $PINNED_X_MOBILE, got ${GOMOBILE_MODULE_VERSION:-unknown}"
 [[ "$GOBIND_MODULE_VERSION" == "$PINNED_X_MOBILE" ]] || fail "gobind must come from $PINNED_X_MOBILE, got ${GOBIND_MODULE_VERSION:-unknown}"
+
+[[ -n "${ANDROID_NDK_HOME:-}" ]] || fail "ANDROID_NDK_HOME must point to pinned NDK $PINNED_NDK"
+NDK_SOURCE_PROPERTIES="$ANDROID_NDK_HOME/source.properties"
+[[ -f "$NDK_SOURCE_PROPERTIES" ]] || fail "NDK source.properties missing at $NDK_SOURCE_PROPERTIES"
+NDK_VERSION="$(awk -F= '$1 ~ /^[[:space:]]*Pkg.Revision[[:space:]]*$/ { gsub(/[[:space:]]/, "", $2); print $2; exit }' "$NDK_SOURCE_PROPERTIES")"
+[[ "$NDK_VERSION" == "$PINNED_NDK" ]] || fail "Android NDK must be exactly $PINNED_NDK, got ${NDK_VERSION:-unknown}"
 
 # The Go pseudo-version carries only the source revision prefix. source.lock records the reviewed full
 # commit mapping, while the binary SHA-256 values below identify the actual installed tool binaries.
@@ -140,7 +147,7 @@ GOMOBILE_SHA="$(sha256sum "$GOMOBILE_PATH" | awk '{print $1}')"
 GOBIND_SHA="$(sha256sum "$GOBIND_PATH" | awk '{print $1}')"
 
 cat >"$REPORT" <<EOF
-format=kosch-n2-offline-aar-evidence-v3
+format=kosch-n2-offline-aar-evidence-v4
 upstream=https://github.com/xjasonlyu/tun2socks
 version=v2.7.0
 commit=$PINNED_COMMIT
@@ -150,6 +157,7 @@ x_mobile_version=$PINNED_X_MOBILE
 x_mobile_commit=$PINNED_X_MOBILE_COMMIT
 gomobile_module_version=$GOMOBILE_MODULE_VERSION
 gobind_module_version=$GOBIND_MODULE_VERSION
+ndk_version=$NDK_VERSION
 gomobile_sha256=$GOMOBILE_SHA
 gobind_sha256=$GOBIND_SHA
 patch_sha256=$PATCH_SHA
@@ -170,4 +178,4 @@ artifact=$(basename "$ARTIFACT")
 artifact_sha256=$ARTIFACT_SHA
 EOF
 
-printf 'AAR: %s\nEvidence: %s\nSHA-256: %s\n' "$ARTIFACT" "$REPORT" "$ARTIFACT_SHA"
+printf 'AAR: %s\nEvidence: %s\nSHA-256: %s\nNDK: %s\n' "$ARTIFACT" "$REPORT" "$ARTIFACT_SHA" "$NDK_VERSION"
