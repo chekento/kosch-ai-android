@@ -12,6 +12,7 @@ class Tun2SocksOfflinePocContractTest {
         upstreamCommit = Tun2SocksOfflinePocContract.UPSTREAM_COMMIT,
         goVersion = Tun2SocksOfflinePocContract.GO_VERSION,
         xMobileVersion = Tun2SocksOfflinePocContract.X_MOBILE_VERSION,
+        xMobileCommit = Tun2SocksOfflinePocContract.X_MOBILE_COMMIT,
         gomobileModuleVersion = Tun2SocksOfflinePocContract.X_MOBILE_VERSION,
         gobindModuleVersion = Tun2SocksOfflinePocContract.X_MOBILE_VERSION,
         gomobileSha256 = digest,
@@ -19,6 +20,12 @@ class Tun2SocksOfflinePocContractTest {
         patchSha256 = digest,
         artifactSha256 = digest,
         androidMinApi = Tun2SocksOfflinePocContract.ANDROID_MIN_API,
+        boundPackage = Tun2SocksOfflinePocContract.BOUND_PACKAGE,
+        engineJavaApiExposed = false,
+        tunFdDuplicated = true,
+        panicCrossBoundary = false,
+        fixedDirectEgress = true,
+        proxyConfigurationExposed = false,
         networkDuringBuild = false,
         runtimeIntegrated = false,
         vpnEstablished = false,
@@ -42,6 +49,7 @@ class Tun2SocksOfflinePocContractTest {
                 upstreamCommit = "0".repeat(40),
                 goVersion = "go1.99.0",
                 xMobileVersion = "v0.0.0-bad",
+                xMobileCommit = "0".repeat(40),
                 gomobileModuleVersion = "v0.0.0-other",
                 gobindModuleVersion = "v0.0.0-other",
             ),
@@ -51,8 +59,31 @@ class Tun2SocksOfflinePocContractTest {
         assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.COMMIT_DRIFT))
         assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.GO_TOOLCHAIN_DRIFT))
         assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.X_MOBILE_TOOLCHAIN_DRIFT))
+        assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.X_MOBILE_COMMIT_DRIFT))
         assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.GOMOBILE_MODULE_DRIFT))
         assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.GOBIND_MODULE_DRIFT))
+    }
+
+    @Test
+    fun unsafeWrapperOrFdOwnership_blocksArtifact() {
+        val result = Tun2SocksOfflinePocContract.evaluate(
+            validEvidence().copy(
+                boundPackage = "github.com/xjasonlyu/tun2socks/v2/engine",
+                engineJavaApiExposed = true,
+                tunFdDuplicated = false,
+                panicCrossBoundary = true,
+                fixedDirectEgress = false,
+                proxyConfigurationExposed = true,
+            ),
+        )
+
+        assertFalse(result.artifactEligible)
+        assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.BOUND_PACKAGE_DRIFT))
+        assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.UNSAFE_ENGINE_API_EXPOSED))
+        assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.TUN_FD_OWNERSHIP_UNSAFE))
+        assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.PANIC_BOUNDARY_UNSAFE))
+        assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.DIRECT_EGRESS_NOT_FIXED))
+        assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.PROXY_CONFIGURATION_EXPOSED))
     }
 
     @Test
