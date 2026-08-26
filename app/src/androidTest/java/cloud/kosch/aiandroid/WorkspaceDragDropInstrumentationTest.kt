@@ -58,7 +58,9 @@ class WorkspaceDragDropInstrumentationTest {
                 .onNodeWithContentDescription("App. Ziehen zum Verschieben", useUnmergedTree = true)
                 .performTouchInput {
                     down(center)
-                    moveBy(Offset(350f, 0f))
+                    // Touch injection distances are physical pixels. Move in several realistic pointer steps
+                    // far enough to cross the full 12-column canvas on the API 36 Pixel 2 density.
+                    repeat(8) { moveBy(Offset(160f, 0f)) }
                     up()
                 }
             composeTestRule.waitForIdle()
