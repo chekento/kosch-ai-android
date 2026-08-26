@@ -40,6 +40,11 @@ class SettingsCenterInstrumentationTest {
         composeTestRule.onNodeWithText("Rasterspalten", useUnmergedTree = true).fetchSemanticsNode()
         composeTestRule.onNodeWithText("Rasterzeilen", useUnmergedTree = true).fetchSemanticsNode()
 
+        // Phone navigation is intentionally hierarchical: detail -> section list -> close.
+        composeTestRule
+            .onNodeWithContentDescription("Zurück zu allen Einstellungen", useUnmergedTree = true)
+            .performClick()
+        composeTestRule.waitForIdle()
         composeTestRule
             .onNodeWithContentDescription("Settings Center schließen", useUnmergedTree = true)
             .performClick()
