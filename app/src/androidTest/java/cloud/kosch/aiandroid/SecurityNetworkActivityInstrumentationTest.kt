@@ -1,10 +1,12 @@
 package cloud.kosch.aiandroid
 
+import android.content.ComponentName
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -46,5 +48,16 @@ class SecurityNetworkActivityInstrumentationTest {
     fun backControl_isAlwaysDiscoverable() {
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithContentDescription("Zurück zum Launcher").fetchSemanticsNode()
+    }
+
+    @Test
+    fun securityActivity_isNotExported() {
+        val activity = composeTestRule.activity
+        val info = activity.packageManager.getActivityInfo(
+            ComponentName(activity, SecurityNetworkActivity::class.java),
+            0,
+        )
+
+        assertFalse("SecurityNetworkActivity must remain internal-only", info.exported)
     }
 }
