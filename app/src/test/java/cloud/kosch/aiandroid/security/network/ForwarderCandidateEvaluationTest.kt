@@ -6,12 +6,13 @@ import org.junit.Test
 
 class ForwarderCandidateEvaluationTest {
     @Test
-    fun tun2socks_isN2SourceCandidate_butCannotActivateWithoutAndroidEvidence() {
+    fun tun2socks_isN2PrototypeCandidate_butCannotActivateWithoutAndroidEvidence() {
         val result = ForwarderCandidateEvaluation.evaluate(
             ForwarderCandidateCatalog.TUN2SOCKS_2_7_0,
             ForwarderUseCase.N2_DIRECT,
         )
 
+        assertTrue(result.prototypeEligible)
         assertFalse(result.activationEligible)
         assertFalse(result.blockers.contains(ForwarderPreflightBlocker.USE_CASE_MISMATCH))
         assertFalse(result.blockers.contains(ForwarderPreflightBlocker.LICENSE_NOT_APPROVED))
@@ -25,24 +26,26 @@ class ForwarderCandidateEvaluationTest {
     }
 
     @Test
-    fun hev_isNotAcceptedAsN2DirectForwarder() {
+    fun hev_isNotAcceptedAsN2DirectPrototype() {
         val result = ForwarderCandidateEvaluation.evaluate(
             ForwarderCandidateCatalog.HEV_SOCKS5_2_17_1,
             ForwarderUseCase.N2_DIRECT,
         )
 
+        assertFalse(result.prototypeEligible)
         assertFalse(result.activationEligible)
         assertTrue(result.blockers.contains(ForwarderPreflightBlocker.USE_CASE_MISMATCH))
         assertTrue(result.blockers.contains(ForwarderPreflightBlocker.DIRECT_EGRESS_UNAVAILABLE))
     }
 
     @Test
-    fun hev_matchesN4Role_butStillNeedsProtectAndDeviceEvidence() {
+    fun hev_matchesN4PrototypeRole_butStillNeedsProtectAndDeviceEvidence() {
         val result = ForwarderCandidateEvaluation.evaluate(
             ForwarderCandidateCatalog.HEV_SOCKS5_2_17_1,
             ForwarderUseCase.N4_PROXY,
         )
 
+        assertTrue(result.prototypeEligible)
         assertFalse(result.activationEligible)
         assertFalse(result.blockers.contains(ForwarderPreflightBlocker.USE_CASE_MISMATCH))
         assertFalse(result.blockers.contains(ForwarderPreflightBlocker.ANDROID_EMBEDDING_UNVERIFIED))
@@ -74,12 +77,13 @@ class ForwarderCandidateEvaluationTest {
 
         val result = ForwarderCandidateEvaluation.evaluate(candidate, ForwarderUseCase.N2_DIRECT)
 
+        assertTrue(result.prototypeEligible)
         assertTrue(result.activationEligible)
         assertTrue(result.blockers.isEmpty())
     }
 
     @Test
-    fun permissiveLicenseDoesNotOverrideMissingNetworkEvidence() {
+    fun permissiveLicenseDoesNotOverrideMissingActivationEvidence() {
         val result = ForwarderCandidateEvaluation.evaluate(
             ForwarderCandidateCatalog.TUN2SOCKS_2_7_0.copy(
                 androidEmbeddingPathVerified = true,
@@ -89,6 +93,7 @@ class ForwarderCandidateEvaluationTest {
             ForwarderUseCase.N2_DIRECT,
         )
 
+        assertTrue(result.prototypeEligible)
         assertFalse(result.activationEligible)
         assertTrue(result.blockers.contains(ForwarderPreflightBlocker.NO_BLACK_HOLE_EVIDENCE_MISSING))
         assertTrue(result.blockers.contains(ForwarderPreflightBlocker.PHYSICAL_DEVICE_EVIDENCE_MISSING))
