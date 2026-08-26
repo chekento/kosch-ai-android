@@ -27,7 +27,7 @@ The patch is intentionally narrow:
 1. adds a mandatory dialer socket option that runs **before** tun2socks' non-global-unicast short-circuit;
 2. samples a gomobile-friendly `SocketProtector` during engine startup;
 3. requires that protector to approve every forwarder-created socket before connect/listen continues;
-4. exposes `StartSafe()` and `StopSafe()` so KoSch never calls the upstream `Start()` / `Stop()` wrappers that route errors through `log.Fatalf(...)`;
+4. exposes only the bounded `koschmobile.Start()` / `koschmobile.Stop()` facade, backed by recoverable `engine.StartKoSchDirect()` / `engine.StopKoSchDirect()`, so KoSch never calls the upstream `Start()` / `Stop()` wrappers that route failures through `log.Fatalf(...)`;
 5. clears the mandatory hook during safe shutdown.
 
 The intended Android implementation of `SocketProtector.Protect(fd)` is `VpnService.protect(fd)`. The app-side `StrictVpnSocketProtectorBridge` rejects negative/oversized descriptors and converts exceptions into `false`.
