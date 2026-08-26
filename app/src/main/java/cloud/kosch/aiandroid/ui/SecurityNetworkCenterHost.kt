@@ -32,6 +32,8 @@ import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.security.NetworkSecurityN1Policy
 import cloud.kosch.aiandroid.security.VpnAuthorizationState
 import cloud.kosch.aiandroid.security.VpnConflictState
+import cloud.kosch.aiandroid.security.VpnConsentAction
+import cloud.kosch.aiandroid.security.VpnConsentDecisionPolicy
 import cloud.kosch.aiandroid.security.VpnConsentGateway
 import cloud.kosch.aiandroid.ui.theme.MutedMist
 import cloud.kosch.aiandroid.ui.theme.Warm
@@ -89,10 +91,10 @@ fun ColumnScope.SecurityNetworkCenterHost(
         conflictState = inspection.conflict
         snapshot = NetworkSecurityN1Policy.snapshot(inspection.authorization)
 
-        when {
-            inspection.authorization == VpnAuthorizationState.AUTHORIZED -> Unit
-            inspection.conflict == VpnConflictState.NONE_DETECTED -> launchAndroidConsent()
-            else -> conflictDialogVisible = true
+        when (VpnConsentDecisionPolicy.actionFor(inspection)) {
+            VpnConsentAction.NO_SYSTEM_DIALOG -> Unit
+            VpnConsentAction.OPEN_SYSTEM_DIALOG -> launchAndroidConsent()
+            VpnConsentAction.REQUIRE_CONFLICT_ACKNOWLEDGEMENT -> conflictDialogVisible = true
         }
     }
 
