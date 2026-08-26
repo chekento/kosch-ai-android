@@ -75,6 +75,14 @@ It separates the run into two security zones:
 1. **networked preparation** — downloads a checksum-pinned official Go `1.26.3` Linux toolchain, installs the exact NDK, checks out the exact tun2socks commit, installs the exact x/mobile pseudo-version and pre-populates all required Go modules;
 2. **offline build** — invokes `build-pinned-aar.sh` with `GOPROXY=off` and `GOSUMDB=off`, validates the emitted evidence and archives the AAR plus SHA-256 manifests.
 
+The uploaded evidence directory contains the AAR, offline report, network-preparation report and `SHA256SUMS`. The checksum manifest deliberately contains **relative filenames only**. A reviewer can therefore download and extract the artifact anywhere and independently verify it from inside that directory:
+
+```bash
+sha256sum -c SHA256SUMS
+```
+
+The verification must succeed without the original GitHub runner path. Absolute `$RUNNER_TEMP` paths in `SHA256SUMS` are forbidden by the repository contract test.
+
 The workflow itself does not modify the Android app, does not add the AAR to Gradle and cannot authorize N2 activation. Its output is only supply-chain/API evidence used by a later review gate.
 
 ## Hard containment boundary
