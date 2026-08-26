@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -56,10 +57,7 @@ import androidx.compose.ui.window.DialogProperties
 import cloud.kosch.aiandroid.AssistantSessionController
 import cloud.kosch.aiandroid.LauncherSettingsController
 import cloud.kosch.aiandroid.WorkspaceHomeController
-import cloud.kosch.aiandroid.model.AppearanceSettings
 import cloud.kosch.aiandroid.model.AssistantAnchor
-import cloud.kosch.aiandroid.model.HomeSettings
-import cloud.kosch.aiandroid.model.LauncherAssistantSettings
 import cloud.kosch.aiandroid.model.MotionProfile
 import cloud.kosch.aiandroid.model.SettingsSection
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
@@ -287,7 +285,7 @@ private fun SettingsDetailPane(
 }
 
 @Composable
-private fun HomeSettingsEditor(settings: LauncherSettingsController, home: WorkspaceHomeController) {
+private fun ColumnScope.HomeSettingsEditor(settings: LauncherSettingsController, home: WorkspaceHomeController) {
     val current = settings.document.home
     var draft by remember(current) { mutableStateOf(current) }
     LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -314,7 +312,7 @@ private fun HomeSettingsEditor(settings: LauncherSettingsController, home: Works
 }
 
 @Composable
-private fun AppearanceSettingsEditor(settings: LauncherSettingsController) {
+private fun ColumnScope.AppearanceSettingsEditor(settings: LauncherSettingsController) {
     val current = settings.document.appearance
     var draft by remember(current) { mutableStateOf(current) }
     LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -327,7 +325,7 @@ private fun AppearanceSettingsEditor(settings: LauncherSettingsController) {
                     FilterChip(
                         selected = draft.motionProfile == profile,
                         onClick = { draft = draft.copy(motionProfile = profile) },
-                        label = { Text(profile.name.lowercase().replaceFirstChar(Char::uppercase)) },
+                        label = { Text(profile.name.lowercase().replaceFirstChar { it.uppercase() }) },
                     )
                 }
             }
@@ -341,7 +339,7 @@ private fun AppearanceSettingsEditor(settings: LauncherSettingsController) {
 }
 
 @Composable
-private fun AssistantSettingsEditor(
+private fun ColumnScope.AssistantSettingsEditor(
     settings: LauncherSettingsController,
     assistant: AssistantSessionController,
 ) {
@@ -357,7 +355,7 @@ private fun AssistantSettingsEditor(
                     FilterChip(
                         selected = draft.anchor == anchor,
                         onClick = { draft = draft.copy(anchor = anchor) },
-                        label = { Text(anchor.name.lowercase().replaceFirstChar(Char::uppercase)) },
+                        label = { Text(anchor.name.lowercase().replaceFirstChar { it.uppercase() }) },
                     )
                 }
             }
@@ -390,7 +388,7 @@ private fun AssistantSettingsEditor(
 }
 
 @Composable
-private fun PlannedSettingsTopics(descriptor: SettingsSectionDescriptor) {
+private fun ColumnScope.PlannedSettingsTopics(descriptor: SettingsSectionDescriptor) {
     Text("Geplante Unteroptionen", color = Mint, style = MaterialTheme.typography.labelLarge)
     LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         items(descriptor.topics) { topic ->
