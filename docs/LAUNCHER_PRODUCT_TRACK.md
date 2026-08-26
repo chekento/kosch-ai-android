@@ -23,6 +23,7 @@ The launcher gets a real configuration center rather than a small preferences pa
 
 - Versioned portable `LauncherSettingsDocument` with explicit normalization and migration path (model landed in this track)
 - At least 22 primary Settings sections: Home/Grid, Pages, Apps, Dock, Folders, Widgets, Appearance, Themes, Assistant, AI, APIs, Voice, Gestures, Search, Notifications, Pen, Automation, Accessibility, Privacy, Backup, System, Advanced
+- Searchable adaptive Settings Center shell with all 22 sections and phone/tablet navigation (UI component landed in this track)
 - Settings search across every subtab
 - Global defaults with page-level and object-level overrides where the setting is meaningful
 - Explicit `inherit default` state for every scoped override
@@ -32,7 +33,8 @@ The launcher gets a real configuration center rather than a small preferences pa
 - Partial import/export with dry-run and conflict preview
 - API/provider configuration separated from credential secret material
 - Secrets, OAuth tokens, widget host IDs, URI grants and other device-bound capabilities excluded from portable settings
-- First live tabs: Home/Grid, Appearance and Assistant
+- Next: atomically persisted Settings Store + migration and launcher navigation entry
+- First live tabs after the store: Home/Grid, Appearance and Assistant
 - Follow with Theme Import/Export, Gesture Matrix, AI/API Provider Settings, Widget/Folder/App inspectors and Backup scopes
 
 ## P0 – Widgets become first-class Home items
@@ -92,4 +94,4 @@ Temporary context/session behavior is not allowed to silently overwrite persiste
 
 Security/firewall work may block a release when it affects privacy or correctness, but it runs as a parallel gate. It does not replace launcher work. Every milestone should ship at least one user-visible launcher improvement unless the milestone is explicitly a release-hardening gate.
 
-The next user-visible sequence is therefore: Home Studio → Settings Center foundation → v7 widget placement → icon packs/gestures → assistant/living-surface integration → deeper theme/creator tools.
+The next user-visible sequence is therefore: Home Studio → Settings Store/navigation → v7 widget placement → icon packs/gestures → assistant/living-surface integration → deeper theme/creator tools.
