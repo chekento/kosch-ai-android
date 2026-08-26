@@ -32,20 +32,28 @@ class Tun2SocksOfflinePocRepositoryContractTest {
     }
 
     @Test
-    fun patch_exposesRecoverableStartAndMandatoryProtect_withoutVpnActivation() {
+    fun patch_bindsSafeFacadeAndDuplicatesTunFd() {
         val patch = pocFile("patches/0001-kosch-safe-mobile-bridge.patch")
 
-        assertTrue(patch.contains("func StartSafe() error"))
-        assertTrue(patch.contains("func StopSafe() error"))
+        assertTrue(patch.contains("package koschmobile"))
+        assertTrue(patch.contains("func Start(tunFD int64, mtu int64, protector SocketProtector) (result string)"))
+        assertTrue(patch.contains("func Stop() (result string)"))
+        assertTrue(patch.contains("func StartKoSchDirect"))
+        assertTrue(patch.contains("func StopKoSchDirect"))
+        assertTrue(patch.contains("unix.Dup(originalFD)"))
+        assertTrue(patch.contains("Proxy:                    \"direct://\""))
         assertTrue(patch.contains("SetMandatorySockOpt"))
-        assertTrue(patch.contains("protector.Protect(int64(fd))"))
-        assertTrue(patch.contains("registerKoSchSocketProtector()"))
+        assertTrue(patch.contains("protector(int64(fd))"))
+        assertTrue(patch.contains("KoSch socket protector is required"))
+        assertTrue(patch.contains("recover()"))
+        assertFalse(patch.contains("func StartSafe() error"))
+        assertFalse(patch.contains("func StopSafe() error"))
         assertFalse(patch.contains("Builder.establish()"))
         assertFalse(patch.contains("android.permission.INTERNET"))
     }
 
     @Test
-    fun builder_isPinnedOfflineAndProducesFingerprintedEvidence() {
+    fun builder_isPinnedOfflineAndBindsOnlyFacade() {
         val script = pocFile("build-pinned-aar.sh")
 
         assertTrue(script.contains(Tun2SocksOfflinePocContract.UPSTREAM_COMMIT))
@@ -53,12 +61,20 @@ class Tun2SocksOfflinePocRepositoryContractTest {
         assertTrue(script.contains("GOPROXY=off"))
         assertTrue(script.contains("GOSUMDB=off"))
         assertTrue(script.contains("apply --check"))
-        assertTrue(script.contains("for tool in git go gomobile gobind sha256sum"))
+        assertTrue(script.contains("for tool in git go gomobile gobind sha256sum unzip jar"))
         assertTrue(script.contains("go mod edit -require="))
         assertTrue(script.contains("go list -mod=mod golang.org/x/mobile/bind"))
+        assertTrue(script.contains("go test -run '^$' ./engine ./koschmobile"))
         assertTrue(script.contains("gomobile bind"))
+        assertTrue(script.contains("./koschmobile"))
+        assertTrue(script.contains("unsafe engine package leaked into generated Java API"))
         assertTrue(script.contains("ANDROID_API=\"29\""))
-        assertTrue(script.contains("-androidapi"))
+        assertTrue(script.contains("bound_package="))
+        assertTrue(script.contains("engine_java_api_exposed=false"))
+        assertTrue(script.contains("tun_fd_duplicated=true"))
+        assertTrue(script.contains("panic_cross_boundary=false"))
+        assertTrue(script.contains("fixed_direct_egress=true"))
+        assertTrue(script.contains("proxy_configuration_exposed=false"))
         assertTrue(script.contains("gomobile_module_version="))
         assertTrue(script.contains("gobind_module_version="))
         assertTrue(script.contains("gomobile_sha256="))
