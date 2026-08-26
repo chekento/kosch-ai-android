@@ -96,7 +96,7 @@ new file mode 100644
 index 0000000..3333333
 --- /dev/null
 +++ b/engine/kosch_direct.go
-@@ -0,0 +1,157 @@
+@@ -0,0 +1,172 @@
 +package engine
 +
 +import (
@@ -172,13 +172,21 @@ index 0000000..3333333
 +	return _defaultDevice != nil || _defaultStack != nil || _defaultKey != nil
 +}
 +
-+func cleanupKoSchFailedStart(dupFD int) {
++func cleanupKoSchFailedStart(dupFD int) (err error) {
 +	deviceOwnedFD := koSchDevicePresent()
-+	_ = stop()
++	defer func() {
++		if recovered := recover(); recovered != nil {
++			err = fmt.Errorf("forwarder cleanup panic: %v", recovered)
++		}
++	}()
 +	if !deviceOwnedFD {
-+		_ = unix.Close(dupFD)
++		defer func() { _ = unix.Close(dupFD) }()
++	}
++	if stopErr := stop(); stopErr != nil {
++		return stopErr
 +	}
 +	clearKoSchSocketProtector()
++	return nil
 +}
 +
 +// StartKoSchDirect is the only engine start path used by the bound KoSch mobile
@@ -211,10 +219,16 @@ index 0000000..3333333
 +	cleanupRequired := true
 +	defer func() {
 +		if recovered := recover(); recovered != nil {
-+			if cleanupRequired {
-+				cleanupKoSchFailedStart(dupFD)
-+			}
++			cleanupErr := cleanupKoSchFailedStart(dupFD)
 +			err = fmt.Errorf("forwarder start panic: %v", recovered)
++			if cleanupErr != nil {
++				err = fmt.Errorf("%v; cleanup failed: %w", err, cleanupErr)
++			}
++		} else if cleanupRequired {
++			cleanupErr := cleanupKoSchFailedStart(dupFD)
++			if cleanupErr != nil && err == nil {
++				err = fmt.Errorf("forwarder cleanup failed: %w", cleanupErr)
++			}
 +		}
 +	}()
 +
@@ -237,28 +251,30 @@ index 0000000..3333333
 +	})
 +
 +	if startErr := start(); startErr != nil {
-+		cleanupKoSchFailedStart(dupFD)
-+		cleanupRequired = false
-+		return startErr
++		err = startErr
++		return err
 +	}
 +
 +	cleanupRequired = false
 +	return nil
 +}
 +
-+// StopKoSchDirect is idempotent and clears all Go references to the Android
-+// socket-protector proxy after the engine has released its duplicated TUN fd.
++// StopKoSchDirect is idempotent. Protector references are cleared only after a
++// successful stop; on stop panic/failure they remain installed fail-closed.
 +func StopKoSchDirect() (err error) {
 +	koSchLifecycleMu.Lock()
 +	defer koSchLifecycleMu.Unlock()
 +	defer func() {
-+		clearKoSchSocketProtector()
 +		if recovered := recover(); recovered != nil {
 +			err = fmt.Errorf("forwarder stop panic: %v", recovered)
 +		}
 +	}()
 +
-+	return stop()
++	if stopErr := stop(); stopErr != nil {
++		return stopErr
++	}
++	clearKoSchSocketProtector()
++	return nil
 +}
 +
 diff --git a/koschmobile/mobile.go b/koschmobile/mobile.go
@@ -266,7 +282,7 @@ new file mode 100644
 index 0000000..4444444
 --- /dev/null
 +++ b/koschmobile/mobile.go
-@@ -0,0 +1,93 @@
+@@ -0,0 +1,105 @@
 +// Package koschmobile is the only package exported through gomobile bind.
 +// It deliberately hides engine.Key and the upstream Engine.Start/Stop wrappers.
 +package koschmobile
@@ -310,10 +326,14 @@ index 0000000..4444444
 +
 +	defer func() {
 +		if recovered := recover(); recovered != nil {
-+			_ = engine.StopKoSchDirect()
-+			running = false
-+			activeProtector = nil
++			cleanupErr := engine.StopKoSchDirect()
 +			result = fmt.Sprintf("mobile start panic: %v", recovered)
++			if cleanupErr == nil {
++				running = false
++				activeProtector = nil
++			} else {
++				result = fmt.Sprintf("%s; cleanup failed: %v", result, cleanupErr)
++			}
 +		}
 +	}()
 +
@@ -343,16 +363,13 @@ index 0000000..4444444
 +	return ""
 +}
 +
-+// Stop is idempotent. It returns an empty string on success and always drops
-+// the Java/Kotlin protector reference so proxy-reference cycles cannot survive
-+// a stopped session.
++// Stop is idempotent. It returns an empty string on success. The Java/Kotlin
++// protector reference is dropped only after the engine reports a clean stop.
 +func Stop() (result string) {
 +	mobileMu.Lock()
 +	defer mobileMu.Unlock()
 +
 +	defer func() {
-+		running = false
-+		activeProtector = nil
 +		if recovered := recover(); recovered != nil {
 +			result = fmt.Sprintf("mobile stop panic: %v", recovered)
 +		}
@@ -361,5 +378,7 @@ index 0000000..4444444
 +	if err := engine.StopKoSchDirect(); err != nil {
 +		return err.Error()
 +	}
++	running = false
++	activeProtector = nil
 +	return ""
 +}
