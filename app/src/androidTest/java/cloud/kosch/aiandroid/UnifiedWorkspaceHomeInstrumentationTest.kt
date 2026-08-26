@@ -51,12 +51,16 @@ class UnifiedWorkspaceHomeInstrumentationTest {
                 .onNodeWithContentDescription("App, Ordner oder Seite hinzufügen", useUnmergedTree = true)
                 .fetchSemanticsNode()
 
-            val assistantNodes = composeTestRule
-                .onAllNodesWithContentDescription("KoSch Assistant einrichten", useUnmergedTree = true)
-                .fetchSemanticsNodes() + composeTestRule
-                .onAllNodesWithContentDescription("KoSch Assistant öffnen", useUnmergedTree = true)
+            val enabledAssistantNodes = composeTestRule
+                .onAllNodesWithContentDescription("KoSch Assistent öffnen", useUnmergedTree = true)
                 .fetchSemanticsNodes()
-            assertTrue("Expected Assistant companion on unified Home", assistantNodes.isNotEmpty())
+            val disabledAssistantNodes = composeTestRule
+                .onAllNodesWithText("Assistant aus", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+            assertTrue(
+                "Expected enabled or disabled Assistant entry on unified Home",
+                enabledAssistantNodes.isNotEmpty() || disabledAssistantNodes.isNotEmpty(),
+            )
 
             composeTestRule
                 .onNodeWithContentDescription("Alle Apps", useUnmergedTree = true)
