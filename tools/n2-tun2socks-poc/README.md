@@ -16,6 +16,8 @@ This directory defines a reproducible, traffic-inert experiment for evaluating `
 
 `source.lock` is authoritative. The builder refuses any different source HEAD, Go toolchain, `gomobile` module version or `gobind` module version.
 
+The x/mobile pseudo-version contains the source revision prefix `4776eadac327`. `source.lock` additionally records the reviewed full commit mapping `4776eadac327bcb80cebc7413c91f8b4abf8ffa1`; the builder verifies that this full lock is well-formed and matches the pseudo-version prefix. This mapping is not presented as an independent reconstruction of the full Git commit from the installed binary. The actual installed `gomobile` and `gobind` executables are independently identified by their SHA-256 fingerprints in the generated evidence.
+
 The x/mobile pin matters because the current `gomobile bind` implementation requires `golang.org/x/mobile/bind` to be resolvable from the module being bound. The POC therefore adds the exact pinned x/mobile version only inside its disposable worktree before binding; it does not change the upstream checkout or the Android app dependency graph.
 
 ## What the KoSch patch changes
@@ -58,7 +60,7 @@ The output directory contains:
 - `tun2socks-kosch-v2.7.0-poc.aar`
 - `tun2socks-kosch-v2.7.0-poc.evidence`
 
-The evidence report records the upstream commit, Go version, x/mobile version, detected gomobile/gobind module versions, SHA-256 of both tool binaries, KoSch patch and generated AAR, plus the containment flags used by `Tun2SocksOfflinePocContract`.
+The evidence report records the upstream commit, Go version, x/mobile pseudo-version and reviewed full-commit mapping, detected gomobile/gobind module versions, SHA-256 of both tool binaries, KoSch patch and generated AAR, plus the containment flags used by `Tun2SocksOfflinePocContract`.
 
 ## Hard containment boundary
 
