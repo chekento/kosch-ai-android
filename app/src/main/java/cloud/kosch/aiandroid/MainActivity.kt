@@ -22,17 +22,21 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.data.PendingDocumentKind
 import cloud.kosch.aiandroid.data.PendingDocumentStore
+import cloud.kosch.aiandroid.model.AssistantAnchor
 import cloud.kosch.aiandroid.model.HomePage
-import cloud.kosch.aiandroid.system.HomeRoleController
 import cloud.kosch.aiandroid.system.DocumentGrantManager
+import cloud.kosch.aiandroid.system.HomeRoleController
 import cloud.kosch.aiandroid.system.ProfessionalShortcut
 import cloud.kosch.aiandroid.system.ProfessionalShortcutResolver
 import cloud.kosch.aiandroid.system.WidgetHostController
 import cloud.kosch.aiandroid.ui.DragDropWorkspaceHomeScreen
 import cloud.kosch.aiandroid.ui.LauncherRoot
+import cloud.kosch.aiandroid.ui.SettingsCenterSurface
+import cloud.kosch.aiandroid.ui.SettingsEntryButton
 import cloud.kosch.aiandroid.ui.components.CompanionFace
 import cloud.kosch.aiandroid.ui.theme.KoSchLauncherTheme
 import java.time.LocalDate
@@ -207,7 +211,11 @@ class MainActivity : ComponentActivity() {
             .forEach(controller::removeWidgetRecord)
 
         setContent {
-            KoSchLauncherTheme {
+            val settings = launcherViewModel.settings
+            val assistantSettings = settings.document.assistant
+            KoSchLauncherTheme(
+                dynamicColor = settings.document.appearance.useMaterialYouAccents,
+            ) {
                 Box {
                     val unifiedHomeSelected = controller.homePage == HomePage.WORKSPACE && !controller.onboardingVisible
                     val legacyOverlayVisible = controller.drawerVisible ||
@@ -251,13 +259,39 @@ class MainActivity : ComponentActivity() {
                             forgetDocument = ::forgetDocument,
                         )
                     }
+
                     if (unifiedHomeVisible) {
+                        SettingsEntryButton(
+                            onClick = { settings.open() },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(end = 18.dp, top = 76.dp),
+                        )
+                    }
+
+                    if (unifiedHomeVisible && assistantSettings.enabled) {
+                        val assistantAlignment = when (assistantSettings.anchor) {
+                            AssistantAnchor.LEFT -> Alignment.BottomStart
+                            AssistantAnchor.CENTER -> Alignment.BottomCenter
+                            AssistantAnchor.RIGHT, AssistantAnchor.FREE -> Alignment.BottomEnd
+                        }
+                        val scale = assistantSettings.scale
                         CompanionFace(
                             onClick = ::requestVoiceInput,
                             modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(end = 18.dp, bottom = 150.dp)
-                                .size(width = 76.dp, height = 68.dp),
+                                .align(assistantAlignment)
+                                .padding(horizontal = 18.dp, vertical = 150.dp)
+                                .size(width = (76f * scale).dp, height = (68f * scale).dp)
+                                .alpha(assistantSettings.opacity),
+                        )
+                    }
+
+                    if (settings.visible) {
+                        SettingsCenterSurface(
+                            settings = settings,
+                            home = launcherViewModel.homeWorkspace,
+                            assistant = launcherViewModel.assistant,
+                            onDismiss = settings::close,
                         )
                     }
                 }
@@ -317,6 +351,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_ESCAPE && launcherViewModel.settings.visible) {
+            launcherViewModel.settings.close()
+            return true
+        }
         if (keyCode == KeyEvent.KEYCODE_ESCAPE && controller.closeTopSurface()) {
             return true
         }
