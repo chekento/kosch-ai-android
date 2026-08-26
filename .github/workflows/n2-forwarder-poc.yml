@@ -44,7 +44,7 @@ jobs:
           grep -q '^runtime_integration=false$' tools/n2-tun2socks-poc/source.lock
           grep -q '^network_during_build=false$' tools/n2-tun2socks-poc/source.lock
           ! grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
-          ! grep -q 'Builder.establish' app/src/main/java/cloud/kosch/aiandroid/security/KoSchConsentVpnService.kt
+          ! grep -q 'Builder(' app/src/main/java/cloud/kosch/aiandroid/security/KoSchConsentVpnService.kt
 
       - name: Install checksum-pinned Go toolchain
         shell: bash
