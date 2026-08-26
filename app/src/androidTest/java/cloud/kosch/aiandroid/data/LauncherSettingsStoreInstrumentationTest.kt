@@ -61,11 +61,11 @@ class LauncherSettingsStoreInstrumentationTest {
     }
 
     @Test
-    fun malformedImport_doesNotOverwriteExistingSettings() {
+    fun oversizedImport_doesNotOverwriteExistingSettings() {
         val existing = LauncherSettingsDocument(home = HomeSettings(gridColumns = 17))
         assertTrue(store.save(existing))
 
-        val result = store.applyImport("schema=%%%not-base64%%%")
+        val result = store.applyImport("x".repeat(600 * 1024))
 
         assertFalse(result.isSuccess)
         assertEquals(17, store.load().home.gridColumns)
