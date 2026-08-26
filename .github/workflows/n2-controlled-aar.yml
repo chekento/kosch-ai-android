@@ -1,0 +1,120 @@
+name: N2 controlled AAR evidence
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/n2-controlled-aar.yml"
+      - "tools/n2-tun2socks-poc/**"
+      - "app/src/test/java/cloud/kosch/aiandroid/security/network/Tun2SocksOfflinePocRepositoryContractTest.kt"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/n2-controlled-aar.yml"
+      - "tools/n2-tun2socks-poc/**"
+      - "app/src/test/java/cloud/kosch/aiandroid/security/network/Tun2SocksOfflinePocRepositoryContractTest.kt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: n2-controlled-aar-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-evidence:
+    name: Build pinned offline AAR evidence
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      GO_VERSION: "1.26.3"
+      X_MOBILE_VERSION: "v0.0.0-20260821190718-4776eadac327"
+      TUN2SOCKS_COMMIT: "8dda19e8e4613e014f0b12f3e624fdff5e5f23b3"
+      NDK_VERSION: "28.2.13676358"
+      BUILD_TOOLS_VERSION: "36.0.0"
+
+    steps:
+      - name: Check out KoSch repository
+        uses: actions/checkout@v7
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up exact Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: false
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Install controlled Android toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdkmanager \
+            "platforms;android-29" \
+            "platforms;android-36" \
+            "build-tools;${BUILD_TOOLS_VERSION}" \
+            "ndk;${NDK_VERSION}"
+          test -s "$ANDROID_HOME/platforms/android-29/android.jar"
+          test -x "$ANDROID_HOME/build-tools/${BUILD_TOOLS_VERSION}/aapt2"
+          test -s "$ANDROID_HOME/ndk/${NDK_VERSION}/source.properties"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/${NDK_VERSION}" >> "$GITHUB_ENV"
+
+      - name: Install exact gomobile and gobind
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOBIN="$RUNNER_TEMP/kosch-go-bin"
+          mkdir -p "$GOBIN"
+          GOBIN="$GOBIN" go install "golang.org/x/mobile/cmd/gomobile@${X_MOBILE_VERSION}"
+          GOBIN="$GOBIN" go install "golang.org/x/mobile/cmd/gobind@${X_MOBILE_VERSION}"
+          echo "$GOBIN" >> "$GITHUB_PATH"
+
+      - name: Prepare pinned source and module cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$RUNNER_TEMP/kosch-go-bin:$PATH"
+          SOURCE_DIR="$RUNNER_TEMP/tun2socks-v2.7.0"
+          git clone https://github.com/xjasonlyu/tun2socks.git "$SOURCE_DIR"
+          git -C "$SOURCE_DIR" checkout --detach "$TUN2SOCKS_COMMIT"
+          test "$(git -C "$SOURCE_DIR" rev-parse HEAD)" = "$TUN2SOCKS_COMMIT"
+          test -z "$(git -C "$SOURCE_DIR" status --porcelain)"
+          (
+            cd "$SOURCE_DIR"
+            go mod download all
+            go mod download "golang.org/x/mobile@${X_MOBILE_VERSION}"
+          )
+          gomobile init
+          echo "TUN2SOCKS_SOURCE=$SOURCE_DIR" >> "$GITHUB_ENV"
+
+      - name: Build and verify traffic-inert controlled evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="$RUNNER_TEMP/kosch-go-bin:$PATH"
+          OUT="$RUNNER_TEMP/n2-controlled-evidence"
+          bash tools/n2-tun2socks-poc/build-controlled-evidence.sh "$TUN2SOCKS_SOURCE" "$OUT"
+          test -s "$OUT/tun2socks-kosch-v2.7.0-poc.aar"
+          test -s "$OUT/tun2socks-kosch-v2.7.0-poc.evidence"
+          test -s "$OUT/tun2socks-kosch-v2.7.0-controlled.evidence"
+          grep -q '^native_16k_alignment_verified=true$' "$OUT/tun2socks-kosch-v2.7.0-controlled.evidence"
+          grep -q '^runtime_integrated=false$' "$OUT/tun2socks-kosch-v2.7.0-controlled.evidence"
+          grep -q '^traffic_forwarding_executed=false$' "$OUT/tun2socks-kosch-v2.7.0-controlled.evidence"
+          git diff --exit-code
+          echo "N2_EVIDENCE_DIR=$OUT" >> "$GITHUB_ENV"
+
+      - name: Upload controlled AAR evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: n2-tun2socks-v2.7.0-controlled-evidence
+          path: ${{ env.N2_EVIDENCE_DIR }}/
+          if-no-files-found: error
+          retention-days: 30
