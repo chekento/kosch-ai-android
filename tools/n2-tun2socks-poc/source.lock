@@ -1,0 +1,9 @@
+# KoSch N2 tun2socks offline POC source lock
+upstream=https://github.com/xjasonlyu/tun2socks
+version=v2.7.0
+commit=8dda19e8e4613e014f0b12f3e624fdff5e5f23b3
+go_module=github.com/xjasonlyu/tun2socks/v2
+go_version=go1.26.3
+android_min_api=29
+runtime_integration=false
+network_during_build=false
