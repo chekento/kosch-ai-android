@@ -1,26 +1,31 @@
 package cloud.kosch.aiandroid
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import android.content.Context
 import cloud.kosch.aiandroid.data.LauncherSettingsStore
+import cloud.kosch.aiandroid.data.WorkspaceStore
 import cloud.kosch.aiandroid.model.AppearanceSettings
 import cloud.kosch.aiandroid.model.HomeSettings
 import cloud.kosch.aiandroid.model.LauncherAssistantSettings
 import cloud.kosch.aiandroid.model.LauncherSettingsDocument
 import cloud.kosch.aiandroid.model.SettingsSection
+import cloud.kosch.aiandroid.model.WorkspaceDocument
+import cloud.kosch.aiandroid.model.WorkspaceGridReflow
 
 /**
  * Activity-recreation-safe state holder for the versioned launcher Settings Center.
  *
  * The controller owns only portable launcher preferences. Credentials, widget host ids and Android grants live in
- * their dedicated stores. Disruptive Home changes are coordinated with WorkspaceHomeController before settings are
- * committed so a failed reflow cannot leave settings and workspace out of sync.
+ * their dedicated stores. Disruptive Home changes are coordinated with the v7 Workspace document before settings
+ * are committed so a failed reflow cannot leave settings and workspace out of sync.
  */
 class LauncherSettingsController(context: Context) {
     private val store = LauncherSettingsStore(context.applicationContext)
+    private val workspaceStore = WorkspaceStore(context.applicationContext)
     private var undoDocument: LauncherSettingsDocument? = null
+    private var undoWorkspace: WorkspaceDocument? = null
 
     var document by mutableStateOf(store.load().normalized())
         private set
@@ -49,22 +54,46 @@ class LauncherSettingsController(context: Context) {
 
     fun applyHome(settings: HomeSettings, home: WorkspaceHomeController): Boolean {
         val normalizedHome = settings.normalized()
-        val previous = document
-        val gridChanged = previous.home.gridColumns != normalizedHome.gridColumns ||
-            previous.home.gridRows != normalizedHome.gridRows
+        val previousSettings = document
+        val previousWorkspace = home.document
+        val gridChanged = previousSettings.home.gridColumns != normalizedHome.gridColumns ||
+            previousSettings.home.gridRows != normalizedHome.gridRows
 
-        if (gridChanged && !home.applyGlobalGrid(normalizedHome.gridColumns, normalizedHome.gridRows)) {
-            notice = home.statusMessage ?: "Raster konnte nicht übernommen werden"
+        val updatedWorkspace = if (gridChanged) {
+            runCatching {
+                WorkspaceGridReflow.reflow(
+                    document = previousWorkspace,
+                    columns = normalizedHome.gridColumns,
+                    rows = normalizedHome.gridRows,
+                )
+            }.getOrElse {
+                notice = it.message ?: "Raster konnte nicht ohne Datenverlust übernommen werden"
+                return false
+            }
+        } else previousWorkspace
+
+        if (gridChanged && !workspaceStore.saveWorkspaceDocument(updatedWorkspace)) {
+            notice = "Neues Raster konnte nicht dauerhaft gespeichert werden"
             return false
         }
 
-        val updated = previous.copy(home = normalizedHome).normalized()
-        if (!persist(updated, previous)) {
-            if (gridChanged) home.applyGlobalGrid(previous.home.gridColumns, previous.home.gridRows, rememberUndo = false)
+        val updatedSettings = previousSettings.copy(home = normalizedHome).normalized()
+        if (!store.save(updatedSettings)) {
+            if (gridChanged) workspaceStore.saveWorkspaceDocument(previousWorkspace)
             notice = "Home-Einstellungen konnten nicht gespeichert werden"
             return false
         }
-        notice = "Home & Raster übernommen"
+
+        undoDocument = previousSettings
+        undoWorkspace = previousWorkspace.takeIf { gridChanged }
+        document = updatedSettings
+        canUndo = true
+        if (gridChanged) home.reload()
+        notice = if (gridChanged) {
+            "Raster auf ${normalizedHome.gridColumns}×${normalizedHome.gridRows} übernommen"
+        } else {
+            "Home-Einstellungen übernommen"
+        }
         return true
     }
 
@@ -75,22 +104,26 @@ class LauncherSettingsController(context: Context) {
         persistSection(document.copy(assistant = settings.normalized()), "Assistent-Einstellungen gespeichert")
 
     fun undo(home: WorkspaceHomeController): Boolean {
-        val previous = undoDocument ?: return false
-        val current = document
-        val gridChanged = current.home.gridColumns != previous.home.gridColumns ||
-            current.home.gridRows != previous.home.gridRows
-        if (gridChanged && !home.applyGlobalGrid(previous.home.gridColumns, previous.home.gridRows, rememberUndo = false)) {
+        val previousSettings = undoDocument ?: return false
+        val currentSettings = document
+        val previousWorkspace = undoWorkspace
+        val currentWorkspace = home.document
+
+        if (previousWorkspace != null && !workspaceStore.saveWorkspaceDocument(previousWorkspace)) {
             notice = "Vorheriges Raster konnte nicht wiederhergestellt werden"
             return false
         }
-        if (!store.save(previous)) {
-            if (gridChanged) home.applyGlobalGrid(current.home.gridColumns, current.home.gridRows, rememberUndo = false)
+        if (!store.save(previousSettings)) {
+            if (previousWorkspace != null) workspaceStore.saveWorkspaceDocument(currentWorkspace)
             notice = "Settings-Undo konnte nicht gespeichert werden"
             return false
         }
-        undoDocument = current
-        document = previous
+
+        undoDocument = currentSettings
+        undoWorkspace = currentWorkspace.takeIf { previousWorkspace != null }
+        document = previousSettings
         canUndo = true
+        if (previousWorkspace != null) home.reload()
         notice = "Letzte Settings-Änderung rückgängig"
         return true
     }
@@ -98,6 +131,7 @@ class LauncherSettingsController(context: Context) {
     fun reload() {
         document = store.load().normalized()
         undoDocument = null
+        undoWorkspace = null
         canUndo = false
     }
 
@@ -108,19 +142,15 @@ class LauncherSettingsController(context: Context) {
             notice = "Keine Änderung"
             return true
         }
-        if (!persist(normalized, previous)) {
+        if (!store.save(normalized)) {
             notice = "Einstellungen konnten nicht gespeichert werden"
             return false
         }
-        notice = message
-        return true
-    }
-
-    private fun persist(updated: LauncherSettingsDocument, previous: LauncherSettingsDocument): Boolean {
-        if (!store.save(updated)) return false
         undoDocument = previous
-        document = updated
+        undoWorkspace = null
+        document = normalized
         canUndo = true
+        notice = message
         return true
     }
 }
