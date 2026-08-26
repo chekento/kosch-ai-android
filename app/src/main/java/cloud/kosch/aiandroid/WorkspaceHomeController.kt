@@ -15,8 +15,8 @@ import java.util.UUID
 /**
  * Activity-recreation-safe controller for the user-facing v7 Home pages.
  *
- * The legacy scene controller remains available while Stage B rolls out. This controller writes only the
- * portable v7 workspace document and keeps one in-memory undo checkpoint for destructive/move operations.
+ * The legacy scene controller remains available while the unified Home rolls out. This controller writes
+ * only the portable v7 workspace document; device-bound widget host ids are stored separately.
  */
 class WorkspaceHomeController(context: Context) {
     private val store = WorkspaceStore(context.applicationContext)
@@ -106,6 +106,17 @@ class WorkspaceHomeController(context: Context) {
             add = { source, pageId, itemId -> WorkspacePageEditor.addFolder(source, pageId, itemId, folderId) },
         )
     }
+
+    /**
+     * Adds a portable widget item and returns its stable workspace id only after the v7 document was saved.
+     * The caller may then bind an Android appWidgetId to that id in the device-only binding store.
+     */
+    fun addWidget(providerComponent: String?): String? = placePortableItem(
+        kindLabel = "Widget",
+        add = { source, pageId, itemId ->
+            WorkspacePageEditor.addWidget(source, pageId, itemId, providerComponent)
+        },
+    )
 
     fun moveItemBy(itemId: String, columns: Int, rows: Int) {
         val item = activePage.items.firstOrNull { it.id == itemId }
@@ -198,13 +209,16 @@ class WorkspaceHomeController(context: Context) {
     fun isUserPage(page: WorkspacePage = activePage): Boolean = page.sceneAdapter == null
 
     fun visiblePortableItems(page: WorkspacePage = activePage) = page.items.filter {
-        it.content is WorkspaceItemContent.App || it.content is WorkspaceItemContent.Folder
+        it.content is WorkspaceItemContent.App ||
+            it.content is WorkspaceItemContent.Folder ||
+            it.content is WorkspaceItemContent.Widget
     }
 
     private fun placePortableItem(
         kindLabel: String,
         add: (WorkspaceDocument, String, String) -> WorkspaceDocument,
-    ) {
+    ): String? {
+        val itemId = "item:user:${UUID.randomUUID()}"
         var working = document
         var targetPage = working.pages.firstOrNull { it.id == working.activePageId }
         if (targetPage?.sceneAdapter != null) {
@@ -216,18 +230,18 @@ class WorkspaceHomeController(context: Context) {
                 )
             }.getOrElse {
                 statusMessage = it.message ?: "Keine freie Home-Seite verfügbar"
-                return
+                return null
             }
             targetPage = working.pages.first { it.id == working.activePageId }
         }
 
         val firstAttempt = runCatching {
-            add(working, requireNotNull(targetPage).id, "item:user:${UUID.randomUUID()}")
+            add(working, requireNotNull(targetPage).id, itemId)
         }
         val updated = firstAttempt.getOrElse { failure ->
             if (failure !is IllegalStateException) {
                 statusMessage = failure.message ?: "$kindLabel konnte nicht platziert werden"
-                return
+                return null
             }
             val withNewPage = runCatching {
                 WorkspacePageEditor.createUserPage(
@@ -237,31 +251,31 @@ class WorkspaceHomeController(context: Context) {
                 )
             }.getOrElse {
                 statusMessage = "Homescreen ist voll und es kann keine weitere Seite erstellt werden"
-                return
+                return null
             }
             runCatching {
-                add(withNewPage, withNewPage.activePageId, "item:user:${UUID.randomUUID()}")
+                add(withNewPage, withNewPage.activePageId, itemId)
             }.getOrElse {
                 statusMessage = it.message ?: "$kindLabel konnte nicht platziert werden"
-                return
+                return null
             }
         }
-        persist(updated, "$kindLabel zum Homescreen hinzugefügt")
+        return if (persist(updated, "$kindLabel zum Homescreen hinzugefügt")) itemId else null
     }
 
     private fun persist(
         updated: WorkspaceDocument,
         message: String?,
         rememberUndo: Boolean = true,
-    ) {
+    ): Boolean {
         val normalized = updated.normalized()
         if (normalized == document) {
             message?.let { statusMessage = it }
-            return
+            return true
         }
         if (!store.saveWorkspaceDocument(normalized)) {
             statusMessage = "Homescreen konnte nicht dauerhaft gespeichert werden"
-            return
+            return false
         }
         if (rememberUndo) {
             undoDocument = document
@@ -269,5 +283,6 @@ class WorkspaceHomeController(context: Context) {
         }
         document = normalized
         message?.let { statusMessage = it }
+        return true
     }
 }
