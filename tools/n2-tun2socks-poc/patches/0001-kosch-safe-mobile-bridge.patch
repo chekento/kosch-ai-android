@@ -55,7 +55,8 @@ index f0c1170..1111111 100644
  	opts, _ := d.atomicOpts.Load().([]SocketOption)
  	if len(opts) == 0 {
  		return nil
- diff --git a/engine/engine.go b/engine/engine.go
+
+diff --git a/engine/engine.go b/engine/engine.go
 index e9c6fc1..2222222 100644
 --- a/engine/engine.go
 +++ b/engine/engine.go
@@ -67,7 +68,8 @@ index e9c6fc1..2222222 100644
  
  	if k.Interface != "" {
  		iface, err := net.InterfaceByName(k.Interface)
- diff --git a/engine/kosch_mobile.go b/engine/kosch_mobile.go
+
+diff --git a/engine/kosch_mobile.go b/engine/kosch_mobile.go
 new file mode 100644
 index 0000000..3333333
 --- /dev/null
