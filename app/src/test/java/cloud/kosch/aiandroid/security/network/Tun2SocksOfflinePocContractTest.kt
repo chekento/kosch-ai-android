@@ -11,7 +11,11 @@ class Tun2SocksOfflinePocContractTest {
         upstreamVersion = Tun2SocksOfflinePocContract.UPSTREAM_VERSION,
         upstreamCommit = Tun2SocksOfflinePocContract.UPSTREAM_COMMIT,
         goVersion = Tun2SocksOfflinePocContract.GO_VERSION,
+        xMobileVersion = Tun2SocksOfflinePocContract.X_MOBILE_VERSION,
+        gomobileModuleVersion = Tun2SocksOfflinePocContract.X_MOBILE_VERSION,
+        gobindModuleVersion = Tun2SocksOfflinePocContract.X_MOBILE_VERSION,
         gomobileSha256 = digest,
+        gobindSha256 = digest,
         patchSha256 = digest,
         artifactSha256 = digest,
         androidMinApi = Tun2SocksOfflinePocContract.ANDROID_MIN_API,
@@ -37,12 +41,18 @@ class Tun2SocksOfflinePocContractTest {
             validEvidence().copy(
                 upstreamCommit = "0".repeat(40),
                 goVersion = "go1.99.0",
+                xMobileVersion = "v0.0.0-bad",
+                gomobileModuleVersion = "v0.0.0-other",
+                gobindModuleVersion = "v0.0.0-other",
             ),
         )
 
         assertFalse(result.artifactEligible)
         assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.COMMIT_DRIFT))
         assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.GO_TOOLCHAIN_DRIFT))
+        assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.X_MOBILE_TOOLCHAIN_DRIFT))
+        assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.GOMOBILE_MODULE_DRIFT))
+        assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.GOBIND_MODULE_DRIFT))
     }
 
     @Test
@@ -82,6 +92,7 @@ class Tun2SocksOfflinePocContractTest {
         val result = Tun2SocksOfflinePocContract.evaluate(
             validEvidence().copy(
                 gomobileSha256 = "not-a-digest",
+                gobindSha256 = "also-not-a-digest",
                 patchSha256 = "",
                 artifactSha256 = "ABCDEF",
             ),
@@ -89,6 +100,7 @@ class Tun2SocksOfflinePocContractTest {
 
         assertFalse(result.artifactEligible)
         assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.GOMOBILE_FINGERPRINT_MISSING))
+        assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.GOBIND_FINGERPRINT_MISSING))
         assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.PATCH_FINGERPRINT_MISSING))
         assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.ARTIFACT_FINGERPRINT_MISSING))
     }
