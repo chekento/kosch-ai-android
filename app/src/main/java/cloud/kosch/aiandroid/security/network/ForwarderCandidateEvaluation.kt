@@ -57,15 +57,33 @@ data class ForwarderPreflightResult(
     val targetUseCase: ForwarderUseCase,
     val blockers: List<ForwarderPreflightBlocker>,
 ) {
+    /** Source-level fit only. It authorizes an isolated engineering POC, never VPN activation. */
+    val prototypeEligible: Boolean
+        get() = blockers.none { it in SOURCE_FIT_BLOCKERS }
+
+    /** Production-path gate. This is intentionally much stricter than prototype eligibility. */
     val activationEligible: Boolean get() = blockers.isEmpty()
+
+    companion object {
+        private val SOURCE_FIT_BLOCKERS = setOf(
+            ForwarderPreflightBlocker.USE_CASE_MISMATCH,
+            ForwarderPreflightBlocker.LICENSE_NOT_APPROVED,
+            ForwarderPreflightBlocker.TUN_FD_INTAKE_UNVERIFIED,
+            ForwarderPreflightBlocker.DIRECT_EGRESS_UNAVAILABLE,
+            ForwarderPreflightBlocker.IPV4_UNVERIFIED,
+            ForwarderPreflightBlocker.IPV6_UNVERIFIED,
+            ForwarderPreflightBlocker.TCP_UNVERIFIED,
+            ForwarderPreflightBlocker.UDP_UNVERIFIED,
+        )
+    }
 }
 
 /**
  * Conservative source-review policy for selecting a future packet forwarder.
  *
- * A candidate can be useful for a proof of concept while still being activation-ineligible. This
- * policy intentionally has no "best effort" fallback: every production-path invariant must be
- * evidenced before the candidate can feed ForwarderReadinessEvidence.
+ * A candidate can be useful for an isolated proof of concept while still being activation-ineligible.
+ * Prototype eligibility only means the pinned source is worth evaluating. It never bypasses the
+ * Android embedding, VpnService.protect, lifecycle, no-black-hole or physical-device gates.
  */
 object ForwarderCandidateEvaluation {
     private val approvedLicenses = setOf("MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause")
