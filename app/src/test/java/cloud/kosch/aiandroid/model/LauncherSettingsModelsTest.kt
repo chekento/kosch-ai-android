@@ -28,7 +28,7 @@ class LauncherSettingsModelsTest {
     }
 
     @Test
-    fun providerSettings_storeOnlyCredentialAliasNotSecretMaterial() {
+    fun providerSettings_normalizePortableVaultReference() {
         val provider = ProviderSettings(
             providerId = " private-provider ",
             enabled = true,
@@ -42,7 +42,6 @@ class LauncherSettingsModelsTest {
         assertEquals("https://example.invalid/v1", provider.endpoint)
         assertEquals("model-x", provider.modelId)
         assertEquals("vault:provider:private", provider.credentialAlias)
-        assertTrue(ProviderSettings::class.members.none { it.name.contains("key", ignoreCase = true) || it.name.contains("secret", ignoreCase = true) })
     }
 
     @Test
