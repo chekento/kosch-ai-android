@@ -56,7 +56,10 @@ class WorkspaceDragDropInstrumentationTest {
                 .fetchSemanticsNode()
 
             composeTestRule
-                .onNodeWithContentDescription("App. Ziehen zum Verschieben", useUnmergedTree = true)
+                .onNodeWithContentDescription(
+                    "App. Ziehen zum Verschieben. Tippen für Größenoptionen",
+                    useUnmergedTree = true,
+                )
                 .performTouchInput {
                     down(center)
                     // Touch injection distances are physical pixels. Move in several realistic pointer steps
