@@ -24,6 +24,7 @@ data class ForwarderCandidateProfile(
     val supportsUdp: Boolean,
     val androidEmbeddingPathVerified: Boolean,
     val socketEscapeStrategy: SocketEscapeStrategy,
+    val recoverableStartFailureVerified: Boolean,
     val deterministicStopApiVerified: Boolean,
     val noBlackHoleEvidenceVerified: Boolean,
     val physicalDeviceEvidenceVerified: Boolean,
@@ -46,6 +47,7 @@ enum class ForwarderPreflightBlocker {
     UDP_UNVERIFIED,
     ANDROID_EMBEDDING_UNVERIFIED,
     VPN_PROTECT_UNVERIFIED,
+    START_FAILURE_CONTAINMENT_UNVERIFIED,
     STOP_API_UNVERIFIED,
     NO_BLACK_HOLE_EVIDENCE_MISSING,
     PHYSICAL_DEVICE_EVIDENCE_MISSING,
@@ -83,7 +85,8 @@ data class ForwarderPreflightResult(
  *
  * A candidate can be useful for an isolated proof of concept while still being activation-ineligible.
  * Prototype eligibility only means the pinned source is worth evaluating. It never bypasses the
- * Android embedding, VpnService.protect, lifecycle, no-black-hole or physical-device gates.
+ * Android embedding, VpnService.protect, recoverable start, lifecycle, no-black-hole or physical-
+ * device gates.
  */
 object ForwarderCandidateEvaluation {
     private val approvedLicenses = setOf("MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause")
@@ -106,6 +109,9 @@ object ForwarderCandidateEvaluation {
             if (!candidate.androidEmbeddingPathVerified) add(ForwarderPreflightBlocker.ANDROID_EMBEDDING_UNVERIFIED)
             if (candidate.socketEscapeStrategy != SocketEscapeStrategy.VPN_PROTECT) {
                 add(ForwarderPreflightBlocker.VPN_PROTECT_UNVERIFIED)
+            }
+            if (!candidate.recoverableStartFailureVerified) {
+                add(ForwarderPreflightBlocker.START_FAILURE_CONTAINMENT_UNVERIFIED)
             }
             if (!candidate.deterministicStopApiVerified) add(ForwarderPreflightBlocker.STOP_API_UNVERIFIED)
             if (!candidate.noBlackHoleEvidenceVerified) add(ForwarderPreflightBlocker.NO_BLACK_HOLE_EVIDENCE_MISSING)
