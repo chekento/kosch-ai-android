@@ -33,6 +33,11 @@ class SecurityNetworkActivityInstrumentationTest {
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
 
+        // LazyColumn correctly preserves its scroll position across recreation, so return to the
+        // contract header before asserting it instead of assuming recreation resets the viewport.
+        composeTestRule
+            .onNodeWithTag(SECURITY_LIST_TAG)
+            .performScrollToNode(hasText("Security & Network"))
         composeTestRule.onNodeWithText("Security & Network").fetchSemanticsNode()
         composeTestRule.onNodeWithText("Autorisierung ≠ aktives VPN").fetchSemanticsNode()
     }
