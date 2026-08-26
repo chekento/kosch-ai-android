@@ -8,6 +8,7 @@ PINNED_COMMIT="8dda19e8e4613e014f0b12f3e624fdff5e5f23b3"
 PINNED_GO="go1.26.3"
 PINNED_MODULE="github.com/xjasonlyu/tun2socks/v2"
 PINNED_X_MOBILE="v0.0.0-20260821190718-4776eadac327"
+BOUND_PACKAGE="$PINNED_MODULE/koschmobile"
 ANDROID_API="29"
 
 SOURCE_DIR="${1:-}"
@@ -27,7 +28,7 @@ SOURCE_DIR="$(cd "$SOURCE_DIR" && pwd)"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 
-for tool in git go gomobile gobind sha256sum; do
+for tool in git go gomobile gobind sha256sum unzip jar; do
   command -v "$tool" >/dev/null 2>&1 || fail "required tool not found: $tool"
 done
 
@@ -56,8 +57,10 @@ export GOPROXY=off
 export GOSUMDB=off
 
 WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/kosch-tun2socks-poc.XXXXXX")"
+CLASS_JAR=""
 cleanup() {
   git -C "$SOURCE_DIR" worktree remove --force "$WORK_DIR" >/dev/null 2>&1 || true
+  [[ -z "$CLASS_JAR" ]] || rm -f "$CLASS_JAR"
   rm -rf "$WORK_DIR"
 }
 trap cleanup EXIT
@@ -66,12 +69,18 @@ git -C "$SOURCE_DIR" worktree add --detach "$WORK_DIR" "$PINNED_COMMIT" >/dev/nu
 git -C "$WORK_DIR" apply --check "$PATCH_FILE"
 git -C "$WORK_DIR" apply "$PATCH_FILE"
 
-# Static containment checks. This POC patch must expose safe lifecycle/protect hooks,
-# and must not contain an Android VPN establishment path.
-grep -q 'func StartSafe() error' "$WORK_DIR/engine/kosch_mobile.go" || fail "recoverable StartSafe missing"
+# Static containment checks: only the dedicated wrapper may cross the gomobile boundary.
+[[ -f "$WORK_DIR/koschmobile/mobile.go" ]] || fail "koschmobile wrapper missing"
+grep -q '^package koschmobile$' "$WORK_DIR/koschmobile/mobile.go" || fail "unexpected wrapper package"
+grep -q 'func Start(tunFD int64, mtu int64, protector SocketProtector) (result string)' "$WORK_DIR/koschmobile/mobile.go" || fail "controlled string-return Start API missing"
+grep -q 'func Stop() (result string)' "$WORK_DIR/koschmobile/mobile.go" || fail "controlled string-return Stop API missing"
+grep -q 'recover()' "$WORK_DIR/koschmobile/mobile.go" || fail "panic containment missing"
+grep -q 'unix.Dup(originalFD)' "$WORK_DIR/engine/kosch_direct.go" || fail "TUN fd duplication missing"
+grep -q 'Proxy:[[:space:]]*"direct://"' "$WORK_DIR/engine/kosch_direct.go" || fail "fixed N2 direct egress missing"
 grep -q 'SetMandatorySockOpt' "$WORK_DIR/dialer/dialer.go" || fail "mandatory socket hook missing"
-grep -q 'protector.Protect(int64(fd))' "$WORK_DIR/engine/kosch_mobile.go" || fail "protect(fd) callback missing"
-if grep -R -n --include='*.go' 'VpnService.Builder\|Builder.establish\|android.permission.INTERNET' "$WORK_DIR/engine" "$WORK_DIR/dialer"; then
+grep -q 'protector(int64(fd))' "$WORK_DIR/engine/kosch_direct.go" || fail "protect(fd) callback missing"
+grep -q 'KoSch socket protector is required' "$WORK_DIR/engine/kosch_direct.go" || fail "missing-protector hard block missing"
+if grep -R -n --include='*.go' 'VpnService.Builder\|Builder.establish\|android.permission.INTERNET' "$WORK_DIR/engine" "$WORK_DIR/dialer" "$WORK_DIR/koschmobile"; then
   fail "active Android VPN/runtime permission code found in offline POC surface"
 fi
 
@@ -87,21 +96,38 @@ REPORT="$OUTPUT_DIR/tun2socks-kosch-v2.7.0-poc.evidence"
   go mod edit -require="golang.org/x/mobile@$PINNED_X_MOBILE"
   go list -mod=mod golang.org/x/mobile/bind >/dev/null
 
+  # Compile the patched engine and wrapper before binding, without running tests.
+  go test -run '^$' ./engine ./koschmobile
+
+  # Bind ONLY the narrow wrapper. Upstream engine.Key and fatal Start/Stop wrappers
+  # must never become part of the generated Java/Kotlin API surface.
   gomobile bind \
     -target=android \
     -androidapi "$ANDROID_API" \
     -o "$ARTIFACT" \
-    ./engine
+    ./koschmobile
 )
 
 [[ -s "$ARTIFACT" ]] || fail "gomobile did not produce an AAR"
+
+# Inspect the Java API surface in the AAR. Native engine symbols may exist internally,
+# but generated Java classes must be limited to koschmobile plus gomobile support.
+CLASS_JAR="$(mktemp "${TMPDIR:-/tmp}/kosch-tun2socks-classes.XXXXXX.jar")"
+unzip -p "$ARTIFACT" classes.jar >"$CLASS_JAR"
+[[ -s "$CLASS_JAR" ]] || fail "AAR classes.jar missing"
+JAVA_CLASSES="$(jar tf "$CLASS_JAR")"
+printf '%s\n' "$JAVA_CLASSES" | grep -q '^koschmobile/' || fail "koschmobile Java API missing"
+if printf '%s\n' "$JAVA_CLASSES" | grep -q '^engine/'; then
+  fail "unsafe engine package leaked into generated Java API"
+fi
+
 ARTIFACT_SHA="$(sha256sum "$ARTIFACT" | awk '{print $1}')"
 PATCH_SHA="$(sha256sum "$PATCH_FILE" | awk '{print $1}')"
 GOMOBILE_SHA="$(sha256sum "$GOMOBILE_PATH" | awk '{print $1}')"
 GOBIND_SHA="$(sha256sum "$GOBIND_PATH" | awk '{print $1}')"
 
 cat >"$REPORT" <<EOF
-format=kosch-n2-offline-aar-evidence-v2
+format=kosch-n2-offline-aar-evidence-v3
 upstream=https://github.com/xjasonlyu/tun2socks
 version=v2.7.0
 commit=$PINNED_COMMIT
@@ -114,6 +140,12 @@ gomobile_sha256=$GOMOBILE_SHA
 gobind_sha256=$GOBIND_SHA
 patch_sha256=$PATCH_SHA
 android_min_api=$ANDROID_API
+bound_package=$BOUND_PACKAGE
+engine_java_api_exposed=false
+tun_fd_duplicated=true
+panic_cross_boundary=false
+fixed_direct_egress=true
+proxy_configuration_exposed=false
 network_during_build=false
 runtime_integrated=false
 vpn_established=false
