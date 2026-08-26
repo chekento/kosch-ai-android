@@ -149,6 +149,46 @@ class FirewallPolicyTest {
     }
 
     @Test
+    fun nonTcpUdpFlowContextRejectsFabricatedPort() {
+        assertThrows(IllegalArgumentException::class.java) {
+            flow(
+                protocol = TrafficProtocol.ICMP,
+                remotePort = 7,
+                uid = null,
+                packageName = null,
+            )
+        }
+    }
+
+    @Test
+    fun protocolAgnosticPortRuleCannotMatchIcmp() {
+        val policy = FirewallPolicySet(
+            listOf(
+                FirewallRule(
+                    id = "block-port-53",
+                    priority = 1,
+                    verdict = FirewallVerdict.BLOCK,
+                    remotePortRange = PortRange(53, 53),
+                ),
+            ),
+        )
+
+        assertEquals(FirewallVerdict.BLOCK, policy.evaluate(flow(protocol = TrafficProtocol.TCP, remotePort = 53)).verdict)
+        assertEquals(FirewallVerdict.BLOCK, policy.evaluate(flow(protocol = TrafficProtocol.UDP, remotePort = 53)).verdict)
+        assertEquals(
+            FirewallVerdict.ALLOW,
+            policy.evaluate(
+                flow(
+                    protocol = TrafficProtocol.ICMP,
+                    remotePort = null,
+                    uid = null,
+                    packageName = null,
+                ),
+            ).verdict,
+        )
+    }
+
+    @Test
     fun packageSpecificRuleRequiresExplicitUid() {
         assertThrows(IllegalArgumentException::class.java) {
             FirewallRule(
@@ -167,10 +207,22 @@ class FirewallPolicyTest {
             FirewallPolicySet(listOf(rule, rule.copy(priority = 2)))
         }
 
+        val maxAllowed = (0 until FirewallPolicySet.MAX_RULES).map { index ->
+            FirewallRule("allowed-$index", index, FirewallVerdict.ALLOW)
+        }
+        assertEquals(FirewallPolicySet.MAX_RULES, FirewallPolicySet(maxAllowed).rules().size)
+
         val tooMany = (0..FirewallPolicySet.MAX_RULES).map { index ->
             FirewallRule("rule-$index", index, FirewallVerdict.ALLOW)
         }
         assertThrows(IllegalArgumentException::class.java) { FirewallPolicySet(tooMany) }
+    }
+
+    @Test
+    fun blockEvaluationRequiresMatchedRule() {
+        assertThrows(IllegalArgumentException::class.java) {
+            FirewallEvaluation(FirewallVerdict.BLOCK, matchedRuleId = null)
+        }
     }
 
     @Test
