@@ -5,7 +5,7 @@ import org.junit.Test
 
 class VpnConsentDecisionPolicyTest {
     @Test
-    fun `authorized state never opens the system dialog`() {
+    fun `authorized state without conflict never opens the system dialog`() {
         val action = VpnConsentDecisionPolicy.actionFor(
             VpnConsentInspection(
                 authorization = VpnAuthorizationState.AUTHORIZED,
@@ -33,6 +33,18 @@ class VpnConsentDecisionPolicyTest {
         val action = VpnConsentDecisionPolicy.actionFor(
             VpnConsentInspection(
                 authorization = VpnAuthorizationState.CONSENT_REQUIRED,
+                conflict = VpnConflictState.ACTIVE_VPN_DETECTED,
+            ),
+        )
+
+        assertEquals(VpnConsentAction.REQUIRE_CONFLICT_ACKNOWLEDGEMENT, action)
+    }
+
+    @Test
+    fun `conflict overrides even a contradictory authorized state`() {
+        val action = VpnConsentDecisionPolicy.actionFor(
+            VpnConsentInspection(
+                authorization = VpnAuthorizationState.AUTHORIZED,
                 conflict = VpnConflictState.ACTIVE_VPN_DETECTED,
             ),
         )
