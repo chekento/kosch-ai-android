@@ -5,8 +5,8 @@ import kotlin.math.abs
 /**
  * Pure editing rules for user-controlled v7 Home pages.
  *
- * Legacy scene pages remain valid compatibility pages while Stage B lands. User pages are identified by
- * sceneAdapter == null and can hold apps/folders immediately; widgets use the same placement rules later.
+ * Legacy scene pages remain valid compatibility pages while Stage B lands. User pages hold apps, folders
+ * and portable widget identities; Android appWidgetId bindings remain device-local outside this model.
  */
 object WorkspacePageEditor {
     const val MAX_USER_PAGES = 20
@@ -14,6 +14,8 @@ object WorkspacePageEditor {
     const val APP_ROW_SPAN = 2
     const val FOLDER_COLUMN_SPAN = 2
     const val FOLDER_ROW_SPAN = 2
+    const val WIDGET_DEFAULT_COLUMN_SPAN = 4
+    const val WIDGET_DEFAULT_ROW_SPAN = 4
 
     fun createUserPage(
         document: WorkspaceDocument,
@@ -120,6 +122,27 @@ object WorkspacePageEditor {
         columnSpan = FOLDER_COLUMN_SPAN,
         rowSpan = FOLDER_ROW_SPAN,
     )
+
+    /** Adds only the portable provider identity. Android appWidgetId is deliberately stored elsewhere. */
+    fun addWidget(
+        document: WorkspaceDocument,
+        pageId: String,
+        itemId: String,
+        providerComponent: String?,
+        columnSpan: Int = WIDGET_DEFAULT_COLUMN_SPAN,
+        rowSpan: Int = WIDGET_DEFAULT_ROW_SPAN,
+    ): WorkspaceDocument {
+        require(columnSpan > 0) { "Widget column span must be positive" }
+        require(rowSpan > 0) { "Widget row span must be positive" }
+        return addItem(
+            document = document,
+            pageId = pageId,
+            itemId = itemId,
+            content = WorkspaceItemContent.Widget(providerComponent),
+            columnSpan = columnSpan,
+            rowSpan = rowSpan,
+        )
+    }
 
     fun moveItem(
         document: WorkspaceDocument,
@@ -265,7 +288,7 @@ object WorkspacePageEditor {
         }
         val page = normalized.pages.firstOrNull { it.id == pageId }
             ?: throw IllegalArgumentException("Workspace page does not exist")
-        require(page.sceneAdapter == null) { "Apps and folders can only be placed on user Home pages" }
+        require(page.sceneAdapter == null) { "Items can only be placed on user Home pages" }
         val bounds = firstFreeBounds(normalized.grid, page.items, columnSpan, rowSpan)
             ?: throw IllegalStateException("Workspace page has no free cell for this item")
         val pages = normalized.pages.map { candidate ->
