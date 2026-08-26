@@ -56,6 +56,27 @@ class WorkspaceHomeController(context: Context) {
         persist(updated, "Neue Home-Seite erstellt")
     }
 
+    fun duplicateActivePage() {
+        if (!isUserPage()) {
+            statusMessage = "Legacy-Szenenseiten können nicht dupliziert werden"
+            return
+        }
+        val source = activePage
+        val updated = runCatching {
+            WorkspacePageEditor.duplicateUserPage(
+                document = document,
+                sourcePageId = source.id,
+                pageId = "page:user:${UUID.randomUUID()}",
+                title = "",
+                newItemIds = source.items.map { "item:user:${UUID.randomUUID()}" },
+            )
+        }.getOrElse {
+            statusMessage = it.message ?: "Home-Seite konnte nicht dupliziert werden"
+            return
+        }
+        persist(updated, "Home-Seite dupliziert")
+    }
+
     fun activatePage(pageId: String) {
         val updated = runCatching { WorkspacePageEditor.activatePage(document, pageId) }
             .getOrElse {
@@ -91,6 +112,24 @@ class WorkspaceHomeController(context: Context) {
                 return
             }
         persist(updated, "Seitenreihenfolge geändert")
+    }
+
+    fun compactActivePage() {
+        if (!isUserPage()) {
+            statusMessage = "Legacy-Szenenseiten bleiben unverändert"
+            return
+        }
+        val updated = runCatching {
+            WorkspacePageEditor.compactUserPage(document, activePage.id)
+        }.getOrElse {
+            statusMessage = it.message ?: "Home-Seite konnte nicht automatisch angeordnet werden"
+            return
+        }
+        if (updated == document) {
+            statusMessage = "Home-Seite ist bereits kompakt angeordnet"
+            return
+        }
+        persist(updated, "Home-Seite automatisch angeordnet")
     }
 
     fun addApp(appKey: String) {
@@ -138,6 +177,26 @@ class WorkspaceHomeController(context: Context) {
             return
         }
         if (updated != document) persist(updated, "Element verschoben")
+    }
+
+    fun resizeItem(itemId: String, columnSpan: Int, rowSpan: Int) {
+        val updated = runCatching {
+            WorkspacePageEditor.resizeItem(
+                document = document,
+                pageId = activePage.id,
+                itemId = itemId,
+                columnSpan = columnSpan,
+                rowSpan = rowSpan,
+            )
+        }.getOrElse {
+            statusMessage = it.message ?: "Element konnte nicht skaliert werden"
+            return
+        }
+        if (updated == document) {
+            statusMessage = "Für diese Größe ist kein freier Bereich verfügbar"
+            return
+        }
+        persist(updated, "Element auf ${columnSpan}×${rowSpan} skaliert")
     }
 
     fun moveItemToPage(
