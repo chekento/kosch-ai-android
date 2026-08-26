@@ -2,10 +2,13 @@ package cloud.kosch.aiandroid.ui
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.kosch.aiandroid.security.NetworkSecurityN1Policy
 import cloud.kosch.aiandroid.security.VpnAuthorizationState
@@ -43,6 +46,9 @@ class SecurityNetworkCenterSurfaceInstrumentationTest {
         composeTestRule.onNodeWithText("Live-Flows 0 · erlaubt 0 · blockiert 0").fetchSemanticsNode()
         composeTestRule.onNodeWithText("Upload 0 B · Download 0 B").fetchSemanticsNode()
 
+        composeTestRule
+            .onNodeWithTag(SECURITY_NETWORK_LIST_TEST_TAG)
+            .performScrollToNode(hasText("Android-VPN-Freigabe öffnen"))
         composeTestRule.onNodeWithText("Android-VPN-Freigabe öffnen").performClick()
         composeTestRule.runOnIdle { assertEquals(1, consentRequests) }
     }
@@ -64,8 +70,12 @@ class SecurityNetworkCenterSurfaceInstrumentationTest {
         composeTestRule.onNodeWithText("Von Android autorisiert").fetchSemanticsNode()
         composeTestRule.onNodeWithText("N2 BEREIT").fetchSemanticsNode()
         composeTestRule.onNodeWithText("Autorisierung ≠ aktives VPN").fetchSemanticsNode()
-        composeTestRule.onNodeWithText("Android-Freigabe erneut prüfen").fetchSemanticsNode()
         composeTestRule.onAllNodesWithText("AUS").assertCountEquals(2)
         composeTestRule.onNodeWithText("DIREKT").fetchSemanticsNode()
+
+        composeTestRule
+            .onNodeWithTag(SECURITY_NETWORK_LIST_TEST_TAG)
+            .performScrollToNode(hasText("Android-Freigabe erneut prüfen"))
+        composeTestRule.onNodeWithText("Android-Freigabe erneut prüfen").fetchSemanticsNode()
     }
 }
