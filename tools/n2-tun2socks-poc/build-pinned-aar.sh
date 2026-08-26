@@ -118,16 +118,21 @@ REPORT="$OUTPUT_DIR/tun2socks-kosch-v2.7.0-poc.evidence"
 
 [[ -s "$ARTIFACT" ]] || fail "gomobile did not produce an AAR"
 
-# Inspect the Java API surface in the AAR. Native engine symbols may exist internally,
-# but generated Java classes must be limited to koschmobile plus gomobile support.
+# Inspect the Java API surface in the AAR. Native Go symbols may exist internally,
+# but generated Java classes are allowlisted to the bound koschmobile API and
+# gomobile's go/ support package. Non-class archive metadata/resources are ignored.
 CLASS_JAR="$(mktemp "${TMPDIR:-/tmp}/kosch-tun2socks-classes.XXXXXX.jar")"
 unzip -p "$ARTIFACT" classes.jar >"$CLASS_JAR"
 [[ -s "$CLASS_JAR" ]] || fail "AAR classes.jar missing"
 JAVA_CLASSES="$(jar tf "$CLASS_JAR")"
 printf '%s\n' "$JAVA_CLASSES" | grep -q '^koschmobile/' || fail "koschmobile Java API missing"
-if printf '%s\n' "$JAVA_CLASSES" | grep -q '^engine/'; then
-  fail "unsafe engine package leaked into generated Java API"
-fi
+UNEXPECTED_JAVA_CLASSES="$(
+  printf '%s\n' "$JAVA_CLASSES" \
+    | grep '\.class$' \
+    | grep -Ev '^(koschmobile/|go/)' \
+    || true
+)"
+[[ -z "$UNEXPECTED_JAVA_CLASSES" ]] || fail "unexpected generated Java API classes: $UNEXPECTED_JAVA_CLASSES"
 
 ARTIFACT_SHA="$(sha256sum "$ARTIFACT" | awk '{print $1}')"
 PATCH_SHA="$(sha256sum "$PATCH_FILE" | awk '{print $1}')"
