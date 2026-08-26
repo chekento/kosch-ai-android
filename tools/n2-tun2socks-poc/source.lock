@@ -6,6 +6,7 @@ go_module=github.com/xjasonlyu/tun2socks/v2
 go_version=go1.26.3
 x_mobile_version=v0.0.0-20260821190718-4776eadac327
 x_mobile_commit=4776eadac327bcb80cebc7413c91f8b4abf8ffa1
+ndk_version=28.2.13676358
 android_min_api=29
 runtime_integration=false
 network_during_build=false
