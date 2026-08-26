@@ -156,8 +156,14 @@ jobs:
           grep -q '^mandatory_protect_hook=true$' "$report"
 
           unzip -l "$artifact"
-          sha256sum "$artifact" "$report" "$out_dir/n2-preparation.evidence" > "$out_dir/SHA256SUMS"
-          sha256sum -c "$out_dir/SHA256SUMS"
+          (
+            cd "$out_dir"
+            sha256sum \
+              "tun2socks-kosch-v2.7.0-poc.aar" \
+              "tun2socks-kosch-v2.7.0-poc.evidence" \
+              "n2-preparation.evidence" > SHA256SUMS
+            sha256sum -c SHA256SUMS
+          )
 
       - name: Upload immutable POC evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
