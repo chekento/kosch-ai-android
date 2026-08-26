@@ -1,6 +1,5 @@
 package cloud.kosch.aiandroid
 
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -34,12 +33,12 @@ class SettingsCenterInstrumentationTest {
             .performClick()
         composeTestRule.waitForIdle()
 
-        composeTestRule.onNodeWithText("Settings Center", useUnmergedTree = true).assertExists()
-        composeTestRule.onNodeWithText("Einstellungen durchsuchen", useUnmergedTree = true).assertExists()
+        composeTestRule.onNodeWithText("Settings Center", useUnmergedTree = true).fetchSemanticsNode()
+        composeTestRule.onNodeWithText("Einstellungen durchsuchen", useUnmergedTree = true).fetchSemanticsNode()
         composeTestRule.onNodeWithText("Home & Raster", useUnmergedTree = true).performClick()
         composeTestRule.waitForIdle()
-        composeTestRule.onNodeWithText("Rasterspalten", useUnmergedTree = true).assertExists()
-        composeTestRule.onNodeWithText("Rasterzeilen", useUnmergedTree = true).assertExists()
+        composeTestRule.onNodeWithText("Rasterspalten", useUnmergedTree = true).fetchSemanticsNode()
+        composeTestRule.onNodeWithText("Rasterzeilen", useUnmergedTree = true).fetchSemanticsNode()
 
         composeTestRule
             .onNodeWithContentDescription("Settings Center schließen", useUnmergedTree = true)
