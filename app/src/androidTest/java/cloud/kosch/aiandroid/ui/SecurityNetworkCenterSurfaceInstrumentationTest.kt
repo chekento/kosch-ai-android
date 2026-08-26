@@ -2,7 +2,6 @@ package cloud.kosch.aiandroid.ui
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.test.assertCountEquals
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
@@ -37,12 +36,12 @@ class SecurityNetworkCenterSurfaceInstrumentationTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Autorisierung ≠ aktives VPN").assertExists()
-        composeTestRule.onNodeWithText("Android-Freigabe erforderlich").assertExists()
+        composeTestRule.onNodeWithText("Autorisierung ≠ aktives VPN").fetchSemanticsNode()
+        composeTestRule.onNodeWithText("Android-Freigabe erforderlich").fetchSemanticsNode()
         composeTestRule.onAllNodesWithText("AUS").assertCountEquals(2)
-        composeTestRule.onNodeWithText("DIREKT").assertExists()
-        composeTestRule.onNodeWithText("Live-Flows 0 · erlaubt 0 · blockiert 0").assertExists()
-        composeTestRule.onNodeWithText("Upload 0 B · Download 0 B").assertExists()
+        composeTestRule.onNodeWithText("DIREKT").fetchSemanticsNode()
+        composeTestRule.onNodeWithText("Live-Flows 0 · erlaubt 0 · blockiert 0").fetchSemanticsNode()
+        composeTestRule.onNodeWithText("Upload 0 B · Download 0 B").fetchSemanticsNode()
 
         composeTestRule.onNodeWithText("Android-VPN-Freigabe öffnen").performClick()
         composeTestRule.runOnIdle { assertEquals(1, consentRequests) }
@@ -62,11 +61,11 @@ class SecurityNetworkCenterSurfaceInstrumentationTest {
             }
         }
 
-        composeTestRule.onNodeWithText("Von Android autorisiert").assertExists()
-        composeTestRule.onNodeWithText("N2 BEREIT").assertExists()
-        composeTestRule.onNodeWithText("Autorisierung ≠ aktives VPN").assertExists()
-        composeTestRule.onNodeWithText("Android-Freigabe erneut prüfen").assertExists()
+        composeTestRule.onNodeWithText("Von Android autorisiert").fetchSemanticsNode()
+        composeTestRule.onNodeWithText("N2 BEREIT").fetchSemanticsNode()
+        composeTestRule.onNodeWithText("Autorisierung ≠ aktives VPN").fetchSemanticsNode()
+        composeTestRule.onNodeWithText("Android-Freigabe erneut prüfen").fetchSemanticsNode()
         composeTestRule.onAllNodesWithText("AUS").assertCountEquals(2)
-        composeTestRule.onNodeWithText("DIREKT").assertExists()
+        composeTestRule.onNodeWithText("DIREKT").fetchSemanticsNode()
     }
 }
