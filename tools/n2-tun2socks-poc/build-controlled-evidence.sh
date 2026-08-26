@@ -30,7 +30,7 @@ sha_of_tool() {
 }
 
 [[ -n "$SOURCE_DIR" ]] || fail "usage: $0 /path/to/tun2socks-v2.7.0 [output-dir]"
-[[ -x "$BASE_BUILDER" ]] || fail "base offline builder is missing or not executable"
+[[ -f "$BASE_BUILDER" ]] || fail "base offline builder is missing"
 
 for tool in go java javac git gomobile gobind sha256sum unzip jar awk sed grep find sort readlink; do
   command -v "$tool" >/dev/null 2>&1 || fail "required tool not found: $tool"
@@ -64,7 +64,7 @@ CLANG="$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/clang"
 mkdir -p "$OUTPUT_DIR"
 OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 
-"$BASE_BUILDER" "$SOURCE_DIR" "$OUTPUT_DIR"
+bash "$BASE_BUILDER" "$SOURCE_DIR" "$OUTPUT_DIR"
 
 AAR="$OUTPUT_DIR/tun2socks-kosch-v2.7.0-poc.aar"
 BASE_EVIDENCE="$OUTPUT_DIR/tun2socks-kosch-v2.7.0-poc.evidence"
