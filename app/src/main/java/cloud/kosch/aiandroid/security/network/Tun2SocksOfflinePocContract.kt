@@ -11,6 +11,8 @@ object Tun2SocksOfflinePocContract {
     const val UPSTREAM_VERSION = "v2.7.0"
     const val UPSTREAM_COMMIT = "8dda19e8e4613e014f0b12f3e624fdff5e5f23b3"
     const val GO_VERSION = "go1.26.3"
+    const val X_MOBILE_VERSION = "v0.0.0-20260821190718-4776eadac327"
+    const val X_MOBILE_COMMIT = "4776eadac327bcb80cebc7413c91f8b4abf8ffa1"
     const val ANDROID_MIN_API = 29
 
     private val sha256 = Regex("[0-9a-f]{64}")
@@ -20,8 +22,12 @@ object Tun2SocksOfflinePocContract {
             if (evidence.upstreamVersion != UPSTREAM_VERSION) add(Tun2SocksOfflinePocBlocker.VERSION_DRIFT)
             if (evidence.upstreamCommit != UPSTREAM_COMMIT) add(Tun2SocksOfflinePocBlocker.COMMIT_DRIFT)
             if (evidence.goVersion != GO_VERSION) add(Tun2SocksOfflinePocBlocker.GO_TOOLCHAIN_DRIFT)
+            if (evidence.xMobileVersion != X_MOBILE_VERSION) add(Tun2SocksOfflinePocBlocker.X_MOBILE_TOOLCHAIN_DRIFT)
+            if (evidence.gomobileModuleVersion != X_MOBILE_VERSION) add(Tun2SocksOfflinePocBlocker.GOMOBILE_MODULE_DRIFT)
+            if (evidence.gobindModuleVersion != X_MOBILE_VERSION) add(Tun2SocksOfflinePocBlocker.GOBIND_MODULE_DRIFT)
             if (evidence.androidMinApi != ANDROID_MIN_API) add(Tun2SocksOfflinePocBlocker.ANDROID_API_DRIFT)
             if (!sha256.matches(evidence.gomobileSha256)) add(Tun2SocksOfflinePocBlocker.GOMOBILE_FINGERPRINT_MISSING)
+            if (!sha256.matches(evidence.gobindSha256)) add(Tun2SocksOfflinePocBlocker.GOBIND_FINGERPRINT_MISSING)
             if (!sha256.matches(evidence.patchSha256)) add(Tun2SocksOfflinePocBlocker.PATCH_FINGERPRINT_MISSING)
             if (!sha256.matches(evidence.artifactSha256)) add(Tun2SocksOfflinePocBlocker.ARTIFACT_FINGERPRINT_MISSING)
             if (evidence.networkDuringBuild) add(Tun2SocksOfflinePocBlocker.BUILD_WAS_NOT_OFFLINE)
@@ -39,7 +45,11 @@ data class Tun2SocksOfflinePocEvidence(
     val upstreamVersion: String,
     val upstreamCommit: String,
     val goVersion: String,
+    val xMobileVersion: String,
+    val gomobileModuleVersion: String,
+    val gobindModuleVersion: String,
     val gomobileSha256: String,
+    val gobindSha256: String,
     val patchSha256: String,
     val artifactSha256: String,
     val androidMinApi: Int,
@@ -55,8 +65,12 @@ enum class Tun2SocksOfflinePocBlocker {
     VERSION_DRIFT,
     COMMIT_DRIFT,
     GO_TOOLCHAIN_DRIFT,
+    X_MOBILE_TOOLCHAIN_DRIFT,
+    GOMOBILE_MODULE_DRIFT,
+    GOBIND_MODULE_DRIFT,
     ANDROID_API_DRIFT,
     GOMOBILE_FINGERPRINT_MISSING,
+    GOBIND_FINGERPRINT_MISSING,
     PATCH_FINGERPRINT_MISSING,
     ARTIFACT_FINGERPRINT_MISSING,
     BUILD_WAS_NOT_OFFLINE,
