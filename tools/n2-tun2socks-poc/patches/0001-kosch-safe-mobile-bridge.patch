@@ -7,28 +7,27 @@ index f0c1170..1111111 100644
  	DefaultDialer.RegisterSockOpt(opt)
  }
 +
-+// SetMandatorySockOpt installs a socket option that is applied before the ordinary
-+// option list and before the non-global-unicast short-circuit. KoSch uses this
-+// only for the VpnService.protect(fd) bridge so every forwarder-created socket
-+// must escape the VPN before connect/listen proceeds.
++// SetMandatorySockOpt installs a socket option that is always applied before
++// ordinary socket options and before the non-global-unicast short-circuit.
++// KoSch uses this only for the VpnService.protect(fd) bridge.
 +func SetMandatorySockOpt(opt SocketOption) {
 +	DefaultDialer.SetMandatorySockOpt(opt)
 +}
 +
++// ClearMandatorySockOpt removes the mandatory socket option.
 +func ClearMandatorySockOpt() { DefaultDialer.ClearMandatorySockOpt() }
  
  // Reset removes all registered socket options from the DefaultDialer.
  func Reset() {
-@@ -27,6 +37,7 @@ func ListenPacket(network, address string) (net.PacketConn, error) {
+@@ -35,6 +45,7 @@ func ListenPacket(network, address string) (net.PacketConn, error) {
  type Dialer struct {
  	optsMu     sync.Mutex
  	atomicOpts atomic.Value
 +	mandatory  atomic.Value
  }
  
--// New creates a new Dialer with the given initial socket options.
-+// New creates a new Dialer with the given initial socket options.
-@@ -44,6 +55,16 @@ func (d *Dialer) RegisterSockOpt(opt SocketOption) {
+ // New creates a new Dialer with the given initial socket options.
+@@ -50,6 +61,16 @@ func (d *Dialer) RegisterSockOpt(opt SocketOption) {
  	d.optsMu.Unlock()
  }
 +
@@ -42,7 +41,7 @@ index f0c1170..1111111 100644
  
  // Reset removes all registered socket options from the Dialer.
  func (d *Dialer) Reset() {
-@@ -53,6 +74,12 @@ func (d *Dialer) Reset() {
+@@ -59,6 +80,13 @@ func (d *Dialer) Reset() {
  }
  
  func (d *Dialer) applySockOpts(network string, address string, c syscall.RawConn) error {
@@ -56,92 +55,100 @@ index f0c1170..1111111 100644
  	opts, _ := d.atomicOpts.Load().([]SocketOption)
  	if len(opts) == 0 {
  		return nil
-
 diff --git a/engine/engine.go b/engine/engine.go
 index e9c6fc1..2222222 100644
 --- a/engine/engine.go
 +++ b/engine/engine.go
-@@ -103,6 +103,7 @@ func general(k *Key) error {
+@@ -91,16 +91,20 @@ func start() error {
+ }
+ 
+ func stop() (err error) {
+ 	_engineMu.Lock()
++	defer _engineMu.Unlock()
++
+ 	if _defaultDevice != nil {
+ 		_defaultDevice.Close()
+ 	}
+ 	if _defaultStack != nil {
+ 		_defaultStack.Close()
+ 		_defaultStack.Wait()
+ 	}
+-	_engineMu.Unlock()
++	_defaultKey = nil
++	_defaultProxy = nil
++	_defaultDevice = nil
++	_defaultStack = nil
+ 	return nil
+ }
+ 
+@@ -124,6 +128,9 @@ func general(k *Key) error {
  
  	// Reset default dialer before registering options.
  	dialer.Reset()
-+	registerKoSchSocketProtector()
++	if err := registerKoSchSocketProtector(); err != nil {
++		return err
++	}
  
  	if k.Interface != "" {
  		iface, err := net.InterfaceByName(k.Interface)
-
-diff --git a/engine/kosch_mobile.go b/engine/kosch_mobile.go
+diff --git a/engine/kosch_direct.go b/engine/kosch_direct.go
 new file mode 100644
 index 0000000..3333333
 --- /dev/null
-+++ b/engine/kosch_mobile.go
-@@ -0,0 +1,73 @@
++++ b/engine/kosch_direct.go
+@@ -0,0 +1,157 @@
 +package engine
 +
 +import (
 +	"errors"
++	"fmt"
 +	"sync"
 +	"syscall"
++
++	"golang.org/x/sys/unix"
 +
 +	"github.com/xjasonlyu/tun2socks/v2/dialer"
 +)
 +
-+// SocketProtector is intentionally gomobile-friendly. The Android adapter must
-+// implement Protect by delegating to VpnService.protect(fd). Returning false
-+// fails the socket creation path closed.
-+type SocketProtector interface {
-+	Protect(fd int64) bool
-+}
++const maxAndroidFD = int64(1<<31 - 1)
 +
 +var (
-+	koschProtectorMu sync.RWMutex
-+	koschProtector   SocketProtector
++	koSchLifecycleMu sync.Mutex
++	koSchProtectorMu sync.RWMutex
++	koSchProtector   func(int64) bool
 +)
 +
-+// SetSocketProtector must be called before StartSafe. The protector is sampled
-+// during start and installed as a mandatory dialer option before any direct
-+// upstream socket is created.
-+func SetSocketProtector(protector SocketProtector) {
-+	koschProtectorMu.Lock()
-+	koschProtector = protector
-+	koschProtectorMu.Unlock()
++func setKoSchSocketProtector(protector func(int64) bool) {
++	koSchProtectorMu.Lock()
++	koSchProtector = protector
++	koSchProtectorMu.Unlock()
 +}
 +
-+func ClearSocketProtector() {
-+	koschProtectorMu.Lock()
-+	koschProtector = nil
-+	koschProtectorMu.Unlock()
-+}
-+
-+// StartSafe exposes the existing recoverable start() result instead of using
-+// the upstream Start() wrapper, whose Fatalf path can terminate the process.
-+func StartSafe() error { return start() }
-+
-+// StopSafe exposes recoverable shutdown and always removes the mandatory hook.
-+func StopSafe() error {
-+	err := stop()
++func clearKoSchSocketProtector() {
++	koSchProtectorMu.Lock()
++	koSchProtector = nil
++	koSchProtectorMu.Unlock()
 +	dialer.ClearMandatorySockOpt()
-+	return err
 +}
 +
-+func registerKoSchSocketProtector() {
++func registerKoSchSocketProtector() error {
 +	dialer.ClearMandatorySockOpt()
 +
-+	koschProtectorMu.RLock()
-+	protector := koschProtector
-+	koschProtectorMu.RUnlock()
++	koSchProtectorMu.RLock()
++	protector := koSchProtector
++	koSchProtectorMu.RUnlock()
 +	if protector == nil {
-+		return
++		return errors.New("KoSch socket protector is required")
 +	}
 +
 +	dialer.SetMandatorySockOpt(dialer.SocketOptionFunc(func(_, _ string, raw syscall.RawConn) error {
 +		var protectErr error
 +		controlErr := raw.Control(func(fd uintptr) {
-+			if fd > uintptr(2147483647) {
++			if uint64(fd) > uint64(maxAndroidFD) {
 +				protectErr = errors.New("socket fd exceeds Android int range")
 +				return
 +			}
-+			if !protector.Protect(int64(fd)) {
++			if !protector(int64(fd)) {
 +				protectErr = errors.New("VpnService.protect rejected upstream socket")
 +			}
 +		})
@@ -150,4 +157,209 @@ index 0000000..3333333
 +		}
 +		return protectErr
 +	}))
++	return nil
++}
++
++func koSchDevicePresent() bool {
++	_engineMu.Lock()
++	defer _engineMu.Unlock()
++	return _defaultDevice != nil
++}
++
++func koSchEngineBusy() bool {
++	_engineMu.Lock()
++	defer _engineMu.Unlock()
++	return _defaultDevice != nil || _defaultStack != nil || _defaultKey != nil
++}
++
++func cleanupKoSchFailedStart(dupFD int) {
++	deviceOwnedFD := koSchDevicePresent()
++	_ = stop()
++	if !deviceOwnedFD {
++		_ = unix.Close(dupFD)
++	}
++	clearKoSchSocketProtector()
++}
++
++// StartKoSchDirect is the only engine start path used by the bound KoSch mobile
++// facade. It duplicates the Android-owned TUN descriptor before handing it to
++// the fdbased device because that device closes the descriptor it owns.
++//
++// The proxy is fixed to direct:// so N2 cannot acquire N4 proxy semantics.
++func StartKoSchDirect(originalFD int, mtu int, protector func(int64) bool) (err error) {
++	koSchLifecycleMu.Lock()
++	defer koSchLifecycleMu.Unlock()
++
++	if originalFD < 0 || int64(originalFD) > maxAndroidFD {
++		return errors.New("invalid Android TUN fd")
++	}
++	if mtu < 1280 || mtu > 9000 {
++		return errors.New("MTU must be between 1280 and 9000")
++	}
++	if protector == nil {
++		return errors.New("socket protector is required")
++	}
++	if koSchEngineBusy() {
++		return errors.New("forwarder engine is already active or dirty")
++	}
++
++	dupFD, dupErr := unix.Dup(originalFD)
++	if dupErr != nil {
++		return fmt.Errorf("duplicate TUN fd: %w", dupErr)
++	}
++
++	cleanupRequired := true
++	defer func() {
++		if recovered := recover(); recovered != nil {
++			if cleanupRequired {
++				cleanupKoSchFailedStart(dupFD)
++			}
++			err = fmt.Errorf("forwarder start panic: %v", recovered)
++		}
++	}()
++
++	setKoSchSocketProtector(protector)
++	Insert(&Key{
++		MTU:                      mtu,
++		Mark:                     0,
++		Proxy:                    "direct://",
++		RestAPI:                  "",
++		Device:                   fmt.Sprintf("fd://%d", dupFD),
++		LogLevel:                 "warn",
++		Interface:                "",
++		TCPModerateReceiveBuffer: false,
++		TCPSendBufferSize:        "",
++		TCPReceiveBufferSize:     "",
++		MulticastGroups:          nil,
++		TUNPreUp:                 "",
++		TUNPostUp:                "",
++		UDPTimeout:               0,
++	})
++
++	if startErr := start(); startErr != nil {
++		cleanupKoSchFailedStart(dupFD)
++		cleanupRequired = false
++		return startErr
++	}
++
++	cleanupRequired = false
++	return nil
++}
++
++// StopKoSchDirect is idempotent and clears all Go references to the Android
++// socket-protector proxy after the engine has released its duplicated TUN fd.
++func StopKoSchDirect() (err error) {
++	koSchLifecycleMu.Lock()
++	defer koSchLifecycleMu.Unlock()
++	defer func() {
++		clearKoSchSocketProtector()
++		if recovered := recover(); recovered != nil {
++			err = fmt.Errorf("forwarder stop panic: %v", recovered)
++		}
++	}()
++
++	return stop()
++}
++
+diff --git a/koschmobile/mobile.go b/koschmobile/mobile.go
+new file mode 100644
+index 0000000..4444444
+--- /dev/null
++++ b/koschmobile/mobile.go
+@@ -0,0 +1,93 @@
++// Package koschmobile is the only package exported through gomobile bind.
++// It deliberately hides engine.Key and the upstream Engine.Start/Stop wrappers.
++package koschmobile
++
++import (
++	"fmt"
++	"sync"
++
++	"github.com/xjasonlyu/tun2socks/v2/engine"
++)
++
++const maxAndroidFD = int64(1<<31 - 1)
++
++// SocketProtector is implemented by the future Android adapter. Protect must
++// delegate to VpnService.protect(fd); false means the socket must not proceed.
++type SocketProtector interface {
++	Protect(fd int64) bool
++}
++
++var (
++	mobileMu        sync.Mutex
++	running         bool
++	activeProtector SocketProtector
++)
++
++func safeProtect(protector SocketProtector, fd int64) (ok bool) {
++	defer func() {
++		if recover() != nil {
++			ok = false
++		}
++	}()
++	return protector.Protect(fd)
++}
++
++// Start starts only the fixed N2 direct forwarder. It returns an empty string
++// on success and a non-empty error string on failure so Go errors/panics never
++// need to cross the gomobile language boundary as exceptions.
++func Start(tunFD int64, mtu int64, protector SocketProtector) (result string) {
++	mobileMu.Lock()
++	defer mobileMu.Unlock()
++
++	defer func() {
++		if recovered := recover(); recovered != nil {
++			_ = engine.StopKoSchDirect()
++			running = false
++			activeProtector = nil
++			result = fmt.Sprintf("mobile start panic: %v", recovered)
++		}
++	}()
++
++	if running {
++		return "forwarder is already running"
++	}
++	if protector == nil {
++		return "socket protector is required"
++	}
++	if tunFD < 0 || tunFD > maxAndroidFD {
++		return "invalid Android TUN fd"
++	}
++	if mtu < 1280 || mtu > 9000 {
++		return "MTU must be between 1280 and 9000"
++	}
++
++	activeProtector = protector
++	err := engine.StartKoSchDirect(int(tunFD), int(mtu), func(fd int64) bool {
++		return safeProtect(protector, fd)
++	})
++	if err != nil {
++		activeProtector = nil
++		return err.Error()
++	}
++
++	running = true
++	return ""
++}
++
++// Stop is idempotent. It returns an empty string on success and always drops
++// the Java/Kotlin protector reference so proxy-reference cycles cannot survive
++// a stopped session.
++func Stop() (result string) {
++	mobileMu.Lock()
++	defer mobileMu.Unlock()
++
++	defer func() {
++		running = false
++		activeProtector = nil
++		if recovered := recover(); recovered != nil {
++			result = fmt.Sprintf("mobile stop panic: %v", recovered)
++		}
++	}()
++
++	if err := engine.StopKoSchDirect(); err != nil {
++		return err.Error()
++	}
++	return ""
 +}
