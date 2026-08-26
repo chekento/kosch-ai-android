@@ -18,6 +18,16 @@ class UnifiedFaqRegistryTest {
     }
 
     @Test
+    fun `unified FAQ preserves base entries and keeps ids unique`() {
+        val unifiedIds = UnifiedFaqRegistry.entries.map { it.id }
+        val baseIds = FaqRegistry.entries.map { it.id }
+
+        assertTrue(unifiedIds.containsAll(baseIds))
+        assertEquals(unifiedIds.size, unifiedIds.toSet().size)
+        assertEquals(FaqRegistry.entries.size + 5, UnifiedFaqRegistry.entries.size)
+    }
+
+    @Test
     fun `security privacy answer excludes traffic runtime data from persistence`() {
         val answer = UnifiedFaqRegistry.entries
             .first { it.id == "security-network-privacy" }
