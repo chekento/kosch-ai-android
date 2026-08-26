@@ -16,6 +16,13 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val settings = LauncherSettingsController(application)
     val assistant = AssistantSessionController(application)
 
+    init {
+        val assistantSettings = settings.document.assistant
+        assistant.setEnabled(assistantSettings.enabled)
+        assistant.setVoiceInputEnabled(assistantSettings.voiceInputEnabled)
+        assistant.setSpeechOutputEnabled(assistantSettings.speechOutputEnabled)
+    }
+
     override fun onCleared() {
         controller.close()
         super.onCleared()
