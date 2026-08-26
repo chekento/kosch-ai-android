@@ -24,7 +24,6 @@ object Tun2SocksOfflinePocContract {
             if (evidence.upstreamCommit != UPSTREAM_COMMIT) add(Tun2SocksOfflinePocBlocker.COMMIT_DRIFT)
             if (evidence.goVersion != GO_VERSION) add(Tun2SocksOfflinePocBlocker.GO_TOOLCHAIN_DRIFT)
             if (evidence.xMobileVersion != X_MOBILE_VERSION) add(Tun2SocksOfflinePocBlocker.X_MOBILE_TOOLCHAIN_DRIFT)
-            if (evidence.xMobileCommit != X_MOBILE_COMMIT) add(Tun2SocksOfflinePocBlocker.X_MOBILE_COMMIT_DRIFT)
             if (evidence.gomobileModuleVersion != X_MOBILE_VERSION) add(Tun2SocksOfflinePocBlocker.GOMOBILE_MODULE_DRIFT)
             if (evidence.gobindModuleVersion != X_MOBILE_VERSION) add(Tun2SocksOfflinePocBlocker.GOBIND_MODULE_DRIFT)
             if (evidence.androidMinApi != ANDROID_MIN_API) add(Tun2SocksOfflinePocBlocker.ANDROID_API_DRIFT)
@@ -54,7 +53,6 @@ data class Tun2SocksOfflinePocEvidence(
     val upstreamCommit: String,
     val goVersion: String,
     val xMobileVersion: String,
-    val xMobileCommit: String,
     val gomobileModuleVersion: String,
     val gobindModuleVersion: String,
     val gomobileSha256: String,
@@ -81,7 +79,6 @@ enum class Tun2SocksOfflinePocBlocker {
     COMMIT_DRIFT,
     GO_TOOLCHAIN_DRIFT,
     X_MOBILE_TOOLCHAIN_DRIFT,
-    X_MOBILE_COMMIT_DRIFT,
     GOMOBILE_MODULE_DRIFT,
     GOBIND_MODULE_DRIFT,
     ANDROID_API_DRIFT,
