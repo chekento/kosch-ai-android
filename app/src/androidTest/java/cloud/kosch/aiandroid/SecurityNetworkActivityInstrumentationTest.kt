@@ -1,10 +1,13 @@
 package cloud.kosch.aiandroid
 
 import android.content.ComponentName
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertFalse
 import org.junit.Rule
@@ -22,6 +25,9 @@ class SecurityNetworkActivityInstrumentationTest {
 
         composeTestRule.onNodeWithText("Security & Network").fetchSemanticsNode()
         composeTestRule.onNodeWithText("Autorisierung ≠ aktives VPN").fetchSemanticsNode()
+        composeTestRule
+            .onNodeWithTag(SECURITY_LIST_TAG)
+            .performScrollToNode(hasText("N1-Datenbilanz"))
         composeTestRule.onNodeWithText("N1-Datenbilanz").fetchSemanticsNode()
 
         composeTestRule.activityRule.scenario.recreate()
@@ -35,6 +41,9 @@ class SecurityNetworkActivityInstrumentationTest {
     fun help_disclosesN1PrivacyBoundary() {
         composeTestRule.waitForIdle()
 
+        composeTestRule
+            .onNodeWithTag(SECURITY_LIST_TAG)
+            .performScrollToNode(hasText("Datenschutz, VPN-Konflikte & nächste Stufen"))
         composeTestRule
             .onNodeWithText("Datenschutz, VPN-Konflikte & nächste Stufen")
             .performClick()
@@ -59,5 +68,9 @@ class SecurityNetworkActivityInstrumentationTest {
         )
 
         assertFalse("SecurityNetworkActivity must remain internal-only", info.exported)
+    }
+
+    private companion object {
+        const val SECURITY_LIST_TAG = "security-network-list"
     }
 }
