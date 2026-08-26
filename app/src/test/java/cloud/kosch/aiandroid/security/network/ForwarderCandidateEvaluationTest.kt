@@ -20,6 +20,7 @@ class ForwarderCandidateEvaluationTest {
         assertFalse(result.blockers.contains(ForwarderPreflightBlocker.DIRECT_EGRESS_UNAVAILABLE))
         assertTrue(result.blockers.contains(ForwarderPreflightBlocker.ANDROID_EMBEDDING_UNVERIFIED))
         assertTrue(result.blockers.contains(ForwarderPreflightBlocker.VPN_PROTECT_UNVERIFIED))
+        assertTrue(result.blockers.contains(ForwarderPreflightBlocker.START_FAILURE_CONTAINMENT_UNVERIFIED))
         assertTrue(result.blockers.contains(ForwarderPreflightBlocker.STOP_API_UNVERIFIED))
         assertTrue(result.blockers.contains(ForwarderPreflightBlocker.NO_BLACK_HOLE_EVIDENCE_MISSING))
         assertTrue(result.blockers.contains(ForwarderPreflightBlocker.PHYSICAL_DEVICE_EVIDENCE_MISSING))
@@ -49,6 +50,7 @@ class ForwarderCandidateEvaluationTest {
         assertFalse(result.activationEligible)
         assertFalse(result.blockers.contains(ForwarderPreflightBlocker.USE_CASE_MISMATCH))
         assertFalse(result.blockers.contains(ForwarderPreflightBlocker.ANDROID_EMBEDDING_UNVERIFIED))
+        assertFalse(result.blockers.contains(ForwarderPreflightBlocker.START_FAILURE_CONTAINMENT_UNVERIFIED))
         assertFalse(result.blockers.contains(ForwarderPreflightBlocker.STOP_API_UNVERIFIED))
         assertTrue(result.blockers.contains(ForwarderPreflightBlocker.VPN_PROTECT_UNVERIFIED))
         assertTrue(result.blockers.contains(ForwarderPreflightBlocker.NO_BLACK_HOLE_EVIDENCE_MISSING))
@@ -70,6 +72,7 @@ class ForwarderCandidateEvaluationTest {
             supportsUdp = true,
             androidEmbeddingPathVerified = true,
             socketEscapeStrategy = SocketEscapeStrategy.VPN_PROTECT,
+            recoverableStartFailureVerified = true,
             deterministicStopApiVerified = true,
             noBlackHoleEvidenceVerified = true,
             physicalDeviceEvidenceVerified = true,
@@ -88,6 +91,7 @@ class ForwarderCandidateEvaluationTest {
             ForwarderCandidateCatalog.TUN2SOCKS_2_7_0.copy(
                 androidEmbeddingPathVerified = true,
                 socketEscapeStrategy = SocketEscapeStrategy.VPN_PROTECT,
+                recoverableStartFailureVerified = true,
                 deterministicStopApiVerified = true,
             ),
             ForwarderUseCase.N2_DIRECT,
