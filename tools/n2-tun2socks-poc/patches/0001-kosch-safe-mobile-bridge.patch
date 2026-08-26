@@ -1,0 +1,150 @@
+diff --git a/dialer/dialer.go b/dialer/dialer.go
+index f0c1170..1111111 100644
+--- a/dialer/dialer.go
++++ b/dialer/dialer.go
+@@ -16,6 +16,16 @@ var DefaultDialer = &Dialer{}
+ func RegisterSockOpt(opt SocketOption) {
+ 	DefaultDialer.RegisterSockOpt(opt)
+ }
++
++// SetMandatorySockOpt installs a socket option that is applied before the ordinary
++// option list and before the non-global-unicast short-circuit. KoSch uses this
++// only for the VpnService.protect(fd) bridge so every forwarder-created socket
++// must escape the VPN before connect/listen proceeds.
++func SetMandatorySockOpt(opt SocketOption) {
++	DefaultDialer.SetMandatorySockOpt(opt)
++}
++
++func ClearMandatorySockOpt() { DefaultDialer.ClearMandatorySockOpt() }
+ 
+ // Reset removes all registered socket options from the DefaultDialer.
+ func Reset() {
+@@ -27,6 +37,7 @@ func ListenPacket(network, address string) (net.PacketConn, error) {
+ type Dialer struct {
+ 	optsMu     sync.Mutex
+ 	atomicOpts atomic.Value
++	mandatory  atomic.Value
+ }
+ 
+ // New creates a new Dialer with the given initial SocketOptions.
+@@ -44,6 +55,16 @@ func (d *Dialer) RegisterSockOpt(opt SocketOption) {
+ 	d.optsMu.Unlock()
+ }
++
++func (d *Dialer) SetMandatorySockOpt(opt SocketOption) {
++	d.mandatory.Store([]SocketOption{opt})
++}
++
++func (d *Dialer) ClearMandatorySockOpt() {
++	d.mandatory.Store([]SocketOption(nil))
++}
+ 
+ // Reset removes all registered SocketOptions from the Dialer.
+ func (d *Dialer) Reset() {
+@@ -53,6 +74,12 @@ func (d *Dialer) Reset() {
+ }
+ 
+ func (d *Dialer) applySockOpts(network string, address string, c syscall.RawConn) error {
++	mandatory, _ := d.mandatory.Load().([]SocketOption)
++	for _, opt := range mandatory {
++		if err := opt.Apply(network, address, c); err != nil {
++			return err
++		}
++	}
++
+ 	opts, _ := d.atomicOpts.Load().([]SocketOption)
+ 	if len(opts) == 0 {
+ 		return nil
+ diff --git a/engine/engine.go b/engine/engine.go
+index e9c6fc1..2222222 100644
+--- a/engine/engine.go
++++ b/engine/engine.go
+@@ -103,6 +103,7 @@ func general(k *Key) error {
+ 
+ 	// Reset default dialer before registering options.
+ 	dialer.Reset()
++	registerKoSchSocketProtector()
+ 
+ 	if k.Interface != "" {
+ 		iface, err := net.InterfaceByName(k.Interface)
+ diff --git a/engine/kosch_mobile.go b/engine/kosch_mobile.go
+new file mode 100644
+index 0000000..3333333
+--- /dev/null
++++ b/engine/kosch_mobile.go
+@@ -0,0 +1,73 @@
++package engine
++
++import (
++	"errors"
++	"sync"
++	"syscall"
++
++	"github.com/xjasonlyu/tun2socks/v2/dialer"
++)
++
++// SocketProtector is intentionally gomobile-friendly. The Android adapter must
++// implement Protect by delegating to VpnService.protect(fd). Returning false
++// fails the socket creation path closed.
++type SocketProtector interface {
++	Protect(fd int64) bool
++}
++
++var (
++	koschProtectorMu sync.RWMutex
++	koschProtector   SocketProtector
++)
++
++// SetSocketProtector must be called before StartSafe. The protector is sampled
++// during start and installed as a mandatory dialer option before any direct
++// upstream socket is created.
++func SetSocketProtector(protector SocketProtector) {
++	koschProtectorMu.Lock()
++	koschProtector = protector
++	koschProtectorMu.Unlock()
++}
++
++func ClearSocketProtector() {
++	koschProtectorMu.Lock()
++	koschProtector = nil
++	koschProtectorMu.Unlock()
++}
++
++// StartSafe exposes the existing recoverable start() result instead of using
++// the upstream Start() wrapper, whose Fatalf path can terminate the process.
++func StartSafe() error { return start() }
++
++// StopSafe exposes recoverable shutdown and always removes the mandatory hook.
++func StopSafe() error {
++	err := stop()
++	dialer.ClearMandatorySockOpt()
++	return err
++}
++
++func registerKoSchSocketProtector() {
++	dialer.ClearMandatorySockOpt()
++
++	koschProtectorMu.RLock()
++	protector := koschProtector
++	koschProtectorMu.RUnlock()
++	if protector == nil {
++		return
++	}
++
++	dialer.SetMandatorySockOpt(dialer.SocketOptionFunc(func(_, _ string, raw syscall.RawConn) error {
++		var protectErr error
++		controlErr := raw.Control(func(fd uintptr) {
++			if fd > uintptr(2147483647) {
++				protectErr = errors.New("socket fd exceeds Android int range")
++				return
++			}
++			if !protector.Protect(int64(fd)) {
++				protectErr = errors.New("VpnService.protect rejected upstream socket")
++			}
++		})
++		if controlErr != nil {
++			return controlErr
++		}
++		return protectErr
++	}))
++}
