@@ -4,6 +4,7 @@ version=v2.7.0
 commit=8dda19e8e4613e014f0b12f3e624fdff5e5f23b3
 go_module=github.com/xjasonlyu/tun2socks/v2
 go_version=go1.26.3
+go_linux_amd64_sha256=2b2cfc7148493da5e73981bffbf3353af381d5f93e789c82c79aff64962eb556
 x_mobile_version=v0.0.0-20260821190718-4776eadac327
 x_mobile_commit=4776eadac327bcb80cebc7413c91f8b4abf8ffa1
 ndk_version=28.2.13676358
