@@ -105,11 +105,12 @@ class SecurityNetworkActivity : ComponentActivity() {
                         title = { Text("Security & Network · N1") },
                         text = {
                             Text(
-                                "N1 fragt ausschließlich Android nach der VPN-Autorisierung. " +
-                                    "Es gibt keinen aktiven Tunnel, keine Paket- oder DNS-Inspektion, " +
-                                    "keine Firewall-Regeln, keinen Proxy, keine Zertifikatsinstallation " +
-                                    "und keine Traffic-Historie. Andere VPN-Apps bleiben unberührt, " +
-                                    "solange die spätere N2-Stufe nicht ausdrücklich aktiviert und geprüft wurde.",
+                                "N1 nutzt Androids VPN-Autorisierung, startet aber keinen aktiven Tunnel, " +
+                                    "keine Paket- oder DNS-Inspektion, keine Firewall-Regeln, keinen Proxy, " +
+                                    "keine Zertifikatsinstallation und keine Traffic-Historie. Android erlaubt " +
+                                    "nur einer App gleichzeitig die VPN-Autorisierung; eine KoSch-Freigabe kann " +
+                                    "deshalb eine andere VPN-App verdrängen. Bei erkanntem oder unklarem Konflikt " +
+                                    "verlangt KoSch vor dem Android-Dialog eine zusätzliche Bestätigung.",
                             )
                         },
                         confirmButton = {
