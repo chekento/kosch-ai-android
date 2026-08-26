@@ -1,6 +1,6 @@
 # Roadmap
 
-Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn Abbruch, Fehlerfall, Restore und Nutzerkontrolle mitgebaut sind.
+Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn Abbruch, Fehlerfall, Restore und Nutzerkontrolle mitgebaut sind. Parallel dazu bleibt der sichtbare Launcher-Produkttrack verbindlich: Security darf Releases blockieren, aber die Produktentwicklung nicht ersetzen.
 
 ## M1 – Launcher Vertical Slice
 
@@ -138,6 +138,35 @@ Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn 
 - [ ] lokale Zusammenfassung und strukturierte Befehle mit Schema-Validator
 - [ ] lokaler, je Quelle löschbarer Embedding-Index für Apps, Shortcuts und explizit gewählte Dateien
 - [ ] 9,5-Gate erst nach Messwerten, Accessibility-/OEM-Lab und geschlossenen Führungs-Gaps neu prüfen
+
+## Launcher Product Track – Home Studio & Settings Center
+
+- [x] Home Studio als sichtbare Launcher-Editierfläche für Drag/Drop, Cross-Page-Drop und Undo
+- [x] Core für Seiten-Duplizierung, Element-Resize und Auto-Anordnen
+- [x] versioniertes `LauncherSettingsDocument` als portable Settings-Grundstruktur
+- [x] Settings-Informationsarchitektur mit mindestens 22 Haupttabs festlegen
+- [ ] atomarer Settings Store mit Schema-Migration
+- [ ] Settings Center Shell mit Suche, Breadcrumbs, Favoriten und „zuletzt geändert“
+- [ ] Scope-System Global → Seite → Objekt mit explizitem „Standard erben“
+- [ ] Home/Raster live an Settings anbinden, inkl. Portrait/Landscape/Tablet/Foldable und Reflow-Vorschau
+- [ ] Appearance live anbinden: Motion, Blur, Transparenz, Corner Scale, Material You, Wallpaper
+- [ ] Assistant Settings vollständig anbinden: Charakter, Position, Größe, Sichtbarkeit, Spawn, Idle, Gaze, Emotion, Viseme, Voice, Chat
+- [ ] Themes: Auswahl, Preview, Import, Export, Rollback und Capability-Manifest
+- [ ] Icon Packs global und pro Objekt
+- [ ] Gesture Matrix global, pro Seite und pro Element
+- [ ] Widgets/Stacks vollständig über Settings/Inspector konfigurierbar
+- [ ] Apps, Drawer, Dock, Folder, Badge und Search Settings vollständig anbinden
+- [ ] KI-/Modell-Einstellungen mit Local-first/Ask/Default-Provider-Routing
+- [ ] API-/Provider-Settings mit Endpoint, Model ID und Vault-Alias; Secret Values niemals im Settings-Dokument
+- [ ] Voice/TTS/STT und Audio-Routing-Einstellungen
+- [ ] Smartpen/Pen-Space-Konfiguration
+- [ ] Automationen/Kontextregeln mit Dry Run und Preview/Apply
+- [ ] Accessibility-Profile als echte Designvarianten
+- [ ] Privacy/Security-Einstellungen in Settings integrieren, Security Center bleibt Detailbereich statt Produktzentrum
+- [ ] Backup/Restore mit Teilbereichsauswahl, Dry Run und Konfliktvorschau
+- [ ] Teil-Reset pro Setting, Gruppe und Tab sowie kompletter Reset
+- [ ] Settings Teil-Import/-Export ohne Secrets/Widget-IDs/URI-Grants
+- [ ] Tests für Migration, Process Death, Import/Export, Scope-Vererbung, große Settings-Datenmengen und OEM-Konfiguration
 
 ## M3 – Sichere Agenten und optionale APIs
 
