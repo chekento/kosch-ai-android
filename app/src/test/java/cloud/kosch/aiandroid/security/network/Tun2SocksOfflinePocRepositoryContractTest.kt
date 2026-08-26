@@ -117,4 +117,20 @@ class Tun2SocksOfflinePocRepositoryContractTest {
         assertTrue(workflow.contains("vpn_established=false"))
         assertTrue(workflow.contains("internet_permission_added=false"))
     }
+
+    @Test
+    fun evidenceWorkflow_emitsRelocatableChecksumManifest() {
+        val workflow = repositoryFile(".github/workflows/n2-forwarder-poc.yml")
+
+        assertTrue(workflow.contains("cd \"\$out_dir\""))
+        assertTrue(workflow.contains("\"tun2socks-kosch-v2.7.0-poc.aar\""))
+        assertTrue(workflow.contains("\"tun2socks-kosch-v2.7.0-poc.evidence\""))
+        assertTrue(workflow.contains("\"n2-preparation.evidence\" > SHA256SUMS"))
+        assertTrue(workflow.contains("sha256sum -c SHA256SUMS"))
+        assertFalse(
+            workflow.contains(
+                "sha256sum \"\$artifact\" \"\$report\" \"\$out_dir/n2-preparation.evidence\"",
+            ),
+        )
+    }
 }
