@@ -18,7 +18,24 @@ data class PacketMetadata(
     val destinationPort: Int?,
     val packetLengthBytes: Int,
     val nonInitialFragment: Boolean,
-)
+) {
+    init {
+        require(source.family == family && destination.family == family) {
+            "Packet address family is inconsistent"
+        }
+        require(ipProtocolNumber in 0..255) { "IP protocol number is invalid" }
+        require(sourcePort == null || sourcePort in 0..65535) { "Source port is invalid" }
+        require(destinationPort == null || destinationPort in 0..65535) { "Destination port is invalid" }
+        require(packetLengthBytes > 0) { "Packet length is invalid" }
+        require(!nonInitialFragment || (sourcePort == null && destinationPort == null)) {
+            "Non-initial fragments must not claim transport ports"
+        }
+        require(
+            protocol == TrafficProtocol.TCP || protocol == TrafficProtocol.UDP ||
+                (sourcePort == null && destinationPort == null),
+        ) { "Only TCP/UDP metadata may contain ports" }
+    }
+}
 
 sealed interface PacketParseOutcome {
     data class Parsed(val metadata: PacketMetadata) : PacketParseOutcome
