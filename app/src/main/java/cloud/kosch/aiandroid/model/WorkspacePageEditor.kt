@@ -40,6 +40,57 @@ object WorkspacePageEditor {
         ).normalized()
     }
 
+    /**
+     * Copies a user page without copying any device-local widget binding.
+     *
+     * Item IDs are supplied by the caller so this pure editor never creates randomness. Widget content carries only
+     * the portable provider identity; Android appWidgetIds remain device-local and therefore need a fresh remap.
+     */
+    fun duplicateUserPage(
+        document: WorkspaceDocument,
+        sourcePageId: String,
+        pageId: String,
+        title: String,
+        newItemIds: List<String>,
+    ): WorkspaceDocument {
+        val normalized = document.normalized()
+        val sourceIndex = normalized.pages.indexOfFirst { it.id == sourcePageId }
+        require(sourceIndex >= 0) { "Workspace source page does not exist" }
+        val source = normalized.pages[sourceIndex]
+        require(source.sceneAdapter == null) { "Legacy scene pages cannot be duplicated" }
+        require(pageId.isNotBlank()) { "Workspace page id must not be blank" }
+        require(pageId.length <= MAX_WORKSPACE_ID_LENGTH) { "Workspace page id is too long" }
+        require(normalized.pages.none { it.id == pageId }) { "Workspace page id already exists" }
+        require(normalized.pages.count { it.sceneAdapter == null } < MAX_USER_PAGES) {
+            "Maximum number of user Home pages reached"
+        }
+        require(newItemIds.size == source.items.size) { "Duplicate page needs one new id per item" }
+        val safeItemIds = newItemIds.map { id ->
+            id.trim().also {
+                require(it.isNotBlank()) { "Duplicated workspace item id must not be blank" }
+                require(it.length <= MAX_WORKSPACE_ID_LENGTH) { "Duplicated workspace item id is too long" }
+            }
+        }
+        require(safeItemIds.distinct().size == safeItemIds.size) { "Duplicated workspace item ids must be unique" }
+        val existingItemIds = normalized.pages.flatMap(WorkspacePage::items).map(WorkspaceItem::id).toSet()
+        require(safeItemIds.none(existingItemIds::contains)) { "Duplicated workspace item id already exists" }
+
+        val safeTitle = title.trim().ifBlank {
+            val suffix = " Kopie"
+            source.title.take(MAX_WORKSPACE_TITLE_LENGTH - suffix.length).trimEnd() + suffix
+        }
+        require(safeTitle.length <= MAX_WORKSPACE_TITLE_LENGTH) { "Workspace page title is too long" }
+        val duplicate = WorkspacePage(
+            id = pageId,
+            title = safeTitle,
+            order = sourceIndex + 1,
+            sceneAdapter = null,
+            items = source.items.zip(safeItemIds) { item, newId -> item.copy(id = newId) },
+        )
+        val pages = normalized.pages.toMutableList().apply { add(sourceIndex + 1, duplicate) }
+        return normalized.copy(activePageId = pageId, pages = pages).normalized()
+    }
+
     fun activatePage(document: WorkspaceDocument, pageId: String): WorkspaceDocument {
         val normalized = document.normalized()
         require(normalized.pages.any { it.id == pageId }) { "Workspace page does not exist" }
@@ -149,6 +200,63 @@ object WorkspacePageEditor {
             )
         }
         return normalized.copy(pages = pages).normalized()
+    }
+
+    /** Resizes one user-page item and moves it only when needed to avoid overlap. */
+    fun resizeItem(
+        document: WorkspaceDocument,
+        pageId: String,
+        itemId: String,
+        columnSpan: Int,
+        rowSpan: Int,
+    ): WorkspaceDocument {
+        val normalized = document.normalized()
+        val page = normalized.pages.firstOrNull { it.id == pageId }
+            ?: throw IllegalArgumentException("Workspace page does not exist")
+        require(page.sceneAdapter == null) { "Legacy scene page items cannot be resized" }
+        val item = page.items.firstOrNull { it.id == itemId }
+            ?: throw IllegalArgumentException("Workspace item does not exist")
+        require(columnSpan in 1..normalized.grid.columns) { "Workspace item width is out of range" }
+        require(rowSpan in 1..normalized.grid.rows) { "Workspace item height is out of range" }
+        val target = nearestAvailableBounds(
+            grid = normalized.grid,
+            items = page.items,
+            requested = item.bounds.copy(columnSpan = columnSpan, rowSpan = rowSpan),
+            excludingItemId = itemId,
+        ) ?: return normalized
+        if (target == item.bounds) return normalized
+        val pages = normalized.pages.map { candidate ->
+            if (candidate.id != pageId) candidate else candidate.copy(
+                items = candidate.items.map { existing ->
+                    if (existing.id == itemId) existing.copy(bounds = target) else existing
+                },
+            )
+        }
+        return normalized.copy(pages = pages).normalized()
+    }
+
+    /** Packs a user page from top-left while preserving item order, size and content. */
+    fun compactUserPage(document: WorkspaceDocument, pageId: String): WorkspaceDocument {
+        val normalized = document.normalized()
+        val page = normalized.pages.firstOrNull { it.id == pageId }
+            ?: throw IllegalArgumentException("Workspace page does not exist")
+        require(page.sceneAdapter == null) { "Legacy scene pages cannot be auto-arranged" }
+        val packed = mutableListOf<WorkspaceItem>()
+        page.items.forEach { item ->
+            val bounds = firstFreeBounds(
+                grid = normalized.grid,
+                items = packed,
+                columnSpan = item.bounds.columnSpan,
+                rowSpan = item.bounds.rowSpan,
+            ) ?: throw IllegalStateException("Workspace page cannot be compacted without losing an item")
+            packed += item.copy(bounds = bounds)
+        }
+        if (packed == page.items) return normalized
+        return normalized.copy(
+            pages = normalized.pages.map { candidate ->
+                if (candidate.id == pageId) candidate.copy(items = packed) else candidate
+            },
+        ).normalized()
     }
 
     fun moveItemToPage(
