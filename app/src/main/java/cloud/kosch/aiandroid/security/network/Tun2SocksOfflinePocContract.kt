@@ -13,6 +13,7 @@ object Tun2SocksOfflinePocContract {
     const val GO_VERSION = "go1.26.3"
     const val X_MOBILE_VERSION = "v0.0.0-20260821190718-4776eadac327"
     const val X_MOBILE_COMMIT = "4776eadac327bcb80cebc7413c91f8b4abf8ffa1"
+    const val NDK_VERSION = "28.2.13676358"
     const val BOUND_PACKAGE = "github.com/xjasonlyu/tun2socks/v2/koschmobile"
     const val ANDROID_MIN_API = 29
 
@@ -27,6 +28,7 @@ object Tun2SocksOfflinePocContract {
             if (evidence.xMobileCommit != X_MOBILE_COMMIT) add(Tun2SocksOfflinePocBlocker.X_MOBILE_COMMIT_DRIFT)
             if (evidence.gomobileModuleVersion != X_MOBILE_VERSION) add(Tun2SocksOfflinePocBlocker.GOMOBILE_MODULE_DRIFT)
             if (evidence.gobindModuleVersion != X_MOBILE_VERSION) add(Tun2SocksOfflinePocBlocker.GOBIND_MODULE_DRIFT)
+            if (evidence.ndkVersion != NDK_VERSION) add(Tun2SocksOfflinePocBlocker.NDK_TOOLCHAIN_DRIFT)
             if (evidence.androidMinApi != ANDROID_MIN_API) add(Tun2SocksOfflinePocBlocker.ANDROID_API_DRIFT)
             if (evidence.boundPackage != BOUND_PACKAGE) add(Tun2SocksOfflinePocBlocker.BOUND_PACKAGE_DRIFT)
             if (evidence.engineJavaApiExposed) add(Tun2SocksOfflinePocBlocker.UNSAFE_ENGINE_API_EXPOSED)
@@ -57,6 +59,7 @@ data class Tun2SocksOfflinePocEvidence(
     val xMobileCommit: String,
     val gomobileModuleVersion: String,
     val gobindModuleVersion: String,
+    val ndkVersion: String,
     val gomobileSha256: String,
     val gobindSha256: String,
     val patchSha256: String,
@@ -84,6 +87,7 @@ enum class Tun2SocksOfflinePocBlocker {
     X_MOBILE_COMMIT_DRIFT,
     GOMOBILE_MODULE_DRIFT,
     GOBIND_MODULE_DRIFT,
+    NDK_TOOLCHAIN_DRIFT,
     ANDROID_API_DRIFT,
     BOUND_PACKAGE_DRIFT,
     UNSAFE_ENGINE_API_EXPOSED,
