@@ -44,7 +44,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,6 +65,7 @@ import cloud.kosch.aiandroid.LauncherController
 import cloud.kosch.aiandroid.WorkspaceHomeController
 import cloud.kosch.aiandroid.model.AppProfile
 import cloud.kosch.aiandroid.model.LauncherFolder
+import cloud.kosch.aiandroid.model.WorkspaceDragResolver
 import cloud.kosch.aiandroid.model.WorkspaceItem
 import cloud.kosch.aiandroid.model.WorkspaceItemContent
 import cloud.kosch.aiandroid.model.WorkspacePageEditor
@@ -310,23 +310,16 @@ private fun DraggableArrangeItem(
     var dragOffset by remember(item.id, item.bounds) { mutableStateOf(Offset.Zero) }
     var dragging by remember(item.id) { mutableStateOf(false) }
     val grid = home.document.grid
-    val rawColumn = item.bounds.column + (dragOffset.x / cellWidthPx).roundToInt()
-    val rawRow = item.bounds.row + (dragOffset.y / cellHeightPx).roundToInt()
-    val crossTarget = when {
-        rawColumn < 0 -> previousPageId
-        rawColumn + item.bounds.columnSpan > grid.columns -> nextPageId
-        else -> null
-    }
-    val requested = if (crossTarget == previousPageId && crossTarget != null) {
-        item.bounds.copy(
-            column = grid.columns - item.bounds.columnSpan,
-            row = rawRow,
-        )
-    } else if (crossTarget == nextPageId && crossTarget != null) {
-        item.bounds.copy(column = 0, row = rawRow)
-    } else {
-        item.bounds.copy(column = rawColumn, row = rawRow)
-    }
+    val dragIntent = WorkspaceDragResolver.resolve(
+        itemBounds = item.bounds,
+        deltaColumns = (dragOffset.x / cellWidthPx).roundToInt(),
+        deltaRows = (dragOffset.y / cellHeightPx).roundToInt(),
+        grid = grid,
+        previousPageId = previousPageId,
+        nextPageId = nextPageId,
+    )
+    val crossTarget = dragIntent.targetPageId
+    val requested = dragIntent.requestedBounds
     val previewBounds = if (crossTarget == null) {
         WorkspacePageEditor.nearestAvailableBounds(
             grid = grid,
@@ -344,8 +337,6 @@ private fun DraggableArrangeItem(
             )
         }
     }
-    val latestCrossTarget by rememberUpdatedState(crossTarget)
-    val latestPreviewBounds by rememberUpdatedState(previewBounds)
 
     Box(Modifier.fillMaxSize()) {
         if (dragging && previewBounds != null && crossTarget == null) {
@@ -396,13 +387,35 @@ private fun DraggableArrangeItem(
                             dragging = false
                         },
                         onDragEnd = {
-                            val target = latestCrossTarget
-                            val bounds = latestPreviewBounds
-                            if (bounds != null) {
-                                if (target == null) {
-                                    home.moveItemTo(item.id, bounds)
+                            // Re-resolve from the final mutable pointer delta. Do not depend on a last-frame
+                            // recomposition: ACTION_UP can arrive before visual preview state is republished.
+                            val finalIntent = WorkspaceDragResolver.resolve(
+                                itemBounds = item.bounds,
+                                deltaColumns = (dragOffset.x / cellWidthPx).roundToInt(),
+                                deltaRows = (dragOffset.y / cellHeightPx).roundToInt(),
+                                grid = grid,
+                                previousPageId = previousPageId,
+                                nextPageId = nextPageId,
+                            )
+                            val finalTarget = finalIntent.targetPageId
+                            val targetItems = if (finalTarget == null) {
+                                home.activePage.items
+                            } else {
+                                home.document.pages.firstOrNull { it.id == finalTarget }?.items
+                            }
+                            val finalBounds = targetItems?.let { items ->
+                                WorkspacePageEditor.nearestAvailableBounds(
+                                    grid = grid,
+                                    items = items,
+                                    requested = finalIntent.requestedBounds,
+                                    excludingItemId = item.id.takeIf { finalTarget == null },
+                                )
+                            }
+                            if (finalBounds != null) {
+                                if (finalTarget == null) {
+                                    home.moveItemTo(item.id, finalBounds)
                                 } else {
-                                    home.moveItemToPage(item.id, target, bounds)
+                                    home.moveItemToPage(item.id, finalTarget, finalBounds)
                                 }
                             }
                             dragOffset = Offset.Zero
