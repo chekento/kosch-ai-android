@@ -140,6 +140,39 @@ class WorkspaceHomeController(context: Context) {
         if (updated != document) persist(updated, "Element verschoben")
     }
 
+    fun moveItemToPage(
+        itemId: String,
+        targetPageId: String,
+        bounds: WorkspaceCellBounds? = null,
+    ) {
+        val sourcePageId = activePage.id
+        val updated = runCatching {
+            WorkspacePageEditor.moveItemToPage(
+                document = document,
+                sourcePageId = sourcePageId,
+                targetPageId = targetPageId,
+                itemId = itemId,
+                requestedBounds = bounds,
+            )
+        }.getOrElse {
+            statusMessage = it.message ?: "Element konnte nicht auf die Zielseite verschoben werden"
+            return
+        }
+        if (updated == document) {
+            statusMessage = "Auf der Zielseite ist kein freier Platz"
+            return
+        }
+        persist(updated, "Element auf ${updated.pages.first { it.id == targetPageId }.title} verschoben")
+    }
+
+    fun adjacentUserPageId(delta: Int): String? {
+        if (delta == 0 || activePage.sceneAdapter != null) return null
+        val userPages = document.pages.filter { it.sceneAdapter == null }
+        val index = userPages.indexOfFirst { it.id == activePage.id }
+        if (index < 0) return null
+        return userPages.getOrNull(index + delta)?.id
+    }
+
     fun removeItem(itemId: String) {
         val updated = runCatching { WorkspacePageEditor.removeItem(document, activePage.id, itemId) }
             .getOrElse {

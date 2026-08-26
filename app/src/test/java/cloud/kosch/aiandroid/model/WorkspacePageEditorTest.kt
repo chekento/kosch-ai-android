@@ -84,6 +84,60 @@ class WorkspacePageEditorTest {
     }
 
     @Test
+    fun moveItemToPage_preservesStableIdAndUsesNearestFreeTarget() {
+        var document = WorkspacePageEditor.createUserPage(base(), "page:user:one", "One")
+        document = WorkspacePageEditor.addApp(document, "page:user:one", "item:app:moving", "app:moving")
+        document = WorkspacePageEditor.createUserPage(document, "page:user:two", "Two")
+        document = WorkspacePageEditor.addFolder(document, "page:user:two", "item:folder:blocker", "folder:blocker")
+
+        val moved = WorkspacePageEditor.moveItemToPage(
+            document = document,
+            sourcePageId = "page:user:one",
+            targetPageId = "page:user:two",
+            itemId = "item:app:moving",
+            requestedBounds = WorkspaceCellBounds(0, 0, 2, 2),
+        )
+
+        val source = moved.pages.first { it.id == "page:user:one" }
+        val target = moved.pages.first { it.id == "page:user:two" }
+        assertTrue(source.items.none { it.id == "item:app:moving" })
+        val movedItem = target.items.single { it.id == "item:app:moving" }
+        assertEquals(WorkspaceCellBounds(2, 0, 2, 2), movedItem.bounds)
+        assertEquals("page:user:two", moved.activePageId)
+        assertEquals(1, moved.pages.flatMap(WorkspacePage::items).count { it.id == "item:app:moving" })
+    }
+
+    @Test
+    fun moveItemToPage_rejectsLegacySceneTargetsAndSources() {
+        var document = WorkspacePageEditor.createUserPage(base(), "page:user:one", "One")
+        document = WorkspacePageEditor.addApp(document, "page:user:one", "item:app:1", "app:one")
+        val legacyId = WorkspaceStableIds.scenePage(SceneId.AI)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            WorkspacePageEditor.moveItemToPage(
+                document,
+                sourcePageId = "page:user:one",
+                targetPageId = legacyId,
+                itemId = "item:app:1",
+            )
+        }
+
+        val legacyItemId = document.pages
+            .first { it.id == legacyId }
+            .items
+            .first()
+            .id
+        assertThrows(IllegalArgumentException::class.java) {
+            WorkspacePageEditor.moveItemToPage(
+                document,
+                sourcePageId = legacyId,
+                targetPageId = "page:user:one",
+                itemId = legacyItemId,
+            )
+        }
+    }
+
+    @Test
     fun normalizedAnchorsAndDuplicateIds_remainBoundedByV7Contract() {
         var document = WorkspacePageEditor.createUserPage(base(), "page:user:one", "Home")
         document = WorkspacePageEditor.addApp(document, "page:user:one", "item:app:1", "app:one")
