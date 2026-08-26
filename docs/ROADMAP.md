@@ -145,12 +145,17 @@ Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn 
 - [x] Core für Seiten-Duplizierung, Element-Resize und Auto-Anordnen
 - [x] versioniertes `LauncherSettingsDocument` als portable Settings-Grundstruktur
 - [x] Settings-Informationsarchitektur mit mindestens 22 Haupttabs festlegen
-- [ ] atomarer Settings Store mit Schema-Migration
-- [ ] Settings Center Shell mit Suche, Breadcrumbs, Favoriten und „zuletzt geändert“
+- [x] atomarer Settings Store mit vollständigem versioniertem Codec, Validierung und portablem Import/Export
+- [ ] explizite Migrationskette für zukünftige Settings-Schema-Versionen
+- [x] adaptive Settings-Center-Shell mit Suche und eigenem Launcher-Navigationseintrag
+- [ ] Breadcrumbs, Favoriten/pinned Settings und „zuletzt geändert“
 - [ ] Scope-System Global → Seite → Objekt mit explizitem „Standard erben“
-- [ ] Home/Raster live an Settings anbinden, inkl. Portrait/Landscape/Tablet/Foldable und Reflow-Vorschau
-- [ ] Appearance live anbinden: Motion, Blur, Transparenz, Corner Scale, Material You, Wallpaper
-- [ ] Assistant Settings vollständig anbinden: Charakter, Position, Größe, Sichtbarkeit, Spawn, Idle, Gaze, Emotion, Viseme, Voice, Chat
+- [x] globales Home-Raster live anbinden mit verlustfreiem Reflow, Apply/Discard und Settings-Undo
+- [ ] Rasterprofile für Portrait/Landscape/Tablet/Foldable und Reflow-Vorschau vor Commit
+- [x] Appearance-Basis live: Material-You-Schalter plus persistente Motion-/Blur-/Opacity-/Corner-/Scale-Tokens
+- [ ] Appearance vollständig visuell anwenden: Motion, Blur, Transparenz, Corner Scale, Wallpaper und Profile
+- [x] Assistant-Settings-Basis live: Aktivierung, Position, Größe, Deckkraft, Voice Input/Output und persistente Verhaltenstoggles
+- [ ] Assistant-Verhalten vollständig verdrahten: Charakter, Spawn/Portal, Idle, Gaze, Emotion, Viseme, Live Chat und Per-Page Sichtbarkeit
 - [ ] Themes: Auswahl, Preview, Import, Export, Rollback und Capability-Manifest
 - [ ] Icon Packs global und pro Objekt
 - [ ] Gesture Matrix global, pro Seite und pro Element
@@ -167,6 +172,21 @@ Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn 
 - [ ] Teil-Reset pro Setting, Gruppe und Tab sowie kompletter Reset
 - [ ] Settings Teil-Import/-Export ohne Secrets/Widget-IDs/URI-Grants
 - [ ] Tests für Migration, Process Death, Import/Export, Scope-Vererbung, große Settings-Datenmengen und OEM-Konfiguration
+
+## Launcher Product Track – Eigene Verknüpfungen & Links
+
+- [ ] eigene Verknüpfungen als first-class Launcher-Objekt mit stabiler ID, Name, Beschreibung und frei wählbarem Icon
+- [ ] sichere HTTP-/HTTPS-Links und Android-Deep-Links
+- [ ] definierte sichere Intent-Vorlagen und launcherinterne Actions; keine ungeprüften rohen Intent-Extras aus Importen ausführen
+- [ ] optionales Zielprofil/Work-Profile, sofern Android die Aktion dort zulässt
+- [ ] Platzierung auf Home-Seiten, im Dock, in Ordnern und in der Command Palette
+- [ ] eigene Links in App-Suche und globaler Suche auffindbar machen
+- [ ] Verknüpfungen als Ziel für Tap, Long Press, Swipe/Geste, Smartpen-Taste und Automation/Rule Engine
+- [ ] per-Link Darstellung: eigenes Icon, Label, Farbe/Theme-Override, Badge-Verhalten und Öffnungsart
+- [ ] Editor mit Validierung, Testen/Vorschau, Duplizieren, Deaktivieren und Löschen mit Undo
+- [ ] portable Import-/Export- und Backup-Unterstützung mit Schema-/Scheme-Validierung
+- [ ] Migration/Restore bei fehlenden Ziel-Apps oder nicht mehr unterstützten Deep Links verständlich darstellen
+- [ ] Tests für URL-Schemes, Deep-Link-Fallback, Profile, Import-Manipulation und nicht auflösbare Ziele
 
 ## M3 – Sichere Agenten und optionale APIs
 
