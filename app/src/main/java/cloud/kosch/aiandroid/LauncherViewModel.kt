@@ -2,18 +2,25 @@ package cloud.kosch.aiandroid
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import cloud.kosch.aiandroid.data.WorkspaceWidgetHostRecovery
 
 /**
- * Owns launcher, unified Home and assistant runtimes across Activity recreation.
+ * Owns launcher, unified Home, Settings Center and Assistant runtimes across Activity recreation.
  *
- * The launcher controller keeps listeners and its single-threaded worker alive while Android recreates the
- * Activity for rotation, window-size changes or fold transitions. The v7 Home controller retains active page
- * and undo state, while assistant conversation and agent state remain session-scoped. Only durable user choices
- * are persisted. Device-local TTS voice assignments stay outside portable launcher configuration.
+ * Device-local widget host ownership is reconciled before Home loads. Portable launcher settings stay
+ * independent from Assistant session/agent/device-voice stores: the Settings Center may edit those runtimes,
+ * but it is not a second source of truth for capture grants, agent state or device-local TTS assignments.
  */
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
     val controller = LauncherController(application).also(LauncherController::start)
+
+    init {
+        // AppWidgetHost ids survive process death. Reconcile them before Home loads the device-local binding map.
+        WorkspaceWidgetHostRecovery(application).reconcile()
+    }
+
     val homeWorkspace = WorkspaceHomeController(application)
+    val settings = LauncherSettingsController(application)
     val assistant = AssistantSessionController(application)
     val assistantAgent = AssistantAgentController(application).also {
         it.setAssistantEnabled(assistant.settings.enabled)
