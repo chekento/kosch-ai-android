@@ -24,6 +24,12 @@ enum class AssistantObservationSource {
     CAMERA,
 }
 
+enum class AssistantVoiceGender {
+    FEMALE,
+    MALE,
+    NEUTRAL,
+}
+
 enum class AssistantAgentState {
     DISABLED,
     IDLE,
@@ -51,12 +57,16 @@ data class AssistantCharacterProfile(
     val assetPackId: String,
     val personaProfileId: String,
     val voiceProfileId: String,
+    val voiceGender: AssistantVoiceGender,
     val supportedPresenceModes: Set<AssistantPresenceMode> = AssistantPresenceMode.entries.toSet(),
 )
 
 /**
  * Persistent, portable preferences only. Runtime consent tokens for screen/camera capture must never
  * be written here; Android grants remain session/device owned.
+ *
+ * Screen and camera awareness are deliberately false by default and may only be enabled through a
+ * user-initiated control path. They are never inferred from Agent mode, provider choice or character.
  */
 data class AssistantAgentPreferences(
     val characterId: String = "default",
