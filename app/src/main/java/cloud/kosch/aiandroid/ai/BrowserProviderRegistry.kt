@@ -106,7 +106,17 @@ object BrowserProviderRegistry {
                 BrowserAiCapability.RESEARCH,
                 BrowserAiCapability.IMAGE_GENERATION,
             ),
-            notes = "Opera integriert Aria als Browser-KI.",
+            notes = "Opera AI (ehemals Aria) ist im Android-Browser integriert und kann ohne Konto genutzt werden.",
+        ),
+        BrowserProviderProfile(
+            id = "opera-gx",
+            name = "Opera GX",
+            packageHints = setOf("com.opera.gx"),
+            labelHints = setOf("opera gx"),
+            playStorePackageName = "com.opera.gx",
+            webUrl = "https://www.opera.com/gx/mobile",
+            aiStatus = BrowserAiStatus.NONE_CONFIRMED,
+            notes = "Die aktuelle Android-Storebeschreibung bestätigt die Desktop-GX-Browser-KI nicht für Mobile; KoSch behauptet sie daher nicht.",
         ),
         BrowserProviderProfile(
             id = "brave",
