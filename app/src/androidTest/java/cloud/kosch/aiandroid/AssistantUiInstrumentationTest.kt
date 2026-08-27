@@ -19,11 +19,8 @@ class AssistantUiInstrumentationTest {
     fun askDockCompanion_opensAssistant_andSurvivesActivityRecreation() {
         composeTestRule.waitForIdle()
         dismissOnboardingIfVisible()
+        openAssistant()
 
-        composeTestRule
-            .onNodeWithContentDescription("KoSch Assistant einrichten", useUnmergedTree = true)
-            .performClick()
-        composeTestRule.waitForIdle()
         composeTestRule
             .onNodeWithText("KoSch Assistant", useUnmergedTree = true)
             .fetchSemanticsNode()
@@ -34,6 +31,46 @@ class AssistantUiInstrumentationTest {
         composeTestRule
             .onNodeWithText("KoSch Assistant", useUnmergedTree = true)
             .fetchSemanticsNode()
+    }
+
+    @Test
+    fun assistantControlCenter_exposesPrivacyAndCharacterControls() {
+        composeTestRule.waitForIdle()
+        dismissOnboardingIfVisible()
+        openAssistant()
+
+        composeTestRule
+            .onNodeWithText("Steuerung", useUnmergedTree = true)
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule
+            .onNodeWithText("Privacy Live", useUnmergedTree = true)
+            .fetchSemanticsNode()
+        composeTestRule
+            .onNodeWithText("Charakter & Name", useUnmergedTree = true)
+            .fetchSemanticsNode()
+        composeTestRule
+            .onNodeWithText("Name des Assistenten", useUnmergedTree = true)
+            .fetchSemanticsNode()
+    }
+
+    private fun openAssistant() {
+        val setupNodes = composeTestRule
+            .onAllNodesWithText("", useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        runCatching {
+            composeTestRule
+                .onNodeWithContentDescription("KoSch Assistant einrichten", useUnmergedTree = true)
+                .performClick()
+        }.recoverCatching {
+            composeTestRule
+                .onNodeWithContentDescription("KoSch Assistant öffnen", useUnmergedTree = true)
+                .performClick()
+        }.getOrThrow()
+        @Suppress("UNUSED_VARIABLE")
+        val keepSemanticsWarm = setupNodes
+        composeTestRule.waitForIdle()
     }
 
     private fun dismissOnboardingIfVisible() {
