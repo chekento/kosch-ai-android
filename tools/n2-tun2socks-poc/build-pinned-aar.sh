@@ -25,6 +25,21 @@ mobile_tool_version() {
   go version -m "$1" | awk '$1 == "mod" && $2 == "golang.org/x/mobile" { print $3; exit }'
 }
 
+verify_network_namespace() {
+  [[ "${KOSCH_NETWORK_NAMESPACE_ISOLATED:-0}" == "1" ]] || \
+    fail "evidence build requires an explicitly isolated network namespace"
+
+  local interfaces
+  interfaces="$(find /sys/class/net -mindepth 1 -maxdepth 1 -printf '%f\n' | sort)"
+  [[ "$interfaces" == "lo" ]] || fail "unexpected network interface(s) in evidence namespace: $interfaces"
+
+  if command -v ip >/dev/null 2>&1; then
+    [[ -z "$(ip route show 2>/dev/null)" ]] || fail "evidence namespace unexpectedly has an IPv4 route"
+    [[ -z "$(ip -6 route show 2>/dev/null | grep -v '^unreachable' || true)" ]] || \
+      fail "evidence namespace unexpectedly has an IPv6 route"
+  fi
+}
+
 [[ -n "$SOURCE_DIR" ]] || fail "usage: $0 /path/to/tun2socks-v2.7.0 [output-dir]"
 SOURCE_DIR="$(cd "$SOURCE_DIR" && pwd)"
 mkdir -p "$OUTPUT_DIR"
@@ -33,6 +48,8 @@ OUTPUT_DIR="$(cd "$OUTPUT_DIR" && pwd)"
 for tool in git go gomobile gobind sha256sum unzip jar awk grep; do
   command -v "$tool" >/dev/null 2>&1 || fail "required tool not found: $tool"
 done
+
+verify_network_namespace
 
 [[ -f "$SOURCE_DIR/go.mod" ]] || fail "source checkout has no go.mod"
 [[ -f "$PATCH_FILE" ]] || fail "KoSch patch is missing"
@@ -67,7 +84,7 @@ X_MOBILE_REV_SUFFIX="${PINNED_X_MOBILE##*-}"
 [[ "${PINNED_X_MOBILE_COMMIT:0:${#X_MOBILE_REV_SUFFIX}}" == "$X_MOBILE_REV_SUFFIX" ]] || \
   fail "x/mobile full commit lock does not match pseudo-version revision $X_MOBILE_REV_SUFFIX"
 
-# No command after this point may resolve modules from the network.
+# Module resolution is disabled in addition to the OS-level network namespace verified above.
 export GOPROXY=off
 export GOSUMDB=off
 
@@ -107,7 +124,7 @@ REPORT="$OUTPUT_DIR/tun2socks-kosch-v2.7.0-poc.evidence"
 
   # Current gomobile requires golang.org/x/mobile/bind to be resolvable from the
   # module being bound. Add the exact module version that produced gomobile/gobind.
-  # GOPROXY=off above guarantees this succeeds only from the pre-populated cache.
+  # GOPROXY=off plus the isolated namespace guarantee this succeeds only from cache.
   go mod edit -require="golang.org/x/mobile@$PINNED_X_MOBILE"
   go list -mod=mod golang.org/x/mobile/bind >/dev/null
 
@@ -147,7 +164,7 @@ GOMOBILE_SHA="$(sha256sum "$GOMOBILE_PATH" | awk '{print $1}')"
 GOBIND_SHA="$(sha256sum "$GOBIND_PATH" | awk '{print $1}')"
 
 cat >"$REPORT" <<EOF
-format=kosch-n2-offline-aar-evidence-v4
+format=kosch-n2-offline-aar-evidence-v5
 upstream=https://github.com/xjasonlyu/tun2socks
 version=v2.7.0
 commit=$PINNED_COMMIT
@@ -168,6 +185,7 @@ tun_fd_duplicated=true
 panic_cross_boundary=false
 fixed_direct_egress=true
 proxy_configuration_exposed=false
+network_namespace_isolated=true
 network_during_build=false
 runtime_integrated=false
 vpn_established=false
