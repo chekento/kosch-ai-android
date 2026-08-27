@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import cloud.kosch.aiandroid.data.LauncherSettingsStore
 import cloud.kosch.aiandroid.data.WorkspaceStore
 import cloud.kosch.aiandroid.data.WorkspaceWidgetBindingStore
 import cloud.kosch.aiandroid.model.DeviceWidgetBinding
@@ -19,15 +20,17 @@ import java.util.UUID
 /**
  * Activity-recreation-safe controller for the user-facing v7 Home pages.
  *
- * The portable WorkspaceDocument remains independent from Android widget host ids. DeviceWidgetBinding
- * records are kept in a separate local store, so duplicate/restore operations cannot accidentally copy
- * a device-bound appWidgetId into another page or device.
+ * The portable WorkspaceDocument remains independent from Android widget host ids. DeviceWidgetBinding records are
+ * kept in a separate local store, so duplicate/restore operations cannot accidentally copy a device-bound appWidgetId
+ * into another page or device. The persisted launcher layout-lock is enforced again at this controller boundary so a
+ * future UI, inbound widget pin or accessibility path cannot mutate Home merely by forgetting to disable an edit button.
  */
 class WorkspaceHomeController(
     context: Context,
     registerAsActive: Boolean = true,
 ) {
     private val store = WorkspaceStore(context.applicationContext)
+    private val settingsStore = LauncherSettingsStore(context.applicationContext)
     private val widgetBindingStore = WorkspaceWidgetBindingStore(context.applicationContext)
     private var undoDocument: WorkspaceDocument? = null
 
@@ -47,6 +50,10 @@ class WorkspaceHomeController(
     val activePage: WorkspacePage
         get() = document.pages.firstOrNull { it.id == document.activePageId } ?: document.pages.first()
 
+    /** Reads the authoritative persisted setting so secondary controllers/pin flows cannot bypass a stale UI state. */
+    val layoutLocked: Boolean
+        get() = settingsStore.load().home.lockLayout
+
     fun reload() {
         document = store.loadWorkspaceDocument().normalized()
         widgetBindings = widgetBindingStore.load()
@@ -62,10 +69,7 @@ class WorkspaceHomeController(
 
     /**
      * Removes stale or crossed device bindings only at an explicit lifecycle/host-validation gate.
-     *
-     * Validation is pair- and provider-aware. A host id that still exists but now belongs to a different provider
-     * after restore/reuse is not accepted. This intentionally does not run on every item removal so an in-session
-     * Home undo can still restore the original item id before the next lifecycle reconciliation.
+     * Host reconciliation is housekeeping rather than a user layout mutation and remains permitted while locked.
      */
     fun pruneWidgetBindings(hostedProviderComponents: Map<Int, String?>): Set<Int> {
         val expectedProviders = document.pages
@@ -87,6 +91,7 @@ class WorkspaceHomeController(
     }
 
     fun createPage(title: String = "") {
+        if (!allowLayoutMutation()) return
         val updated = runCatching {
             WorkspacePageEditor.createUserPage(
                 document = document,
@@ -101,7 +106,8 @@ class WorkspaceHomeController(
     }
 
     fun duplicateActivePage() {
-        if (!isUserPage()) {
+        if (!allowLayoutMutation()) return
+        if (!isPortableUserPage()) {
             statusMessage = "Legacy-Szenenseiten können nicht dupliziert werden"
             return
         }
@@ -121,16 +127,18 @@ class WorkspaceHomeController(
         persist(updated, "Home-Seite dupliziert · Widgets müssen auf der Kopie neu zugeordnet werden")
     }
 
+    /** Page navigation is not a layout mutation and deliberately remains available while layout is locked. */
     fun activatePage(pageId: String) {
         val updated = runCatching { WorkspacePageEditor.activatePage(document, pageId) }
             .getOrElse {
                 statusMessage = it.message ?: "Home-Seite konnte nicht geöffnet werden"
                 return
             }
-        persist(updated, null, rememberUndo = false)
+        persist(updated, null, rememberUndo = false, layoutMutation = false)
     }
 
     fun renameActivePage(title: String) {
+        if (!allowLayoutMutation()) return
         val updated = runCatching {
             WorkspacePageEditor.renameUserPage(document, activePage.id, title)
         }.getOrElse {
@@ -141,6 +149,7 @@ class WorkspaceHomeController(
     }
 
     fun deleteActiveUserPage() {
+        if (!allowLayoutMutation()) return
         val updated = runCatching { WorkspacePageEditor.deleteUserPage(document, activePage.id) }
             .getOrElse {
                 statusMessage = it.message ?: "Diese Seite kann nicht gelöscht werden"
@@ -150,6 +159,7 @@ class WorkspaceHomeController(
     }
 
     fun moveActivePage(delta: Int) {
+        if (!allowLayoutMutation()) return
         val updated = runCatching { WorkspacePageEditor.movePage(document, activePage.id, delta) }
             .getOrElse {
                 statusMessage = it.message ?: "Home-Seite konnte nicht verschoben werden"
@@ -159,7 +169,8 @@ class WorkspaceHomeController(
     }
 
     fun compactActivePage() {
-        if (!isUserPage()) {
+        if (!allowLayoutMutation()) return
+        if (!isPortableUserPage()) {
             statusMessage = "Legacy-Szenenseiten bleiben unverändert"
             return
         }
@@ -177,6 +188,7 @@ class WorkspaceHomeController(
     }
 
     fun addApp(appKey: String) {
+        if (!allowLayoutMutation()) return
         placePortableItem(
             kindLabel = "App",
             add = { source, pageId, itemId -> WorkspacePageEditor.addApp(source, pageId, itemId, appKey) },
@@ -184,6 +196,7 @@ class WorkspaceHomeController(
     }
 
     fun addFolder(folderId: String) {
+        if (!allowLayoutMutation()) return
         placePortableItem(
             kindLabel = "Ordner",
             add = { source, pageId, itemId -> WorkspacePageEditor.addFolder(source, pageId, itemId, folderId) },
@@ -192,6 +205,7 @@ class WorkspaceHomeController(
 
     /** Returns true only when both portable placement and device-local host binding succeed. */
     fun addWidget(appWidgetId: Int, providerComponent: String?): Boolean {
+        if (!allowLayoutMutation()) return false
         if (appWidgetId <= 0) {
             statusMessage = "Ungültige Android-Widget-ID"
             return false
@@ -219,6 +233,7 @@ class WorkspaceHomeController(
     }
 
     fun moveItemBy(itemId: String, columns: Int, rows: Int) {
+        if (!allowLayoutMutation()) return
         val item = activePage.items.firstOrNull { it.id == itemId }
         if (item == null) {
             statusMessage = "Element wurde nicht gefunden"
@@ -242,6 +257,7 @@ class WorkspaceHomeController(
     }
 
     fun moveItemTo(itemId: String, bounds: WorkspaceCellBounds) {
+        if (!allowLayoutMutation()) return
         val updated = runCatching {
             WorkspacePageEditor.moveItem(document, activePage.id, itemId, bounds)
         }.getOrElse {
@@ -252,6 +268,7 @@ class WorkspaceHomeController(
     }
 
     fun resizeItem(itemId: String, columnSpan: Int, rowSpan: Int) {
+        if (!allowLayoutMutation()) return
         val updated = runCatching {
             WorkspacePageEditor.resizeItem(
                 document = document,
@@ -276,6 +293,7 @@ class WorkspaceHomeController(
         targetPageId: String,
         bounds: WorkspaceCellBounds? = null,
     ) {
+        if (!allowLayoutMutation()) return
         val sourcePageId = activePage.id
         val updated = runCatching {
             WorkspacePageEditor.moveItemToPage(
@@ -305,6 +323,7 @@ class WorkspaceHomeController(
     }
 
     fun removeItem(itemId: String) {
+        if (!allowLayoutMutation()) return
         val updated = runCatching { WorkspacePageEditor.removeItem(document, activePage.id, itemId) }
             .getOrElse {
                 statusMessage = it.message ?: "Element konnte nicht entfernt werden"
@@ -314,6 +333,7 @@ class WorkspaceHomeController(
     }
 
     fun undo() {
+        if (!allowLayoutMutation()) return
         val previous = undoDocument ?: return
         val current = document
         if (!store.saveWorkspaceDocument(previous)) {
@@ -326,7 +346,8 @@ class WorkspaceHomeController(
         statusMessage = "Letzte Homescreen-Änderung rückgängig"
     }
 
-    fun isUserPage(page: WorkspacePage = activePage): Boolean = page.sceneAdapter == null
+    /** Used by Home Studio: locked user pages are intentionally not exposed as editable entry points. */
+    fun isUserPage(page: WorkspacePage = activePage): Boolean = isPortableUserPage(page) && !layoutLocked
 
     fun visiblePortableItems(page: WorkspacePage = activePage) = page.items.filter {
         it.content is WorkspaceItemContent.App ||
@@ -334,10 +355,19 @@ class WorkspaceHomeController(
             it.content is WorkspaceItemContent.Widget
     }
 
+    private fun isPortableUserPage(page: WorkspacePage = activePage): Boolean = page.sceneAdapter == null
+
+    private fun allowLayoutMutation(): Boolean {
+        if (!layoutLocked) return true
+        statusMessage = "Layout ist gesperrt · in Einstellungen → Home entsperren"
+        return false
+    }
+
     private fun placePortableItem(
         kindLabel: String,
         add: (WorkspaceDocument, String, String) -> WorkspaceDocument,
     ): String? {
+        if (!allowLayoutMutation()) return null
         var working = document
         var targetPage = working.pages.firstOrNull { it.id == working.activePageId }
         if (targetPage?.sceneAdapter != null) {
@@ -387,7 +417,9 @@ class WorkspaceHomeController(
         updated: WorkspaceDocument,
         message: String?,
         rememberUndo: Boolean = true,
+        layoutMutation: Boolean = true,
     ): Boolean {
+        if (layoutMutation && !allowLayoutMutation()) return false
         val normalized = updated.normalized()
         if (normalized == document) {
             message?.let { statusMessage = it }
