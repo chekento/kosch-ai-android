@@ -1,6 +1,6 @@
-# KoSch AI Android
+# KAL – KoSch AI Launcher
 
-KoSch ist ein nativer, local-first Android-Launcher für professionelle Nutzer: eine belastbare HOME-Shell, ein programmierbarer Workspace und eine sichere KI-Orchestrierung statt eines starren App-Rasters. Der Kern funktioniert **beim ersten Start offline – ohne Konto, API-Schlüssel oder Modell-Download**. KI liegt unter Suche, Kontext, Dateien, Aktionen und Layout; App-Start, Telefon, Dateien, Widgets, Einstellungen und der Sicherheitsausgang bleiben auch ohne Modell verfügbar.
+KAL ist ein nativer, local-first Android-Launcher für professionelle Nutzer: eine belastbare HOME-Shell, ein programmierbarer Workspace und eine sichere KI-Orchestrierung statt eines starren App-Rasters. Der Kern funktioniert **beim ersten Start offline – ohne Konto, API-Schlüssel oder Modell-Download**. KI liegt unter Suche, Kontext, Dateien, Aktionen und Layout; App-Start, Telefon, Dateien, Widgets, Einstellungen und der Sicherheitsausgang bleiben auch ohne Modell verfügbar.
 
 LCARS ist bewusst kein Kernbestandteil. Themes sollen später als austauschbare Programme entstehen; LCARS kann dann eines davon sein.
 
@@ -39,9 +39,9 @@ M2.5 vertieft den professionellen Alpha-Kern an den Stellen, an denen klassische
 
 ## Ehrliche Qualitätslage
 
-Der reproduzierbare M2.5-Vergleich bewertet KoSch, Pixel/Android 17 als Systemreferenz sowie Nova, Niagara, Smart Launcher, Microsoft Launcher und Lawnchair in **100 Kategorien von 0,1 bis 10,0**. Zusätzlich werden **25 simulierte Fachperspektiven** berechnet; sie sind keine tatsächlich befragten Personen.
+Der reproduzierbare M2.5-Vergleich bewertet KAL, Pixel/Android 17 als Systemreferenz sowie Nova, Niagara, Smart Launcher, Microsoft Launcher und Lawnchair in **100 Kategorien von 0,1 bis 10,0**. Zusätzlich werden **25 simulierte Fachperspektiven** berechnet; sie sind keine tatsächlich befragten Personen.
 
-- KoSch M2.5: **8,2/10 allgemein**
+- KAL M2.5: **8,2/10 allgemein**
 - Mittel der 25 Fachperspektiven: **8,1/10**
 - Rang in dieser breiten Matrix: **2**
 - Zielwert über 9,5: **nicht erreicht**
@@ -50,7 +50,7 @@ Der Fortschritt von M2.4 (8,1/7,9) ist durch konkrete Quellcode-, Test- und CI-D
 
 ## Was „lokale KI“ in M2.5 bedeutet
 
-`KoSch Local Core` ist sofort aktiv und deterministisch. Er plant deutsche und englische Befehle, rankt Apps mit transparenten lokalen Startsignalen, bewertet Kontext, schlägt Szenen/Dock/Ordner/Layout vor und analysiert ausgewählte Dateimetadaten. Er hat keine autonomen Android-Rechte: schreibende oder destruktive Aktionen laufen über feste Capabilities, Vorschau, Bestätigung und – wo technisch ehrlich möglich – Undo.
+`KAL Local Core` ist sofort aktiv und deterministisch. Er plant deutsche und englische Befehle, rankt Apps mit transparenten lokalen Startsignalen, bewertet Kontext, schlägt Szenen/Dock/Ordner/Layout vor und analysiert ausgewählte Dateimetadaten. Er hat keine autonomen Android-Rechte: schreibende oder destruktive Aktionen laufen über feste Capabilities, Vorschau, Bestätigung und – wo technisch ehrlich möglich – Undo.
 
 Ein generatives LLM ist noch nicht ungefragt in der APK gebündelt. Modellgröße, RAM, Thermik, Beschleunigung und Lizenz unterscheiden sich zu stark. Ein späterer optionaler Modell-Pack muss in einer getrennten Service-/Prozessgrenze laufen; der Local Core bleibt Fallback.
 
@@ -64,20 +64,20 @@ Voraussetzungen: JDK 17, Android SDK 36 und Android Studio/AGP 8.13.
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease
 ```
 
-Die lokale Debug-APK liegt unter `app/build/outputs/apk/debug/app-debug.apk`. Ein grüner GitHub-Actions-Lauf veröffentlicht das Artefakt `kosch-ai-launcher-m2.5-debug` mit:
+Die lokale Debug-APK liegt unter `app/build/outputs/apk/debug/app-debug.apk`. Ein grüner GitHub-Actions-Lauf veröffentlicht das Artefakt `kal-ai-launcher-m2.5-debug` mit:
 
-- `KoSch-AI-Launcher-M2.5-debug.apk`
-- `KoSch-AI-Launcher-M2.5-debug.apk.sha256`
+- `KAL-AI-Launcher-M2.5-debug.apk`
+- `KAL-AI-Launcher-M2.5-debug.apk.sha256`
 
 ## Sicher testen
 
 1. APK zuerst auf Emulator oder Zweitgerät installieren.
-2. Einführung durchlaufen und KoSch öffnen.
+2. Einführung durchlaufen und KAL öffnen.
 3. Optional **Android-Start-App auswählen** verwenden.
 4. **Kontrollzentrum → Sicherheitsausgang** testen.
-5. KoSch dort jederzeit durch einen anderen Launcher ersetzen.
+5. KAL dort jederzeit durch einen anderen Launcher ersetzen.
 
-Telefon, Dateien, Kontakte, Sprache, Widgets, Deinstallation und Systemeinstellungen öffnen sichtbare Android-System- oder App-Oberflächen. KoSch simuliert keine Berührungen und übernimmt weder Notruf- noch vollständige Dialer-/Dateisystemrechte.
+Telefon, Dateien, Kontakte, Sprache, Widgets, Deinstallation und Systemeinstellungen öffnen sichtbare Android-System- oder App-Oberflächen. KAL simuliert keine Berührungen und übernimmt weder Notruf- noch vollständige Dialer-/Dateisystemrechte.
 
 ## Dokumentation
 
@@ -90,7 +90,7 @@ Telefon, Dateien, Kontakte, Sprache, Widgets, Deinstallation und Systemeinstellu
 - [M2.5 Release Notes](docs/RELEASE_NOTES_M2_5.md)
 - [Strenges M2.5-Konkurrenzreview](docs/COMPETITOR_REVIEW_M2_5.md)
 - [7 Launcher × 100 Kategorien](docs/launcher_comparison_m2_5.csv)
-- [25 × 100 KoSch-Fachmatrix](docs/expert_scores_m2_5.csv)
+- [25 × 100 KAL-Fachmatrix](docs/expert_scores_m2_5.csv)
 - [25 Rollen × 7 Launcher](docs/expert_launcher_overall_m2_5.csv)
 - [Formatierte M2.5-Benchmark-Arbeitsmappe](docs/launcher_benchmark_m2_5.xlsx)
 - Historie: [M2.4](docs/COMPETITOR_REVIEW_M2_4.md), [M2.3](docs/COMPETITOR_REVIEW_M2_3.md), [M2.2](docs/COMPETITOR_REVIEW_M2_2.md), [M2.1](docs/COMPETITOR_REVIEW_M2_1.md), [M2](docs/EXPERT_REVIEW_M2.md)
