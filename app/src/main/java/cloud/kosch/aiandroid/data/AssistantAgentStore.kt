@@ -19,6 +19,9 @@ class AssistantAgentStore(context: Context) {
         characterId = preferences.getString(KEY_CHARACTER_ID, DEFAULT_CHARACTER_ID)
             ?.takeIf(::validIdentifier)
             ?: DEFAULT_CHARACTER_ID,
+        assistantName = preferences.getString(KEY_ASSISTANT_NAME, "")
+            ?.takeIf(::validAssistantName)
+            .orEmpty(),
         presenceMode = enumValueOrDefault(
             value = preferences.getString(KEY_PRESENCE_MODE, null),
             fallback = AssistantPresenceMode.AMBIENT,
@@ -48,6 +51,7 @@ class AssistantAgentStore(context: Context) {
 
     private fun saveInternal(settings: AssistantAgentPreferences, allowObservationOptIn: Boolean) {
         require(validIdentifier(settings.characterId)) { "Ungültige Charakter-ID" }
+        require(validAssistantName(settings.assistantName)) { "Ungültiger Assistentenname" }
         require(settings.wakeWordMode != AssistantWakeWordMode.CUSTOM || validWakeWord(settings.customWakeWord)) {
             "Ungültiges Wake Word"
         }
@@ -61,6 +65,7 @@ class AssistantAgentStore(context: Context) {
         }
         preferences.edit()
             .putString(KEY_CHARACTER_ID, settings.characterId)
+            .putString(KEY_ASSISTANT_NAME, settings.assistantName.trim())
             .putString(KEY_PRESENCE_MODE, settings.presenceMode.name)
             .putString(KEY_WAKE_WORD_MODE, settings.wakeWordMode.name)
             .putString(KEY_CUSTOM_WAKE_WORD, settings.customWakeWord.trim())
@@ -75,6 +80,11 @@ class AssistantAgentStore(context: Context) {
     private fun validIdentifier(value: String): Boolean =
         value.length in 1..MAX_IDENTIFIER_LENGTH && value.all { it.isLowerCase() || it.isDigit() || it == '_' }
 
+    private fun validAssistantName(value: String): Boolean {
+        val normalized = value.trim()
+        return normalized.length <= MAX_ASSISTANT_NAME_LENGTH && normalized.none { it.isISOControl() }
+    }
+
     private fun validWakeWord(value: String): Boolean {
         val normalized = value.trim()
         return normalized.length in MIN_WAKE_WORD_LENGTH..MAX_WAKE_WORD_LENGTH &&
@@ -87,6 +97,7 @@ class AssistantAgentStore(context: Context) {
     private companion object {
         const val PREFERENCES_NAME = "kosch_assistant_agent_preferences"
         const val KEY_CHARACTER_ID = "character_id_v1"
+        const val KEY_ASSISTANT_NAME = "assistant_name_v1"
         const val KEY_PRESENCE_MODE = "presence_mode_v1"
         const val KEY_WAKE_WORD_MODE = "wake_word_mode_v1"
         const val KEY_CUSTOM_WAKE_WORD = "custom_wake_word_v1"
@@ -97,6 +108,7 @@ class AssistantAgentStore(context: Context) {
         const val KEY_CONFIRM_EXTERNAL = "confirm_external_actions_v1"
         const val DEFAULT_CHARACTER_ID = "default"
         const val MAX_IDENTIFIER_LENGTH = 48
+        const val MAX_ASSISTANT_NAME_LENGTH = 32
         const val MIN_WAKE_WORD_LENGTH = 2
         const val MAX_WAKE_WORD_LENGTH = 32
     }
