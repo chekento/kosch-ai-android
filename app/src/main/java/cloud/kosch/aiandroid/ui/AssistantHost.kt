@@ -76,6 +76,13 @@ fun AssistantHost(
     requestSpeech: (String) -> Boolean,
     requestVoicePreview: (voiceName: String) -> Boolean,
     stopSpeech: () -> Unit,
+    requestScreenSession: () -> Unit,
+    stopScreenSession: () -> Unit,
+    cameraSessionRequested: Boolean,
+    requestCameraSession: () -> Unit,
+    stopCameraSession: () -> Unit,
+    onCameraSessionStarted: () -> Unit,
+    onCameraSessionFailure: (String) -> Unit,
     showFloatingTrigger: Boolean = true,
 ) {
     val effectiveReducedMotion = assistant.settings.reducedMotion || !ValueAnimator.areAnimatorsEnabled()
@@ -131,6 +138,13 @@ fun AssistantHost(
             requestSpeech = requestSpeech,
             requestVoicePreview = requestVoicePreview,
             stopSpeech = stopSpeech,
+            requestScreenSession = requestScreenSession,
+            stopScreenSession = stopScreenSession,
+            cameraSessionRequested = cameraSessionRequested,
+            requestCameraSession = requestCameraSession,
+            stopCameraSession = stopCameraSession,
+            onCameraSessionStarted = onCameraSessionStarted,
+            onCameraSessionFailure = onCameraSessionFailure,
             effectiveReducedMotion = effectiveReducedMotion,
         )
     }
@@ -149,6 +163,13 @@ private fun AssistantSheet(
     requestSpeech: (String) -> Boolean,
     requestVoicePreview: (voiceName: String) -> Boolean,
     stopSpeech: () -> Unit,
+    requestScreenSession: () -> Unit,
+    stopScreenSession: () -> Unit,
+    cameraSessionRequested: Boolean,
+    requestCameraSession: () -> Unit,
+    stopCameraSession: () -> Unit,
+    onCameraSessionStarted: () -> Unit,
+    onCameraSessionFailure: (String) -> Unit,
     effectiveReducedMotion: Boolean,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -216,6 +237,13 @@ private fun AssistantSheet(
                     voice = voice,
                     requestVoicePreview = requestVoicePreview,
                     stopSpeech = stopSpeech,
+                    requestScreenSession = requestScreenSession,
+                    stopScreenSession = stopScreenSession,
+                    cameraSessionRequested = cameraSessionRequested,
+                    requestCameraSession = requestCameraSession,
+                    stopCameraSession = stopCameraSession,
+                    onCameraSessionStarted = onCameraSessionStarted,
+                    onCameraSessionFailure = onCameraSessionFailure,
                     modifier = Modifier.weight(1f),
                 )
             } else {
