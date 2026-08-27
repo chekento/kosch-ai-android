@@ -4,6 +4,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -48,6 +49,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -85,7 +87,7 @@ fun AiHubEntryButton(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AiHubSurface(
     hub: AiHubController,
@@ -214,6 +216,7 @@ fun AiHubSurface(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AiHubCard(
     entry: AiHubEntry,
@@ -292,7 +295,11 @@ private fun AiHubCard(
                 }
             }
 
-            Button(onClick = onOpen, modifier = Modifier.fillMaxWidth()) {
+            Button(
+                onClick = onOpen,
+                enabled = entry.installState != AiHubInstallState.UNAVAILABLE,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
                 val icon = when (entry.installState) {
                     AiHubInstallState.STORE_AVAILABLE -> Icons.Rounded.Storefront
                     else -> if (hasPrompt && (entry.kind == AiHubEntryKind.LLM_APP || entry.kind == AiHubEntryKind.LOCAL_LLM_APP)) {
@@ -317,8 +324,7 @@ private fun installLabel(state: AiHubInstallState): String = when (state) {
     AiHubInstallState.UNAVAILABLE -> "NICHT VERFÜGBAR"
 }
 
-@Composable
-private fun installColor(state: AiHubInstallState) = when (state) {
+private fun installColor(state: AiHubInstallState): Color = when (state) {
     AiHubInstallState.INSTALLED, AiHubInstallState.SYSTEM_AVAILABLE -> Mint
     AiHubInstallState.STORE_AVAILABLE -> Sky
     AiHubInstallState.WEB_ONLY -> Violet
