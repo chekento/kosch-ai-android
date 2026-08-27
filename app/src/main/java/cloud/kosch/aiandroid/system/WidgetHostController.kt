@@ -1,7 +1,6 @@
 package cloud.kosch.aiandroid.system
 
 import android.appwidget.AppWidgetHost
-import android.appwidget.AppWidgetHostView
 import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.content.Intent
@@ -24,6 +23,8 @@ class WidgetHostController(context: Context) {
     fun deleteId(appWidgetId: Int) = host.deleteAppWidgetId(appWidgetId)
 
     fun hostedIds(): Set<Int> = host.appWidgetIds.filter { it > 0 }.toSet()
+
+    fun hostedProviderComponents(): Map<Int, String?> = hostedIds().associateWith(::providerComponent)
 
     fun providerComponent(appWidgetId: Int): String? = manager
         .getAppWidgetInfo(appWidgetId)
@@ -63,7 +64,34 @@ class WidgetHostController(context: Context) {
         }
     }
 
+    /** Creates a host view sized to the actual V7 grid cell area instead of legacy board presets. */
+    fun createWorkspaceView(
+        context: Context,
+        appWidgetId: Int,
+        widthDp: Int,
+        heightDp: Int,
+    ): View? {
+        val info = manager.getAppWidgetInfo(appWidgetId) ?: return null
+        val safeWidth = widthDp.coerceAtLeast(MIN_WIDGET_DP)
+        val safeHeight = heightDp.coerceAtLeast(MIN_WIDGET_DP)
+        return host.createView(context, appWidgetId, info).apply {
+            setAppWidget(appWidgetId, info)
+            updateAppWidgetSize(
+                Bundle.EMPTY,
+                safeWidth,
+                safeHeight,
+                safeWidth,
+                safeHeight,
+            )
+            layoutParams = ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            )
+        }
+    }
+
     private companion object {
         const val HOST_ID = 0x4B4F5343 // "KOSC"
+        const val MIN_WIDGET_DP = 40
     }
 }
