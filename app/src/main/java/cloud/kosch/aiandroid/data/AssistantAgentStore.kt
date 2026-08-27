@@ -8,6 +8,9 @@ import cloud.kosch.aiandroid.model.AssistantWakeWordMode
 /**
  * Stores portable assistant-agent preferences only. Screen/camera consent grants, MediaProjection
  * tokens, URI grants and any other device/session-bound capabilities are intentionally excluded.
+ *
+ * Generic preference writes are not allowed to escalate screen/camera awareness from off to on.
+ * That transition has a dedicated user-opt-in write path for Settings/UI controls.
  */
 class AssistantAgentStore(context: Context) {
     private val preferences = context.getSharedPreferences(PREFERENCES_NAME, Context.MODE_PRIVATE)
@@ -35,9 +38,26 @@ class AssistantAgentStore(context: Context) {
     )
 
     fun save(settings: AssistantAgentPreferences) {
+        saveInternal(settings = settings, allowObservationOptIn = false)
+    }
+
+    /** Dedicated persistence path for a direct Settings/UI user gesture. */
+    fun saveUserObservationOptIn(settings: AssistantAgentPreferences) {
+        saveInternal(settings = settings, allowObservationOptIn = true)
+    }
+
+    private fun saveInternal(settings: AssistantAgentPreferences, allowObservationOptIn: Boolean) {
         require(validIdentifier(settings.characterId)) { "Ungültige Charakter-ID" }
         require(settings.wakeWordMode != AssistantWakeWordMode.CUSTOM || validWakeWord(settings.customWakeWord)) {
             "Ungültiges Wake Word"
+        }
+        val currentScreen = preferences.getBoolean(KEY_SCREEN_OBSERVATION, false)
+        val currentCamera = preferences.getBoolean(KEY_CAMERA_OBSERVATION, false)
+        require(allowObservationOptIn || currentScreen || !settings.screenObservationEnabled) {
+            "Screen-Awareness darf nur manuell aktiviert werden"
+        }
+        require(allowObservationOptIn || currentCamera || !settings.cameraObservationEnabled) {
+            "Camera-Awareness darf nur manuell aktiviert werden"
         }
         preferences.edit()
             .putString(KEY_CHARACTER_ID, settings.characterId)
