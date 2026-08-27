@@ -28,7 +28,8 @@ import java.util.concurrent.Executors
  *
  * Images are deliberately not converted, retained or persisted in Stage G. The analyzer proves that
  * live frames are flowing and closes every ImageProxy immediately. Leaving this composable unbinds
- * the camera and tears down the analyzer executor.
+ * exactly the Assistant's camera use cases and tears down the analyzer executor. A late provider
+ * callback is guarded so it cannot resurrect capture after the visible preview has been disposed.
  */
 @Composable
 fun AssistantCameraSessionPreview(
@@ -57,12 +58,17 @@ fun AssistantCameraSessionPreview(
             onDispose { analysisExecutor.shutdownNow() }
         } else {
             var provider: ProcessCameraProvider? = null
+            var preview: Preview? = null
             var analysis: ImageAnalysis? = null
             var started = false
+            var disposed = false
 
             val listener = Runnable {
+                if (disposed) return@Runnable
                 runCatching {
                     val resolvedProvider = cameraProviderFuture.get()
+                    if (disposed) return@runCatching
+
                     val resolvedPreview = Preview.Builder().build().also {
                         it.setSurfaceProvider(previewView.surfaceProvider)
                     }
@@ -71,32 +77,54 @@ fun AssistantCameraSessionPreview(
                         .build()
                         .also { useCase ->
                             useCase.setAnalyzer(analysisExecutor) { image ->
-                                AssistantObservationRuntime.cameraFrameObserved()
-                                image.close()
+                                try {
+                                    if (!disposed) AssistantObservationRuntime.cameraFrameObserved()
+                                } finally {
+                                    image.close()
+                                }
                             }
                         }
-                    resolvedProvider.unbindAll()
+
+                    if (disposed) {
+                        resolvedAnalysis.clearAnalyzer()
+                        return@runCatching
+                    }
+
                     resolvedProvider.bindToLifecycle(
                         activity,
                         CameraSelector.DEFAULT_BACK_CAMERA,
                         resolvedPreview,
                         resolvedAnalysis,
                     )
+                    if (disposed) {
+                        resolvedAnalysis.clearAnalyzer()
+                        resolvedProvider.unbind(resolvedPreview, resolvedAnalysis)
+                        return@runCatching
+                    }
+
                     provider = resolvedProvider
+                    preview = resolvedPreview
                     analysis = resolvedAnalysis
                     started = true
                     AssistantObservationRuntime.cameraStarted()
                     onStarted()
                 }.onFailure { error ->
-                    AssistantObservationRuntime.cameraStopped()
-                    onFailure(error.message ?: "CameraX-Session konnte nicht gestartet werden")
+                    if (!disposed) {
+                        AssistantObservationRuntime.cameraStopped()
+                        onFailure(error.message ?: "CameraX-Session konnte nicht gestartet werden")
+                    }
                 }
             }
             cameraProviderFuture.addListener(listener, ContextCompat.getMainExecutor(context))
 
             onDispose {
+                disposed = true
                 analysis?.clearAnalyzer()
-                provider?.unbindAll()
+                val currentPreview = preview
+                val currentAnalysis = analysis
+                if (currentPreview != null && currentAnalysis != null) {
+                    provider?.unbind(currentPreview, currentAnalysis)
+                }
                 analysisExecutor.shutdownNow()
                 AssistantObservationRuntime.cameraStopped()
                 if (started) onStopped()
