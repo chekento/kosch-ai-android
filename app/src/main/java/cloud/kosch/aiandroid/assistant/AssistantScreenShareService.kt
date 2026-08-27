@@ -190,6 +190,7 @@ class AssistantScreenShareService : Service() {
     }
 
     private fun releaseProjection(stopProjection: Boolean) {
+        val hadActiveSession = projection != null || virtualDisplay != null || imageReader != null
         val currentProjection = projection
         projection = null
 
@@ -209,6 +210,12 @@ class AssistantScreenShareService : Service() {
         captureThread?.quitSafely()
         captureThread = null
         AssistantObservationRuntime.screenStopped()
+        if (hadActiveSession) {
+            AssistantVisualContextRuntime.cancel(
+                AssistantObservationSource.SCREEN,
+                "Bildschirmfreigabe wurde beendet, bevor der angeforderte Kontextframe bereit war",
+            )
+        }
     }
 
     private fun ensureNotificationChannel() {
