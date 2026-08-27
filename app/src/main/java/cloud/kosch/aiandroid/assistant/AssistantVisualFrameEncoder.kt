@@ -41,10 +41,9 @@ object AssistantVisualFrameEncoder {
         val croppedBitmap = if (paddedWidth == width) {
             paddedBitmap
         } else {
-            runCatching { Bitmap.createBitmap(paddedBitmap, 0, 0, width, height) }
-                .getOrNull()
-                .also { paddedBitmap.recycle() }
-                ?: return null
+            val cropped = runCatching { Bitmap.createBitmap(paddedBitmap, 0, 0, width, height) }.getOrNull()
+            paddedBitmap.recycle()
+            cropped ?: return null
         }
 
         return try {
@@ -55,13 +54,11 @@ object AssistantVisualFrameEncoder {
     }
 
     fun encodeCameraImage(image: ImageProxy): EncodedJpeg? {
-        val width = image.width.coerceAtLeast(1)
-        val height = image.height.coerceAtLeast(1)
         val rotation = normalizeRotation(image.imageInfo.rotationDegrees)
         val jpeg = when (image.format) {
             ImageFormat.JPEG -> image.planes.firstOrNull()?.buffer?.duplicate()?.let { buffer ->
                 buffer.rewind()
-                ByteArray(buffer.remaining()).also(buffer::get)
+                ByteArray(buffer.remaining()).also { bytes -> buffer.get(bytes) }
             }
 
             ImageFormat.YUV_420_888 -> yuv420ToJpeg(image)
@@ -124,20 +121,18 @@ object AssistantVisualFrameEncoder {
     }
 
     private fun compressBitmap(source: Bitmap, rotationDegrees: Int): EncodedJpeg? {
-        var working = rotateIfNeeded(source, rotationDegrees)
-        val ownsRotated = working !== source
-        try {
-            working = scaleToMaxEdge(working, MAX_CONTEXT_EDGE).also { scaled ->
-                if (scaled !== working && ownsRotated) working.recycle()
-            }
+        val rotated = rotateIfNeeded(source, rotationDegrees)
+        val scaled = scaleToMaxEdge(rotated, MAX_CONTEXT_EDGE)
+        if (scaled !== rotated && rotated !== source) rotated.recycle()
 
+        try {
             var bytes: ByteArray? = null
             for (quality in QUALITY_STEPS) {
-                bytes = compress(working, quality) ?: continue
+                bytes = compress(scaled, quality) ?: continue
                 if (bytes.size <= AssistantVisualContextRuntime.MAX_CONTEXT_BYTES) {
                     return EncodedJpeg(
-                        width = working.width,
-                        height = working.height,
+                        width = scaled.width,
+                        height = scaled.height,
                         rotationDegrees = 0,
                         bytes = bytes,
                     )
@@ -148,9 +143,9 @@ object AssistantVisualFrameEncoder {
             val scale = sqrt(
                 AssistantVisualContextRuntime.MAX_CONTEXT_BYTES.toFloat() / oversized.size.toFloat(),
             ).coerceIn(MIN_SECOND_PASS_SCALE, MAX_SECOND_PASS_SCALE)
-            val secondWidth = (working.width * scale).roundToInt().coerceAtLeast(MIN_CONTEXT_EDGE)
-            val secondHeight = (working.height * scale).roundToInt().coerceAtLeast(MIN_CONTEXT_EDGE)
-            val secondPass = Bitmap.createScaledBitmap(working, secondWidth, secondHeight, true)
+            val secondWidth = (scaled.width * scale).roundToInt().coerceAtLeast(MIN_CONTEXT_EDGE)
+            val secondHeight = (scaled.height * scale).roundToInt().coerceAtLeast(MIN_CONTEXT_EDGE)
+            val secondPass = Bitmap.createScaledBitmap(scaled, secondWidth, secondHeight, true)
             try {
                 for (quality in SECOND_PASS_QUALITY_STEPS) {
                     val candidate = compress(secondPass, quality) ?: continue
@@ -164,11 +159,11 @@ object AssistantVisualFrameEncoder {
                     }
                 }
             } finally {
-                secondPass.recycle()
+                if (secondPass !== scaled) secondPass.recycle()
             }
             return null
         } finally {
-            if (working !== source && !working.isRecycled) working.recycle()
+            if (scaled !== source && !scaled.isRecycled) scaled.recycle()
         }
     }
 
