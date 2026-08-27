@@ -48,6 +48,7 @@ class AiHubController(context: Context) {
     private val launcherApps = appContext.getSystemService(LauncherApps::class.java)
     private val publishedSurfaceDiscovery = AiPublishedSurfaceDiscovery(appContext)
     private val publishedSurfaceCache = mutableMapOf<String, AiPublishedSurfaceSnapshot>()
+    private var defaultRoutingContextProvider: () -> AiHubRoutingContext = { AiHubRoutingContext() }
 
     var visible by mutableStateOf(false)
         private set
@@ -61,6 +62,11 @@ class AiHubController(context: Context) {
         private set
     var routingContext by mutableStateOf(AiHubRoutingContext())
         private set
+
+    /** Supplies abstract launcher context for old/direct open() call sites without coupling this controller to Home. */
+    fun setDefaultRoutingContextProvider(provider: () -> AiHubRoutingContext) {
+        defaultRoutingContextProvider = provider
+    }
 
     fun entries(apps: List<LaunchableApp>): List<AiHubEntry> = AiHubCatalog.entries(apps, hiddenIds)
 
@@ -161,10 +167,10 @@ class AiHubController(context: Context) {
 
     fun open(
         initialPrompt: String = "",
-        context: AiHubRoutingContext = AiHubRoutingContext(),
+        context: AiHubRoutingContext? = null,
     ) {
         publishedSurfaceCache.clear()
-        routingContext = context
+        routingContext = context ?: defaultRoutingContextProvider()
         prompt = initialPrompt.take(MAX_PROMPT_CHARS)
         notice = null
         visible = true
