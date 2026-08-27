@@ -4,10 +4,12 @@ import android.app.Application
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import cloud.kosch.aiandroid.ai.AiContextHandoffPolicy
 import cloud.kosch.aiandroid.ai.AiContextHandoffSelection
 import cloud.kosch.aiandroid.ai.AiHubContextSignal
 import cloud.kosch.aiandroid.ai.AiHubOrigin
 import cloud.kosch.aiandroid.ai.AiHubRoutingContext
+import cloud.kosch.aiandroid.ai.PenAiContextPlanner
 import cloud.kosch.aiandroid.data.WorkspaceWidgetHostRecovery
 import cloud.kosch.aiandroid.model.HomePage
 import cloud.kosch.aiandroid.model.SceneId
@@ -86,28 +88,69 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         return true
     }
 
+    /**
+     * Pen Space is summarized locally into aggregate statistics. Raw stroke coordinates and SVG bytes are deliberately
+     * not placed into prompt state; a future multimodal image handoff remains a separate explicit consent path.
+     */
+    fun prepareCurrentPenAiHandoff(): Boolean {
+        val strokes = controller.loadInkStrokes()
+        if (strokes.isEmpty()) return false
+        val summary = PenAiContextPlanner.summarize(strokes)
+        aiContextHandoff.prepare(
+            AiContextHandoffPolicy.fromPenSketch(
+                title = "Pen-Space-Skizze",
+                summary = summary.text,
+                textualDescription = "Lokale Aggregatanalyse der Skizze; keine Rohkoordinaten oder SVG-Daten enthalten.",
+            ),
+        )
+        return true
+    }
+
     fun cancelCurrentAiHandoff() {
         aiContextHandoff.cancel()
     }
 
-    /**
-     * Only the explicit UI confirmation path may call this with userConfirmed=true. The handoff draft is consumed once
-     * and the AI Hub receives only the bounded selected prompt payload, never the original file URI implicitly.
-     */
     fun confirmCurrentFileAiHandoff(
         userPrompt: String,
         userConfirmed: Boolean,
         selection: AiContextHandoffSelection = AiContextHandoffSelection.MINIMAL,
+    ): Boolean = confirmCurrentAiHandoff(
+        userPrompt = userPrompt,
+        userConfirmed = userConfirmed,
+        selection = selection,
+        requestedOrigin = AiHubOrigin.FILE,
+        closeSourceSurface = controller::closeFileSheet,
+    )
+
+    fun confirmCurrentPenAiHandoff(
+        userPrompt: String,
+        userConfirmed: Boolean,
+        selection: AiContextHandoffSelection = AiContextHandoffSelection.MINIMAL,
+    ): Boolean = confirmCurrentAiHandoff(
+        userPrompt = userPrompt,
+        userConfirmed = userConfirmed,
+        selection = selection,
+        requestedOrigin = AiHubOrigin.PEN,
+        closeSourceSurface = {},
+    )
+
+    /** Only an explicit UI confirmation may pass userConfirmed=true. */
+    private fun confirmCurrentAiHandoff(
+        userPrompt: String,
+        userConfirmed: Boolean,
+        selection: AiContextHandoffSelection,
+        requestedOrigin: AiHubOrigin,
+        closeSourceSurface: () -> Unit,
     ): Boolean {
         val confirmed = aiContextHandoff.confirm(
             userPrompt = userPrompt,
             userConfirmed = userConfirmed,
             selection = selection,
         ) ?: return false
-        controller.closeFileSheet()
+        closeSourceSurface()
         openAiHub(
             initialPrompt = confirmed.prompt,
-            requestedOrigin = AiHubOrigin.FILE,
+            requestedOrigin = requestedOrigin,
         )
         return true
     }
