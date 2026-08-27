@@ -12,6 +12,7 @@ import cloud.kosch.aiandroid.ai.AiHubLaunchPlan
 import cloud.kosch.aiandroid.ai.AiHubLaunchPlanner
 import cloud.kosch.aiandroid.ai.AiHubPreferencePolicy
 import cloud.kosch.aiandroid.ai.AiHubRecommendation
+import cloud.kosch.aiandroid.ai.AiHubShortcutRoutePolicy
 import cloud.kosch.aiandroid.ai.AiHubTaskIntent
 import cloud.kosch.aiandroid.ai.AiHubTaskRouter
 import cloud.kosch.aiandroid.ai.AiPublishedShortcutKind
@@ -66,6 +67,8 @@ class AiHubController(context: Context) {
             .take(limit)
     }
 
+    fun bestRecommendation(apps: List<LaunchableApp>): AiHubRecommendation? = recommendations(apps, 1).firstOrNull()
+
     fun inferredTask(): AiHubTaskIntent = AiHubTaskRouter.infer(prompt)
 
     fun canPreferForCurrentTask(entry: AiHubEntry): Boolean =
@@ -105,6 +108,35 @@ class AiHubController(context: Context) {
             AiHubEntryKind.LLM_APP, AiHubEntryKind.LOCAL_LLM_APP -> discovered.shortcuts
         }
         return discovered.copy(shortcuts = shortcuts)
+    }
+
+    fun bestPublishedShortcut(entry: AiHubEntry): AiPublishedShortcutSurface? {
+        val shortcuts = publishedSurfaces(entry).shortcuts
+        val preferredKind = AiHubShortcutRoutePolicy.preferredKind(
+            inferredTask(),
+            shortcuts.map { it.kind },
+        ) ?: return null
+        return shortcuts
+            .asSequence()
+            .filter { it.kind == preferredKind }
+            .sortedBy { it.label.lowercase() }
+            .firstOrNull()
+    }
+
+    /** Executes the top safe route now. A stale published shortcut falls back to the normal Android launch plan. */
+    fun executeBestRoute(apps: List<LaunchableApp>): Boolean {
+        val recommendation = bestRecommendation(apps) ?: return false
+        val entry = recommendation.entry
+        val shortcut = bestPublishedShortcut(entry)
+        if (shortcut != null) {
+            val shortcutResult = launchPublishedShortcut(shortcut)
+            if (shortcutResult.isSuccess) {
+                notice = "${shortcut.label} als beste Route für ${recommendation.intent.title} geöffnet"
+                return true
+            }
+        }
+        execute(entry)
+        return true
     }
 
     fun open(initialPrompt: String = "") {
@@ -151,19 +183,23 @@ class AiHubController(context: Context) {
     }
 
     fun execute(surface: AiPublishedShortcutSurface) {
-        runCatching {
-            launcherApps.startShortcut(
-                surface.packageName,
-                surface.shortcutId,
-                null,
-                null,
-                surface.user,
-            )
-        }.onSuccess {
-            notice = "${surface.label} über den von der App veröffentlichten Android-Shortcut geöffnet"
-        }.onFailure {
-            notice = "Der veröffentlichte Shortcut ${surface.label} ist aktuell nicht startbar"
-        }
+        launchPublishedShortcut(surface)
+            .onSuccess {
+                notice = "${surface.label} über den von der App veröffentlichten Android-Shortcut geöffnet"
+            }
+            .onFailure {
+                notice = "Der veröffentlichte Shortcut ${surface.label} ist aktuell nicht startbar"
+            }
+    }
+
+    private fun launchPublishedShortcut(surface: AiPublishedShortcutSurface): Result<Unit> = runCatching {
+        launcherApps.startShortcut(
+            surface.packageName,
+            surface.shortcutId,
+            null,
+            null,
+            surface.user,
+        )
     }
 
     fun consumeNotice() {
