@@ -25,6 +25,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelProvider
 import cloud.kosch.aiandroid.LauncherViewModel
+import cloud.kosch.aiandroid.ai.AssistantBuiltInVoiceCatalog
+import cloud.kosch.aiandroid.ai.AssistantVoiceDecision
+import cloud.kosch.aiandroid.ai.AssistantVoicePolicy
+import cloud.kosch.aiandroid.model.AssistantSystemVoiceOption
+import cloud.kosch.aiandroid.model.AssistantVoiceGender
 import cloud.kosch.aiandroid.model.AssistantVisualState
 import cloud.kosch.aiandroid.system.DocumentGrantManager
 import cloud.kosch.aiandroid.ui.AssistantHost
@@ -49,17 +54,21 @@ fun CompanionFace(
         activity?.let { ViewModelProvider(it)[LauncherViewModel::class.java] }
     }
     val assistant = viewModel?.assistant
+    val assistantAgent = viewModel?.assistantAgent
+    val assistantVoice = viewModel?.assistantVoice
     val launcherController = viewModel?.controller
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     val documentGrantManager = remember(context) { DocumentGrantManager(context.applicationContext) }
 
     var ttsEngine by remember { mutableStateOf<TextToSpeech?>(null) }
     var ttsReady by remember { mutableStateOf(false) }
-    val speechRuntimeEnabled = assistant?.settings?.enabled == true && assistant.settings.speechOutputEnabled
+    val ttsRuntimeEnabled = assistant != null && (
+        (assistant.settings.enabled && assistant.settings.speechOutputEnabled) || assistant.sheetVisible
+    )
     val effectiveReducedMotion = assistant?.settings?.reducedMotion == true || !ValueAnimator.areAnimatorsEnabled()
 
-    DisposableEffect(context, assistant, speechRuntimeEnabled) {
-        if (assistant == null || !speechRuntimeEnabled) {
+    DisposableEffect(context, assistant, assistantVoice, ttsRuntimeEnabled) {
+        if (assistant == null || !ttsRuntimeEnabled) {
             ttsEngine = null
             ttsReady = false
             onDispose { }
@@ -75,7 +84,25 @@ fun CompanionFace(
                     } else {
                         false
                     }
-                    mainHandler.post { ttsReady = ready }
+                    val voices = if (ready) {
+                        runCatching {
+                            current.voices.orEmpty().map { voice ->
+                                AssistantSystemVoiceOption(
+                                    name = voice.name,
+                                    languageTag = voice.locale.toLanguageTag(),
+                                    quality = voice.quality,
+                                    latency = voice.latency,
+                                    networkRequired = voice.isNetworkConnectionRequired,
+                                )
+                            }
+                        }.getOrDefault(emptyList())
+                    } else {
+                        emptyList()
+                    }
+                    mainHandler.post {
+                        assistantVoice?.updateAvailableVoices(voices)
+                        ttsReady = ready
+                    }
                 }
             }
             engineReference = engine
@@ -172,10 +199,43 @@ fun CompanionFace(
             .onFailure { launcherController?.postNotice("Die Android-Kontaktauswahl ist nicht verfügbar") }
     }
 
+    fun selectCharacterVoice(engine: TextToSpeech): Boolean {
+        val character = assistantAgent?.character ?: return true
+        val profile = AssistantBuiltInVoiceCatalog.resolve(character.voiceProfileId)
+        if (profile == null || AssistantVoicePolicy.decision(character, profile) != AssistantVoiceDecision.ALLOW) {
+            launcherController?.postNotice("Stimmenprofil des Charakters ist ungültig")
+            return false
+        }
+
+        val gender = character.voiceGender
+        val assignedName = assistantVoice?.assignedVoiceName(gender)
+        if (gender != AssistantVoiceGender.NEUTRAL && assignedName == null) {
+            launcherController?.postNotice(
+                "Ordne ${character.displayName} zuerst eine ${if (gender == AssistantVoiceGender.FEMALE) "weibliche" else "männliche"} Stimme zu",
+            )
+            return false
+        }
+
+        if (assignedName == null) return true
+        val systemVoice = runCatching { engine.voices.orEmpty().firstOrNull { it.name == assignedName } }.getOrNull()
+        if (systemVoice == null) {
+            if (gender == AssistantVoiceGender.NEUTRAL) return true
+            launcherController?.postNotice("Die zugeordnete Stimme ist auf diesem Gerät nicht verfügbar")
+            return false
+        }
+        if (engine.setVoice(systemVoice) == TextToSpeech.ERROR) {
+            launcherController?.postNotice("Die zugeordnete Stimme konnte nicht aktiviert werden")
+            return false
+        }
+        return true
+    }
+
     val requestSpeech: (String) -> Boolean = { text ->
         val engine = ttsEngine
         if (!ttsReady || engine == null) {
             launcherController?.postNotice("Android Text-to-Speech ist auf diesem Gerät nicht bereit")
+            false
+        } else if (!selectCharacterVoice(engine)) {
             false
         } else {
             val utteranceId = "kosch-assistant-${System.nanoTime()}"
@@ -192,6 +252,30 @@ fun CompanionFace(
             result != TextToSpeech.ERROR
         }
     }
+
+    val requestVoicePreview: (String) -> Boolean = { voiceName ->
+        val engine = ttsEngine
+        val systemVoice = engine?.let { current ->
+            runCatching { current.voices.orEmpty().firstOrNull { it.name == voiceName } }.getOrNull()
+        }
+        if (!ttsReady || engine == null || systemVoice == null) {
+            launcherController?.postNotice("Diese TTS-Stimme ist gerade nicht verfügbar")
+            false
+        } else if (engine.setVoice(systemVoice) == TextToSpeech.ERROR) {
+            launcherController?.postNotice("Diese TTS-Stimme konnte nicht aktiviert werden")
+            false
+        } else {
+            val sample = "Hallo. Ich bin dein KoSch Assistant. So klingt diese Stimme."
+            val utteranceId = "kosch-assistant-preview-${System.nanoTime()}"
+            assistant?.speechQueued(utteranceId, sample)
+            val result = runCatching {
+                engine.speak(sample, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+            }.getOrDefault(TextToSpeech.ERROR)
+            if (result == TextToSpeech.ERROR) assistant?.speechFailed(utteranceId)
+            result != TextToSpeech.ERROR
+        }
+    }
+
     val stopSpeech: () -> Unit = {
         ttsEngine?.stop()
         assistant?.speechInterrupted()
@@ -244,17 +328,21 @@ fun CompanionFace(
         onPointerAttention = { x, y, pressed -> assistant?.pointerAttention(x, y, pressed) },
         onActivate = { assistant?.attentionActivated() },
         onClick = { assistant?.open() ?: onClick() },
+        assistantId = assistantAgent?.character?.assetPackId ?: AssistantAssetCatalog.DEFAULT_ASSISTANT_ID,
         modifier = modifier,
     )
 
-    if (assistant != null && launcherController != null) {
+    if (assistant != null && assistantAgent != null && assistantVoice != null && launcherController != null) {
         AssistantHost(
             assistant = assistant,
+            agent = assistantAgent,
+            voice = assistantVoice,
             launcherController = launcherController,
             requestVoiceInput = requestAssistantVoice,
             requestDocument = requestDocument,
             requestContact = requestContact,
             requestSpeech = requestSpeech,
+            requestVoicePreview = requestVoicePreview,
             stopSpeech = stopSpeech,
             showFloatingTrigger = false,
         )
