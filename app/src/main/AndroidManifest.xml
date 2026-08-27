@@ -53,13 +53,13 @@
         <!--
              Official, user-initiated Android ingress for highlighted/shared text. This endpoint receives only the
              text Android explicitly supplies after PROCESS_TEXT/ACTION_SEND; it has no additional permission and
-             still places the payload behind KoSch's explicit disclosure-scope consent surface.
+             still places the payload behind KAL's explicit disclosure-scope consent surface.
         -->
         <activity
             android:name=".AiTextIngressActivity"
             android:exported="true"
             android:excludeFromRecents="true"
-            android:label="Mit KoSch fragen"
+            android:label="In KAL analysieren"
             android:screenOrientation="unspecified">
             <intent-filter>
                 <action android:name="android.intent.action.PROCESS_TEXT" />
@@ -105,7 +105,7 @@
         <service
             android:name=".system.KoSchNotificationListenerService"
             android:exported="true"
-            android:label="KoSch Benachrichtigungspunkte"
+            android:label="KAL Benachrichtigungspunkte"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
