@@ -68,7 +68,7 @@ object AssistantWakeWordResolver {
     ): String? = when (preferences.wakeWordMode) {
         AssistantWakeWordMode.OFF -> null
         AssistantWakeWordMode.COMPUTER -> "Computer"
-        AssistantWakeWordMode.ASSISTANT_NAME -> character.displayName
+        AssistantWakeWordMode.ASSISTANT_NAME -> preferences.assistantName.trim().ifEmpty { character.displayName }
         AssistantWakeWordMode.CUSTOM -> preferences.customWakeWord.trim().takeIf { it.isNotEmpty() }
     }
 }
