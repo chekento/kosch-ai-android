@@ -5,19 +5,22 @@ import cloud.kosch.aiandroid.model.LauncherSettingsDocument
 
 /**
  * Single-blob settings store: one SharedPreferences commit replaces the complete normalized document atomically.
- * This intentionally stays separate from Android capabilities and the secret vault.
+ * Android capabilities, capture/session state, device-local voice assignments and the secret vault stay outside.
+ * The portability policy also neutralizes legacy Assistant shadow fields before they can be saved/exported.
  */
 class LauncherSettingsStore(context: Context) {
     private val preferences = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
     fun load(): LauncherSettingsDocument {
         val payload = preferences.getString(KEY_DOCUMENT, null) ?: return LauncherSettingsDocument()
-        return runCatching { LauncherSettingsCodec.decode(payload) }
-            .getOrDefault(LauncherSettingsDocument())
+        return runCatching {
+            PortableLauncherSettingsPolicy.project(LauncherSettingsCodec.decode(payload))
+        }.getOrDefault(LauncherSettingsDocument())
     }
 
     fun save(document: LauncherSettingsDocument): Boolean {
-        val payload = LauncherSettingsCodec.encode(document)
+        val portable = PortableLauncherSettingsPolicy.project(document)
+        val payload = LauncherSettingsCodec.encode(portable)
         require(payload.toByteArray(Charsets.UTF_8).size <= MAX_SETTINGS_BYTES) {
             "Launcher settings document exceeds the local size budget"
         }
@@ -30,7 +33,7 @@ class LauncherSettingsStore(context: Context) {
         require(payload.toByteArray(Charsets.UTF_8).size <= MAX_SETTINGS_BYTES) {
             "Launcher settings import exceeds the size budget"
         }
-        LauncherSettingsCodec.decode(payload).normalized()
+        PortableLauncherSettingsPolicy.project(LauncherSettingsCodec.decode(payload))
     }
 
     fun applyImport(payload: String): Result<LauncherSettingsDocument> = validateImport(payload).mapCatching { document ->
@@ -38,7 +41,7 @@ class LauncherSettingsStore(context: Context) {
         document
     }
 
-    fun exportPortable(): String = LauncherSettingsCodec.encode(load())
+    fun exportPortable(): String = LauncherSettingsCodec.encode(PortableLauncherSettingsPolicy.project(load()))
 
     fun reset(): Boolean = preferences.edit().remove(KEY_DOCUMENT).commit()
 
