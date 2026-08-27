@@ -69,6 +69,7 @@ class AssistantScreenShareService : Service() {
                 val resultCode = intent.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
                 val resultData = intent.parcelableIntentExtra(EXTRA_RESULT_DATA)
                 if (resultCode != Activity.RESULT_OK || resultData == null) {
+                    AssistantObservationRuntime.screenFailed("Android hat keinen gültigen Screen-Share-Consent geliefert")
                     stopSelfResult(startId)
                     return START_NOT_STICKY
                 }
@@ -98,6 +99,7 @@ class AssistantScreenShareService : Service() {
             projectionManager.getMediaProjection(resultCode, resultData)
         }.getOrNull()
         if (mediaProjection == null) {
+            AssistantObservationRuntime.screenFailed("MediaProjection konnte nicht erzeugt werden")
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return
@@ -142,6 +144,7 @@ class AssistantScreenShareService : Service() {
             reader.close()
             thread.quitSafely()
             runCatching { mediaProjection.stop() }
+            AssistantObservationRuntime.screenFailed("Virtuelles Display für Screen Share konnte nicht gestartet werden")
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return
@@ -218,7 +221,7 @@ class AssistantScreenShareService : Service() {
             .setContentIntent(openIntent)
             .setOngoing(true)
             .setCategory(Notification.CATEGORY_SERVICE)
-            .addAction(Notification.Action.Builder(null, "Stoppen", stopIntent).build())
+            .addAction(Notification.Action.Builder(0, "Stoppen", stopIntent).build())
             .build()
     }
 
