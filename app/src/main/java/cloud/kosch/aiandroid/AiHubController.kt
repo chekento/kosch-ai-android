@@ -35,6 +35,7 @@ class AiHubController(context: Context) {
     private val systemActions = SystemActionGateway(appContext)
     private val launcherApps = appContext.getSystemService(LauncherApps::class.java)
     private val publishedSurfaceDiscovery = AiPublishedSurfaceDiscovery(appContext)
+    private val publishedSurfaceCache = mutableMapOf<String, AiPublishedSurfaceSnapshot>()
 
     var visible by mutableStateOf(false)
         private set
@@ -56,7 +57,9 @@ class AiHubController(context: Context) {
 
     fun publishedSurfaces(entry: AiHubEntry): AiPublishedSurfaceSnapshot {
         val app = entry.installedApp ?: return AiPublishedSurfaceSnapshot()
-        val discovered = publishedSurfaceDiscovery.snapshot(app)
+        val discovered = publishedSurfaceCache.getOrPut(app.key) {
+            publishedSurfaceDiscovery.snapshot(app)
+        }
         val shortcuts = when (entry.kind) {
             AiHubEntryKind.BROWSER -> discovered.shortcuts.filter { it.kind == AiPublishedShortcutKind.AI_ASSISTANT }
             AiHubEntryKind.SYSTEM_BROWSER -> emptyList()
@@ -66,6 +69,7 @@ class AiHubController(context: Context) {
     }
 
     fun open(initialPrompt: String = "") {
+        publishedSurfaceCache.clear()
         prompt = initialPrompt.take(MAX_PROMPT_CHARS)
         notice = null
         visible = true
