@@ -19,12 +19,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.Send
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Language
-import androidx.compose.material.icons.rounded.OpenInNew
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Storefront
 import androidx.compose.material3.AssistChip
@@ -57,6 +57,7 @@ import cloud.kosch.aiandroid.AiHubController
 import cloud.kosch.aiandroid.ai.AiHubEntry
 import cloud.kosch.aiandroid.ai.AiHubEntryKind
 import cloud.kosch.aiandroid.ai.AiHubInstallState
+import cloud.kosch.aiandroid.ai.AiHubRecommendation
 import cloud.kosch.aiandroid.model.LaunchableApp
 import cloud.kosch.aiandroid.system.AiPublishedShortcutSurface
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
@@ -99,7 +100,16 @@ fun AiHubSurface(
     var filter by remember { mutableStateOf(AiHubFilter.SMART) }
     val allEntries = hub.entries(apps)
     val recommendations = hub.recommendations(apps)
+    val currentTask = hub.inferredTask()
     val recommendationReasons = recommendations.associate { it.entry.stableId to it.reason }
+    val bestRecommendation = recommendations.firstOrNull()
+    val bestShortcut = if (bestRecommendation != null) {
+        remember(bestRecommendation.entry.stableId, bestRecommendation.entry.installedApp?.key, hub.prompt) {
+            hub.bestPublishedShortcut(bestRecommendation.entry)
+        }
+    } else {
+        null
+    }
     val entries = when (filter) {
         AiHubFilter.SMART -> recommendations.map { it.entry }
         AiHubFilter.ALL -> allEntries
@@ -178,7 +188,9 @@ fun AiHubSurface(
                     AssistChip(
                         onClick = { hub.restoreAll() },
                         label = { Text("${hub.hiddenIds.size} wiederherstellen") },
-                        leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp)) },
+                        leadingIcon = {
+                            Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
+                        },
                     )
                 }
             }
@@ -196,18 +208,30 @@ fun AiHubSurface(
                         Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = Sky)
                         Column {
                             Text(
-                                "KoSch empfiehlt · ${hub.inferredTask().title}",
+                                "KoSch empfiehlt · ${currentTask.title}",
                                 color = Sky,
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                "Verfügbarkeit und bestätigte Fähigkeiten werden lokal bewertet.",
+                                "Verfügbarkeit, bestätigte Fähigkeiten und deine geräte-lokale Aufgabenpräferenz werden bewertet.",
                                 color = MutedMist,
                                 style = MaterialTheme.typography.bodySmall,
                             )
                         }
                     }
+                }
+
+                bestRecommendation?.let { best ->
+                    AiHubBestRouteCard(
+                        recommendation = best,
+                        shortcut = bestShortcut,
+                        hasPrompt = hub.prompt.isNotBlank(),
+                        canPrefer = hub.canPreferForCurrentTask(best.entry),
+                        preferred = hub.isPreferredForCurrentTask(best.entry),
+                        onTogglePreferred = { hub.togglePreferredForCurrentTask(best.entry) },
+                        onExecute = { hub.executeBestRoute(apps) },
+                    )
                 }
             }
 
@@ -242,13 +266,17 @@ fun AiHubSurface(
                         AiHubCard(
                             entry = entry,
                             hasPrompt = hub.prompt.isNotBlank(),
+                            taskTitle = currentTask.title,
                             recommendationReason = if (filter == AiHubFilter.SMART) {
                                 recommendationReasons[entry.stableId]
                             } else {
                                 null
                             },
+                            canPrefer = hub.canPreferForCurrentTask(entry),
+                            preferred = hub.isPreferredForCurrentTask(entry),
                             publishedShortcuts = published.shortcuts,
                             publishedWidgetCount = published.widgets.size,
+                            onTogglePreferred = { hub.togglePreferredForCurrentTask(entry) },
                             onPublishedShortcut = hub::execute,
                             onOpen = { hub.execute(entry) },
                             onDismiss = { hub.dismiss(entry) },
@@ -261,14 +289,85 @@ fun AiHubSurface(
     }
 }
 
+@Composable
+private fun AiHubBestRouteCard(
+    recommendation: AiHubRecommendation,
+    shortcut: AiPublishedShortcutSurface?,
+    hasPrompt: Boolean,
+    canPrefer: Boolean,
+    preferred: Boolean,
+    onTogglePreferred: () -> Unit,
+    onExecute: () -> Unit,
+) {
+    val entry = recommendation.entry
+    Surface(
+        color = Violet.copy(alpha = 0.13f),
+        shape = RoundedCornerShape(20.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                "BESTE ROUTE · ${recommendation.intent.title.uppercase()}",
+                color = Mint,
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                entry.title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(recommendation.reason, color = MutedMist, style = MaterialTheme.typography.bodySmall)
+            Text(
+                shortcut?.let { "Direkt · ${it.label} · von der App veröffentlicht" }
+                    ?: "Sicherer Android-Weg · ${actionLabel(entry, hasPrompt)}",
+                color = Sky,
+                style = MaterialTheme.typography.labelMedium,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Button(
+                    onClick = onExecute,
+                    modifier = Modifier.weight(1f),
+                    enabled = entry.installState != AiHubInstallState.UNAVAILABLE,
+                ) {
+                    Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(7.dp))
+                    Text(
+                        shortcut?.let { "Direkt · ${it.label}" } ?: "Mit ${entry.title} starten",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (canPrefer) {
+                    FilterChip(
+                        selected = preferred,
+                        onClick = onTogglePreferred,
+                        label = { Text(if (preferred) "Bevorzugt" else "Merken") },
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AiHubCard(
     entry: AiHubEntry,
     hasPrompt: Boolean,
+    taskTitle: String,
     recommendationReason: String?,
+    canPrefer: Boolean,
+    preferred: Boolean,
     publishedShortcuts: List<AiPublishedShortcutSurface>,
     publishedWidgetCount: Int,
+    onTogglePreferred: () -> Unit,
     onPublishedShortcut: (AiPublishedShortcutSurface) -> Unit,
     onOpen: () -> Unit,
     onDismiss: () -> Unit,
@@ -297,7 +396,9 @@ private fun AiHubCard(
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            imageVector = if (entry.kind == AiHubEntryKind.BROWSER || entry.kind == AiHubEntryKind.SYSTEM_BROWSER) {
+                            imageVector = if (
+                                entry.kind == AiHubEntryKind.BROWSER || entry.kind == AiHubEntryKind.SYSTEM_BROWSER
+                            ) {
                                 Icons.Rounded.Language
                             } else {
                                 Icons.Rounded.AutoAwesome
@@ -379,7 +480,11 @@ private fun AiHubCard(
                             shape = RoundedCornerShape(50),
                         ) {
                             Text(
-                                if (publishedWidgetCount == 1) "1 Widget veröffentlicht" else "$publishedWidgetCount Widgets veröffentlicht",
+                                if (publishedWidgetCount == 1) {
+                                    "1 Widget veröffentlicht"
+                                } else {
+                                    "$publishedWidgetCount Widgets veröffentlicht"
+                                },
                                 modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
                                 color = Sky,
                                 style = MaterialTheme.typography.labelMedium,
@@ -389,6 +494,16 @@ private fun AiHubCard(
                 }
             }
 
+            if (canPrefer) {
+                FilterChip(
+                    selected = preferred,
+                    onClick = onTogglePreferred,
+                    label = {
+                        Text(if (preferred) "Bevorzugt für $taskTitle" else "Für $taskTitle bevorzugen")
+                    },
+                )
+            }
+
             Button(
                 onClick = onOpen,
                 enabled = entry.installState != AiHubInstallState.UNAVAILABLE,
@@ -396,10 +511,13 @@ private fun AiHubCard(
             ) {
                 val icon = when (entry.installState) {
                     AiHubInstallState.STORE_AVAILABLE -> Icons.Rounded.Storefront
-                    else -> if (hasPrompt && (entry.kind == AiHubEntryKind.LLM_APP || entry.kind == AiHubEntryKind.LOCAL_LLM_APP)) {
+                    else -> if (
+                        hasPrompt &&
+                        (entry.kind == AiHubEntryKind.LLM_APP || entry.kind == AiHubEntryKind.LOCAL_LLM_APP)
+                    ) {
                         Icons.AutoMirrored.Rounded.Send
                     } else {
-                        Icons.Rounded.OpenInNew
+                        Icons.AutoMirrored.Rounded.OpenInNew
                     }
                 }
                 Icon(icon, contentDescription = null, modifier = Modifier.size(18.dp))
