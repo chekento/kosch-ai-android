@@ -31,7 +31,7 @@ class AssistantAgentStore(context: Context) {
             fallback = AssistantWakeWordMode.OFF,
         ),
         customWakeWord = preferences.getString(KEY_CUSTOM_WAKE_WORD, "")
-            ?.takeIf(::validWakeWord)
+            ?.takeIf(::validWakeWordDraft)
             .orEmpty(),
         localWakeWordOnly = preferences.getBoolean(KEY_LOCAL_WAKE_WORD_ONLY, true),
         screenObservationEnabled = preferences.getBoolean(KEY_SCREEN_OBSERVATION, false),
@@ -52,9 +52,7 @@ class AssistantAgentStore(context: Context) {
     private fun saveInternal(settings: AssistantAgentPreferences, allowObservationOptIn: Boolean) {
         require(validIdentifier(settings.characterId)) { "Ungültige Charakter-ID" }
         require(validAssistantName(settings.assistantName)) { "Ungültiger Assistentenname" }
-        require(settings.wakeWordMode != AssistantWakeWordMode.CUSTOM || validWakeWord(settings.customWakeWord)) {
-            "Ungültiges Wake Word"
-        }
+        require(validWakeWordDraft(settings.customWakeWord)) { "Ungültiges Wake Word" }
         val currentScreen = preferences.getBoolean(KEY_SCREEN_OBSERVATION, false)
         val currentCamera = preferences.getBoolean(KEY_CAMERA_OBSERVATION, false)
         require(allowObservationOptIn || currentScreen || !settings.screenObservationEnabled) {
@@ -85,9 +83,9 @@ class AssistantAgentStore(context: Context) {
         return normalized.length <= MAX_ASSISTANT_NAME_LENGTH && normalized.none { it.isISOControl() }
     }
 
-    private fun validWakeWord(value: String): Boolean {
+    private fun validWakeWordDraft(value: String): Boolean {
         val normalized = value.trim()
-        return normalized.length in MIN_WAKE_WORD_LENGTH..MAX_WAKE_WORD_LENGTH &&
+        return normalized.length <= MAX_WAKE_WORD_LENGTH &&
             normalized.all { it.isLetterOrDigit() || it == ' ' || it == '-' || it == '_' }
     }
 
@@ -109,7 +107,6 @@ class AssistantAgentStore(context: Context) {
         const val DEFAULT_CHARACTER_ID = "default"
         const val MAX_IDENTIFIER_LENGTH = 48
         const val MAX_ASSISTANT_NAME_LENGTH = 32
-        const val MIN_WAKE_WORD_LENGTH = 2
         const val MAX_WAKE_WORD_LENGTH = 32
     }
 }
