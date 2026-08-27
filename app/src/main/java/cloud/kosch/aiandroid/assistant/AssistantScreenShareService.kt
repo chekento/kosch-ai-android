@@ -22,6 +22,7 @@ import android.os.IBinder
 import androidx.core.content.ContextCompat
 import cloud.kosch.aiandroid.MainActivity
 import cloud.kosch.aiandroid.R
+import cloud.kosch.aiandroid.model.AssistantObservationSource
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -30,9 +31,9 @@ import kotlin.math.roundToInt
  * Explicit MediaProjection session boundary for Assistant Screen Awareness.
  *
  * The Activity must first receive Android's capture consent result. Only then may it start this
- * foreground service and pass that one session result. The service is non-sticky, never persists the
- * result Intent and never uploads or stores captured pixels. Stage G only verifies a live frame flow;
- * a later inference bridge may consume explicitly requested transient frames behind the same policy.
+ * foreground service and pass that one session result. The service is non-sticky and never persists
+ * the result Intent. Continuous frames are closed immediately. Stage H may encode exactly one frame
+ * only after AssistantVisualContextRuntime contains an explicit one-shot SCREEN request.
  */
 class AssistantScreenShareService : Service() {
     private val projectionManager by lazy {
@@ -120,8 +121,32 @@ class AssistantScreenShareService : Service() {
         reader.setOnImageAvailableListener({ source ->
             val image = runCatching { source.acquireLatestImage() }.getOrNull()
             if (image != null) {
-                AssistantObservationRuntime.screenFrameObserved()
-                image.close()
+                try {
+                    AssistantObservationRuntime.screenFrameObserved()
+                    val requestId = AssistantVisualContextRuntime.claimCapture(AssistantObservationSource.SCREEN)
+                    if (requestId != null) {
+                        val encoded = runCatching {
+                            AssistantVisualFrameEncoder.encodeScreenImage(image)
+                        }.getOrNull()
+                        if (encoded == null) {
+                            AssistantVisualContextRuntime.fail(
+                                requestId,
+                                "Der angeforderte Bildschirm-Kontextframe konnte nicht komprimiert werden",
+                            )
+                        } else {
+                            AssistantVisualContextRuntime.publishJpeg(
+                                requestId = requestId,
+                                source = AssistantObservationSource.SCREEN,
+                                width = encoded.width,
+                                height = encoded.height,
+                                rotationDegrees = encoded.rotationDegrees,
+                                jpegBytes = encoded.bytes,
+                            )
+                        }
+                    }
+                } finally {
+                    image.close()
+                }
             }
         }, handler)
 
