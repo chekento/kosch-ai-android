@@ -7,7 +7,6 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -32,18 +31,42 @@ class AssistantObservationManifestInstrumentationTest {
     }
 
     @Test
-    fun observationPermissionBudget_containsCameraAndProjectionButNoMicOrInternet() {
+    fun observationPermissionBudget_isExplicitAndForbidsSensitiveExpansion() {
         val packageInfo = context.packageManager.getPackageInfo(
             context.packageName,
             PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong()),
         )
         val requested = packageInfo.requestedPermissions.orEmpty().toSet()
 
-        assertTrue(Manifest.permission.CAMERA in requested)
-        assertTrue(Manifest.permission.FOREGROUND_SERVICE in requested)
-        assertTrue(Manifest.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION in requested)
-        assertFalse(Manifest.permission.RECORD_AUDIO in requested)
+        val required = setOf(
+            Manifest.permission.ACCESS_NETWORK_STATE,
+            Manifest.permission.CAMERA,
+            Manifest.permission.FOREGROUND_SERVICE,
+            Manifest.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION,
+        )
+        val debugOnlyAllowed = setOf(Manifest.permission.DUMP)
+        val forbidden = setOf(
+            Manifest.permission.INTERNET,
+            Manifest.permission.RECORD_AUDIO,
+            Manifest.permission.ACCESS_FINE_LOCATION,
+            Manifest.permission.ACCESS_COARSE_LOCATION,
+            Manifest.permission.READ_CONTACTS,
+            Manifest.permission.WRITE_CONTACTS,
+            Manifest.permission.READ_CALL_LOG,
+            Manifest.permission.WRITE_CALL_LOG,
+            Manifest.permission.READ_SMS,
+            Manifest.permission.SEND_SMS,
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.QUERY_ALL_PACKAGES,
+        )
+
+        assertTrue("Missing required observation permissions: ${required - requested}", requested.containsAll(required))
+        assertTrue(
+            "Unexpected permission expansion in debug APK: ${requested - required - debugOnlyAllowed}",
+            requested.all { it in required || it in debugOnlyAllowed },
+        )
+        assertTrue("Forbidden observation permissions requested: ${requested intersect forbidden}", (requested intersect forbidden).isEmpty())
         assertFalse(Manifest.permission.INTERNET in requested)
-        assertEquals(4, requested.size)
+        assertFalse(Manifest.permission.RECORD_AUDIO in requested)
     }
 }
