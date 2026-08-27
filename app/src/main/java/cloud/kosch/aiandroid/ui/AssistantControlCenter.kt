@@ -31,6 +31,7 @@ import cloud.kosch.aiandroid.AssistantAgentController
 import cloud.kosch.aiandroid.AssistantSessionController
 import cloud.kosch.aiandroid.AssistantVoiceController
 import cloud.kosch.aiandroid.ai.AssistantCharacterCatalog
+import cloud.kosch.aiandroid.ai.AssistantWakeWordResolver
 import cloud.kosch.aiandroid.model.AssistantAgentState
 import cloud.kosch.aiandroid.model.AssistantObservationSource
 import cloud.kosch.aiandroid.model.AssistantPresenceMode
@@ -56,9 +57,18 @@ fun AssistantControlCenter(
     val requiredGender = character.voiceGender
     val assignedVoice = voice.assignedVoice(requiredGender)
     val locale = Locale.getDefault()
-    val voiceOptions = remember(voice.availableVoices, locale) {
-        prioritizeVoices(voice.availableVoices, locale).take(MAX_VISIBLE_VOICES)
+    val reservedOppositeVoice = when (requiredGender) {
+        AssistantVoiceGender.FEMALE -> voice.assignments.maleVoiceName
+        AssistantVoiceGender.MALE -> voice.assignments.femaleVoiceName
+        AssistantVoiceGender.NEUTRAL -> null
     }
+    val voiceOptions = remember(voice.availableVoices, locale, requiredGender, reservedOppositeVoice) {
+        prioritizeVoices(
+            voice.availableVoices.filterNot { it.name == reservedOppositeVoice },
+            locale,
+        ).take(MAX_VISIBLE_VOICES)
+    }
+    val effectiveWakeWord = AssistantWakeWordResolver.resolve(agent.preferences, character)
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
@@ -101,8 +111,8 @@ fun AssistantControlCenter(
 
         item {
             ControlSection(
-                title = "Charakter",
-                body = "Darstellung und Stimme wechseln; Provider, Rechte und Chat werden nicht mit dem Avatar gekoppelt.",
+                title = "Charakter & Name",
+                body = "Darstellung, Rufname und Stimme wechseln; Provider, Rechte und Chat werden nicht mit dem Avatar gekoppelt.",
             ) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(AssistantCharacterCatalog.all(), key = { it.id }) { profile ->
@@ -116,6 +126,17 @@ fun AssistantControlCenter(
                         )
                     }
                 }
+                OutlinedTextField(
+                    value = agent.preferences.assistantName,
+                    onValueChange = agent::setAssistantName,
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Name des Assistenten") },
+                    placeholder = { Text(character.displayName) },
+                    supportingText = {
+                        Text("Dieser Rufname wird bei Wake Word = Assistentenname verwendet.")
+                    },
+                )
                 Text(
                     "Aktiv: ${character.displayName} · Stimme ${voiceGenderLabel(requiredGender)}",
                     color = MutedMist,
@@ -141,9 +162,13 @@ fun AssistantControlCenter(
                     style = MaterialTheme.typography.bodySmall,
                 )
 
+                voice.statusMessage?.let { message ->
+                    Text(message, color = Warm, style = MaterialTheme.typography.bodySmall)
+                }
+
                 if (voiceOptions.isEmpty()) {
                     Text(
-                        "Android TTS meldet noch keine auswählbaren Stimmen.",
+                        "Android TTS meldet noch keine passenden auswählbaren Stimmen.",
                         color = MutedMist,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -186,6 +211,13 @@ fun AssistantControlCenter(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+                if (requiredGender != AssistantVoiceGender.NEUTRAL) {
+                    Text(
+                        "Die Zuordnung erfolgt bewusst nach Probehören, weil Android TTS kein verlässliches plattformweites Geschlechtsmerkmal für Stimmen liefert.",
+                        color = MutedMist,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
         }
 
@@ -209,7 +241,7 @@ fun AssistantControlCenter(
         item {
             ControlSection(
                 title = "Wake Word",
-                body = "Standardmäßig aus. „Computer“, Charaktername oder ein eigenes Wake Word sind möglich.",
+                body = "Standardmäßig aus. „Computer“, Assistentenname oder ein eigenes Wake Word sind möglich.",
             ) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(AssistantWakeWordMode.entries, key = { it.name }) { mode ->
@@ -227,8 +259,14 @@ fun AssistantControlCenter(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         label = { Text("Eigenes Wake Word") },
+                        supportingText = { Text("Mindestens 2 Zeichen; Entwürfe bleiben speicherbar.") },
                     )
                 }
+                Text(
+                    if (effectiveWakeWord == null) "Aktivierung: AUS / noch ungültig" else "Aktivierung: „$effectiveWakeWord“",
+                    color = if (agent.preferences.wakeWordMode != AssistantWakeWordMode.OFF && effectiveWakeWord == null) Warm else MutedMist,
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 ControlToggleRow(
                     title = "Wake Word lokal erkennen",
                     body = "Audio für die Aktivierung nicht an einen Netzwerkprovider senden.",
@@ -380,7 +418,7 @@ private fun presenceLabel(mode: AssistantPresenceMode): String = when (mode) {
 private fun wakeWordLabel(mode: AssistantWakeWordMode): String = when (mode) {
     AssistantWakeWordMode.OFF -> "Aus"
     AssistantWakeWordMode.COMPUTER -> "Computer"
-    AssistantWakeWordMode.ASSISTANT_NAME -> "Charaktername"
+    AssistantWakeWordMode.ASSISTANT_NAME -> "Assistentenname"
     AssistantWakeWordMode.CUSTOM -> "Eigenes"
 }
 
