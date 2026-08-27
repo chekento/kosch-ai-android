@@ -35,9 +35,11 @@ The patch is intentionally narrow:
 
 The intended Android implementation of `SocketProtector.Protect(fd)` is `VpnService.protect(fd)`. The app-side `StrictVpnSocketProtectorBridge` rejects negative/oversized descriptors and converts exceptions into `false`.
 
-## Offline build
+## Offline build contract
 
-The build script does **not** clone or download anything. Supply a clean local checkout whose HEAD is the pinned commit and pre-install:
+The build script does **not** clone or download anything. It also refuses to emit offline evidence unless its caller has placed it inside a dedicated Linux network namespace that contains only the loopback interface and no IP routes. This makes `network_during_build=false` an enforced condition rather than a label inferred from Go environment variables.
+
+Supply a clean local checkout whose HEAD is the pinned commit and pre-install:
 
 - Go `go1.26.3`;
 - `gomobile` from x/mobile `v0.0.0-20260821190718-4776eadac327`;
@@ -46,11 +48,9 @@ The build script does **not** clone or download anything. Supply a clean local c
 - Android SDK platform 29 required by gomobile;
 - a Go module cache containing tun2socks and x/mobile dependencies.
 
-```bash
-tools/n2-tun2socks-poc/build-pinned-aar.sh /path/to/tun2socks-v2.7.0
-```
+The controlled GitHub evidence workflow supplies the required namespace automatically. A direct local invocation must provide an equivalent isolated namespace and set `KOSCH_NETWORK_NAMESPACE_ISOLATED=1`; setting that variable without the required interface/route state still fails the builder.
 
-Before the module graph is touched inside the actual builder, the script forces:
+Before the module graph is touched inside the actual builder, the script additionally forces:
 
 ```text
 GOPROXY=off
@@ -64,7 +64,7 @@ The output directory contains:
 - `tun2socks-kosch-v2.7.0-poc.aar`
 - `tun2socks-kosch-v2.7.0-poc.evidence`
 
-The evidence report records the upstream commit, Go version, x/mobile pseudo-version and reviewed full-commit mapping, NDK revision, detected gomobile/gobind module versions, SHA-256 of both tool binaries, KoSch patch and generated AAR, plus the containment flags used by `Tun2SocksOfflinePocContract`.
+The evidence report records the upstream commit, Go version, x/mobile pseudo-version and reviewed full-commit mapping, NDK revision, detected gomobile/gobind module versions, SHA-256 of both tool binaries, KoSch patch and generated AAR, plus the containment flags used by `Tun2SocksOfflinePocContract`. Evidence format v5 also records `network_namespace_isolated=true`.
 
 ## Controlled evidence workflow
 
@@ -73,7 +73,9 @@ The evidence report records the upstream commit, Go version, x/mobile pseudo-ver
 It separates the run into two security zones:
 
 1. **networked preparation** — downloads a checksum-pinned official Go `1.26.3` Linux toolchain, installs the exact NDK, checks out the exact tun2socks commit, installs the exact x/mobile pseudo-version and pre-populates all required Go modules;
-2. **offline build** — invokes `build-pinned-aar.sh` with `GOPROXY=off` and `GOSUMDB=off`, validates the emitted evidence and archives the AAR plus SHA-256 manifests.
+2. **isolated build** — creates a fresh Linux network namespace with only `lo` and no route, invokes `build-pinned-aar.sh` with `GOPROXY=off` and `GOSUMDB=off`, validates the emitted evidence and archives the AAR plus SHA-256 manifests.
+
+Before networked preparation is allowed to become packaging evidence, the workflow also checks the current KoSch application itself: production source/Gradle surfaces must contain no tun2socks/koschmobile integration marker, `debugRuntimeClasspath` must not contain the forwarder, and Android's generated merged debug manifest must remain free of `android.permission.INTERNET`. The workflow therefore cannot truthfully emit `runtime_integrated=false` merely because one selected Kotlin source file happened not to contain a builder call.
 
 The uploaded evidence directory contains the AAR, offline report, network-preparation report and `SHA256SUMS`. The checksum manifest deliberately contains **relative filenames only**. A reviewer can therefore download and extract the artifact anywhere and independently verify it from inside that directory:
 
