@@ -7,12 +7,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import cloud.kosch.aiandroid.ai.AiHubCatalog
 import cloud.kosch.aiandroid.ai.AiHubContextPolicy
+import cloud.kosch.aiandroid.ai.AiHubDecisionPolicy
 import cloud.kosch.aiandroid.ai.AiHubEntry
 import cloud.kosch.aiandroid.ai.AiHubEntryKind
 import cloud.kosch.aiandroid.ai.AiHubLaunchPlan
 import cloud.kosch.aiandroid.ai.AiHubLaunchPlanner
 import cloud.kosch.aiandroid.ai.AiHubPreferencePolicy
 import cloud.kosch.aiandroid.ai.AiHubRecommendation
+import cloud.kosch.aiandroid.ai.AiHubRouteDecision
 import cloud.kosch.aiandroid.ai.AiHubRoutingContext
 import cloud.kosch.aiandroid.ai.AiHubShortcutRoutePolicy
 import cloud.kosch.aiandroid.ai.AiHubTaskIntent
@@ -35,7 +37,8 @@ import cloud.kosch.aiandroid.system.SystemActionGateway
  * undocumented prompt injection.
  *
  * Routing order is deliberate: semantic task -> privacy-minimal local context -> valid device-local preference ->
- * published Android shortcut / normal safe Android route. Context never grants a capability or observation right.
+ * confidence explanation -> published Android shortcut / normal safe Android route. Context never grants a capability
+ * or observation right, and confidence never changes the underlying ranking.
  */
 class AiHubController(context: Context) {
     private val appContext = context.applicationContext
@@ -75,7 +78,11 @@ class AiHubController(context: Context) {
             .take(limit)
     }
 
-    fun bestRecommendation(apps: List<LaunchableApp>): AiHubRecommendation? = recommendations(apps, 1).firstOrNull()
+    fun routeDecision(apps: List<LaunchableApp>): AiHubRouteDecision? =
+        AiHubDecisionPolicy.decide(recommendations(apps))
+
+    fun bestRecommendation(apps: List<LaunchableApp>): AiHubRecommendation? =
+        routeDecision(apps)?.primary
 
     fun inferredTask(): AiHubTaskIntent = AiHubTaskRouter.infer(prompt)
 
@@ -131,20 +138,25 @@ class AiHubController(context: Context) {
             .firstOrNull()
     }
 
-    /** Executes the top safe route now. A stale published shortcut falls back to the normal Android launch plan. */
-    fun executeBestRoute(apps: List<LaunchableApp>): Boolean {
-        val recommendation = bestRecommendation(apps) ?: return false
+    /** Executes any ranked recommendation through the same official shortcut -> safe Android fallback chain. */
+    fun executeRecommendation(recommendation: AiHubRecommendation): Boolean {
         val entry = recommendation.entry
         val shortcut = bestPublishedShortcut(entry)
         if (shortcut != null) {
             val shortcutResult = launchPublishedShortcut(shortcut)
             if (shortcutResult.isSuccess) {
-                notice = "${shortcut.label} als beste Route für ${recommendation.intent.title} geöffnet"
+                notice = "${shortcut.label} für ${recommendation.intent.title} geöffnet"
                 return true
             }
         }
         execute(entry)
         return true
+    }
+
+    /** Executes the top safe route now. A stale published shortcut falls back to the normal Android launch plan. */
+    fun executeBestRoute(apps: List<LaunchableApp>): Boolean {
+        val recommendation = routeDecision(apps)?.primary ?: return false
+        return executeRecommendation(recommendation)
     }
 
     fun open(
