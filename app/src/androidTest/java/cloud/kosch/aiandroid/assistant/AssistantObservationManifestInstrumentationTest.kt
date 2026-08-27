@@ -44,7 +44,10 @@ class AssistantObservationManifestInstrumentationTest {
             Manifest.permission.FOREGROUND_SERVICE,
             Manifest.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION,
         )
-        val debugOnlyAllowed = setOf(Manifest.permission.DUMP)
+        val toolingAndFrameworkAllowed = setOf(
+            Manifest.permission.DUMP,
+            "${context.packageName}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+        )
         val forbidden = setOf(
             Manifest.permission.INTERNET,
             Manifest.permission.RECORD_AUDIO,
@@ -62,8 +65,8 @@ class AssistantObservationManifestInstrumentationTest {
 
         assertTrue("Missing required observation permissions: ${required - requested}", requested.containsAll(required))
         assertTrue(
-            "Unexpected permission expansion in debug APK: ${requested - required - debugOnlyAllowed}",
-            requested.all { it in required || it in debugOnlyAllowed },
+            "Unexpected permission expansion in debug APK: ${requested - required - toolingAndFrameworkAllowed}",
+            requested.all { it in required || it in toolingAndFrameworkAllowed },
         )
         assertTrue("Forbidden observation permissions requested: ${requested intersect forbidden}", (requested intersect forbidden).isEmpty())
         assertFalse(Manifest.permission.INTERNET in requested)
