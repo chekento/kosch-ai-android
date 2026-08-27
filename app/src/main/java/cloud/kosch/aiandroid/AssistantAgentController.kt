@@ -53,7 +53,7 @@ class AssistantAgentController(context: Context) {
     }
 
     fun setAssistantName(name: String) {
-        updatePreferences(preferences.copy(assistantName = name.trim().take(32)))
+        updatePreferences(preferences.copy(assistantName = name.take(32)))
     }
 
     fun setPresenceMode(mode: AssistantPresenceMode) {
@@ -65,7 +65,7 @@ class AssistantAgentController(context: Context) {
         updatePreferences(
             preferences.copy(
                 wakeWordMode = mode,
-                customWakeWord = customWakeWord.trim(),
+                customWakeWord = customWakeWord.take(32),
             ),
         )
     }
