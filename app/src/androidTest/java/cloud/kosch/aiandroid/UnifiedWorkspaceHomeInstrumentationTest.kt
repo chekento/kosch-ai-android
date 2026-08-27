@@ -1,7 +1,6 @@
 package cloud.kosch.aiandroid
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -22,7 +21,7 @@ class UnifiedWorkspaceHomeInstrumentationTest {
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun userHomePage_rendersCompanionKeepsHomeAcrossDrawerAndSurvivesRecreation() {
+    fun userHomePage_keepsCoreEntryPointsAcrossDrawerAndSurvivesRecreation() {
         composeTestRule.waitForIdle()
         dismissOnboardingIfVisible()
 
@@ -51,16 +50,17 @@ class UnifiedWorkspaceHomeInstrumentationTest {
                 .onNodeWithContentDescription("App, Ordner oder Seite hinzufügen", useUnmergedTree = true)
                 .fetchSemanticsNode()
 
-            val enabledAssistantNodes = composeTestRule
-                .onAllNodesWithContentDescription("KoSch Assistent öffnen", useUnmergedTree = true)
-                .fetchSemanticsNodes()
-            val disabledAssistantNodes = composeTestRule
-                .onAllNodesWithText("Assistant aus", useUnmergedTree = true)
-                .fetchSemanticsNodes()
-            assertTrue(
-                "Expected enabled or disabled Assistant entry on unified Home",
-                enabledAssistantNodes.isNotEmpty() || disabledAssistantNodes.isNotEmpty(),
-            )
+            // PR #41 is intentionally independent from the separate Assistant runtime track.
+            // The durable Home contract is therefore the launcher-owned Apps + Ask/voice entry path.
+            composeTestRule
+                .onNodeWithContentDescription("Alle Apps", useUnmergedTree = true)
+                .fetchSemanticsNode()
+            composeTestRule
+                .onNodeWithText("⌘ Ask", useUnmergedTree = true)
+                .fetchSemanticsNode()
+            composeTestRule
+                .onNodeWithContentDescription("Spracheingabe", useUnmergedTree = true)
+                .fetchSemanticsNode()
 
             composeTestRule
                 .onNodeWithContentDescription("Alle Apps", useUnmergedTree = true)
@@ -86,6 +86,12 @@ class UnifiedWorkspaceHomeInstrumentationTest {
             assertTextPresent("API36 Home Test")
             composeTestRule
                 .onNodeWithText("App fehlt", useUnmergedTree = true)
+                .fetchSemanticsNode()
+            composeTestRule
+                .onNodeWithText("⌘ Ask", useUnmergedTree = true)
+                .fetchSemanticsNode()
+            composeTestRule
+                .onNodeWithContentDescription("Spracheingabe", useUnmergedTree = true)
                 .fetchSemanticsNode()
         } finally {
             composeTestRule.runOnUiThread {
