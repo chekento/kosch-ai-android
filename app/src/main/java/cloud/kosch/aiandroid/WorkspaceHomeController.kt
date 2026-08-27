@@ -13,6 +13,7 @@ import cloud.kosch.aiandroid.model.WorkspaceItemContent
 import cloud.kosch.aiandroid.model.WorkspacePage
 import cloud.kosch.aiandroid.model.WorkspacePageEditor
 import cloud.kosch.aiandroid.model.WorkspaceWidgetEditor
+import java.lang.ref.WeakReference
 import java.util.UUID
 
 /**
@@ -22,10 +23,17 @@ import java.util.UUID
  * records are kept in a separate local store, so duplicate/restore operations cannot accidentally copy
  * a device-bound appWidgetId into another page or device.
  */
-class WorkspaceHomeController(context: Context) {
+class WorkspaceHomeController(
+    context: Context,
+    registerAsActive: Boolean = true,
+) {
     private val store = WorkspaceStore(context.applicationContext)
     private val widgetBindingStore = WorkspaceWidgetBindingStore(context.applicationContext)
     private var undoDocument: WorkspaceDocument? = null
+
+    init {
+        if (registerAsActive) activeController = WeakReference(this)
+    }
 
     var document by mutableStateOf(store.loadWorkspaceDocument().normalized())
         private set
@@ -396,5 +404,17 @@ class WorkspaceHomeController(context: Context) {
         document = normalized
         message?.let { statusMessage = it }
         return true
+    }
+
+    companion object {
+        private var activeController: WeakReference<WorkspaceHomeController>? = null
+
+        /**
+         * Refreshes the active launcher controller after another in-process component committed Workspace state.
+         * A weak reference avoids extending the controller lifetime; after process death normal persisted restore wins.
+         */
+        fun notifyPersistedChange() {
+            activeController?.get()?.reload()
+        }
     }
 }
