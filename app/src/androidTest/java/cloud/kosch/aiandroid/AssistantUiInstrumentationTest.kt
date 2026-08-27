@@ -1,6 +1,7 @@
 package cloud.kosch.aiandroid
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -57,19 +58,17 @@ class AssistantUiInstrumentationTest {
 
     private fun openAssistant() {
         val setupNodes = composeTestRule
-            .onAllNodesWithText("", useUnmergedTree = true)
+            .onAllNodesWithContentDescription("KoSch Assistant einrichten", useUnmergedTree = true)
             .fetchSemanticsNodes()
-        runCatching {
+        if (setupNodes.isNotEmpty()) {
             composeTestRule
                 .onNodeWithContentDescription("KoSch Assistant einrichten", useUnmergedTree = true)
                 .performClick()
-        }.recoverCatching {
+        } else {
             composeTestRule
                 .onNodeWithContentDescription("KoSch Assistant öffnen", useUnmergedTree = true)
                 .performClick()
-        }.getOrThrow()
-        @Suppress("UNUSED_VARIABLE")
-        val keepSemanticsWarm = setupNodes
+        }
         composeTestRule.waitForIdle()
     }
 
