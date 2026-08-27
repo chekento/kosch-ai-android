@@ -1,6 +1,8 @@
 package cloud.kosch.aiandroid
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,9 +29,12 @@ import kotlin.math.sqrt
 class AssistantSessionController(context: Context) {
     private val store = AssistantStore(context.applicationContext)
     private val localCore = AssistantLocalCore()
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var nextMessageId = 1L
     private var activeSpeechText = ""
     private var visualStateAfterSpeech = AssistantVisualState.IDLE
+    private var lastVisualReadyRequestId = -1L
+    private var lastVisualFailureGeneration = -1L
 
     var settings by mutableStateOf(store.load())
         private set
@@ -50,6 +55,12 @@ class AssistantSessionController(context: Context) {
     var attentionSignal by mutableStateOf(AssistantAttentionSignal.Idle)
         private set
 
+    init {
+        AssistantVisualContextRuntime.setEventListener { event ->
+            mainHandler.post { handleVisualContextEvent(event) }
+        }
+    }
+
     fun open() {
         sheetVisible = true
     }
@@ -65,7 +76,10 @@ class AssistantSessionController(context: Context) {
         updateSettings(settings.copy(enabled = enabled))
         awaitingVoice = false
         clearSpeechSignal()
-        if (!enabled) attentionSignal = AssistantAttentionSignal.Idle
+        if (!enabled) {
+            attentionSignal = AssistantAttentionSignal.Idle
+            AssistantVisualContextRuntime.discard()
+        }
         visualState = if (enabled) AssistantVisualState.IDLE else AssistantVisualState.DISABLED
         if (enabled && messages.isEmpty()) {
             append(
@@ -109,7 +123,14 @@ class AssistantSessionController(context: Context) {
         handoffPrompt = null
         clearSpeechSignal()
         attentionSignal = AssistantAttentionSignal.Idle
+        AssistantVisualContextRuntime.discard()
         visualState = if (settings.enabled) AssistantVisualState.IDLE else AssistantVisualState.DISABLED
+    }
+
+    fun close() {
+        AssistantVisualContextRuntime.setEventListener(null)
+        AssistantVisualContextRuntime.discard()
+        mainHandler.removeCallbacksAndMessages(null)
     }
 
     fun requestVoice(requestVoiceInput: () -> Unit) {
@@ -232,7 +253,8 @@ class AssistantSessionController(context: Context) {
     }
 
     fun visualContextReady(metadata: AssistantVisualContextRuntime.Metadata) {
-        if (!settings.enabled) return
+        if (!settings.enabled || metadata.requestId == lastVisualReadyRequestId) return
+        lastVisualReadyRequestId = metadata.requestId
         val source = when (metadata.source) {
             AssistantObservationSource.SCREEN -> "Bildschirm"
             AssistantObservationSource.CAMERA -> "Kamera"
@@ -245,8 +267,9 @@ class AssistantSessionController(context: Context) {
         visualState = AssistantVisualState.IDLE
     }
 
-    fun visualContextFailed(message: String) {
-        if (!settings.enabled) return
+    fun visualContextFailed(message: String, eventGeneration: Long = -1L) {
+        if (!settings.enabled || eventGeneration == lastVisualFailureGeneration) return
+        lastVisualFailureGeneration = eventGeneration
         append(
             AssistantMessageRole.ASSISTANT,
             "Der visuelle Kontextframe ist fehlgeschlagen: ${message.take(240)}",
@@ -319,6 +342,16 @@ class AssistantSessionController(context: Context) {
         if (!matchesActiveSpeech(utteranceId)) return
         clearSpeechSignal()
         if (settings.enabled) visualState = AssistantVisualState.ERROR
+    }
+
+    private fun handleVisualContextEvent(event: AssistantVisualContextRuntime.Event) {
+        when (event.status) {
+            AssistantVisualContextRuntime.Status.READY -> event.metadata?.let(::visualContextReady)
+            AssistantVisualContextRuntime.Status.FAILED -> event.failureMessage?.let { message ->
+                visualContextFailed(message, event.generation)
+            }
+            else -> Unit
+        }
     }
 
     private fun requestActiveVisualContext(requestedSource: AssistantObservationSource?): Boolean {
