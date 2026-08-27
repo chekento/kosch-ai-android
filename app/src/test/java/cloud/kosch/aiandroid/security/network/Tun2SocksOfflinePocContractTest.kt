@@ -15,6 +15,7 @@ class Tun2SocksOfflinePocContractTest {
         xMobileCommit = Tun2SocksOfflinePocContract.X_MOBILE_COMMIT,
         gomobileModuleVersion = Tun2SocksOfflinePocContract.X_MOBILE_VERSION,
         gobindModuleVersion = Tun2SocksOfflinePocContract.X_MOBILE_VERSION,
+        ndkVersion = Tun2SocksOfflinePocContract.NDK_VERSION,
         gomobileSha256 = digest,
         gobindSha256 = digest,
         patchSha256 = digest,
@@ -52,6 +53,7 @@ class Tun2SocksOfflinePocContractTest {
                 xMobileCommit = "0".repeat(40),
                 gomobileModuleVersion = "v0.0.0-other",
                 gobindModuleVersion = "v0.0.0-other",
+                ndkVersion = "99.0.0",
             ),
         )
 
@@ -62,6 +64,7 @@ class Tun2SocksOfflinePocContractTest {
         assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.X_MOBILE_COMMIT_DRIFT))
         assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.GOMOBILE_MODULE_DRIFT))
         assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.GOBIND_MODULE_DRIFT))
+        assertTrue(result.blockers.contains(Tun2SocksOfflinePocBlocker.NDK_TOOLCHAIN_DRIFT))
     }
 
     @Test

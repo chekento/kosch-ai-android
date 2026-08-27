@@ -10,11 +10,13 @@ class Tun2SocksOfflinePocRepositoryContractTest {
         .firstOrNull { File(it, "settings.gradle.kts").isFile }
         ?: error("Repository root not found from ${System.getProperty("user.dir")}")
 
-    private fun pocFile(relativePath: String): String {
-        val file = File(repositoryRoot(), "tools/n2-tun2socks-poc/$relativePath")
-        assertTrue("Missing POC file: ${file.path}", file.isFile)
+    private fun repositoryFile(relativePath: String): String {
+        val file = File(repositoryRoot(), relativePath)
+        assertTrue("Missing repository file: ${file.path}", file.isFile)
         return file.readText()
     }
+
+    private fun pocFile(relativePath: String): String = repositoryFile("tools/n2-tun2socks-poc/$relativePath")
 
     @Test
     fun sourceLock_isExactAndRuntimeInert() {
@@ -23,8 +25,10 @@ class Tun2SocksOfflinePocRepositoryContractTest {
         assertTrue(lock.contains("version=${Tun2SocksOfflinePocContract.UPSTREAM_VERSION}"))
         assertTrue(lock.contains("commit=${Tun2SocksOfflinePocContract.UPSTREAM_COMMIT}"))
         assertTrue(lock.contains("go_version=${Tun2SocksOfflinePocContract.GO_VERSION}"))
+        assertTrue(lock.contains("go_linux_amd64_sha256=2b2cfc7148493da5e73981bffbf3353af381d5f93e789c82c79aff64962eb556"))
         assertTrue(lock.contains("x_mobile_version=${Tun2SocksOfflinePocContract.X_MOBILE_VERSION}"))
         assertTrue(lock.contains("x_mobile_commit=${Tun2SocksOfflinePocContract.X_MOBILE_COMMIT}"))
+        assertTrue(lock.contains("ndk_version=${Tun2SocksOfflinePocContract.NDK_VERSION}"))
         assertTrue(lock.contains("android_min_api=${Tun2SocksOfflinePocContract.ANDROID_MIN_API}"))
         assertTrue(lock.contains("runtime_integration=false"))
         assertTrue(lock.contains("network_during_build=false"))
@@ -53,18 +57,25 @@ class Tun2SocksOfflinePocRepositoryContractTest {
     }
 
     @Test
-    fun builder_isPinnedOfflineAndBindsOnlyFacade() {
+    fun builder_isPinnedNetworkIsolatedAndBindsOnlyFacade() {
         val script = pocFile("build-pinned-aar.sh")
 
         assertTrue(script.contains(Tun2SocksOfflinePocContract.UPSTREAM_COMMIT))
         assertTrue(script.contains(Tun2SocksOfflinePocContract.X_MOBILE_VERSION))
         assertTrue(script.contains(Tun2SocksOfflinePocContract.X_MOBILE_COMMIT))
+        assertTrue(script.contains(Tun2SocksOfflinePocContract.NDK_VERSION))
+        assertTrue(script.contains("ANDROID_NDK_HOME"))
+        assertTrue(script.contains("Pkg.Revision"))
         assertTrue(script.contains("X_MOBILE_REV_SUFFIX"))
         assertTrue(script.contains("x_mobile_commit="))
+        assertTrue(script.contains("ndk_version="))
         assertTrue(script.contains("GOPROXY=off"))
         assertTrue(script.contains("GOSUMDB=off"))
+        assertTrue(script.contains("KOSCH_NETWORK_NAMESPACE_ISOLATED"))
+        assertTrue(script.contains("find /sys/class/net"))
+        assertTrue(script.contains("network_namespace_isolated=true"))
         assertTrue(script.contains("apply --check"))
-        assertTrue(script.contains("for tool in git go gomobile gobind sha256sum unzip jar"))
+        assertTrue(script.contains("for tool in git go gomobile gobind sha256sum unzip jar awk grep"))
         assertTrue(script.contains("go mod edit -require="))
         assertTrue(script.contains("go list -mod=mod golang.org/x/mobile/bind"))
         assertTrue(script.contains("go test -run '^$' ./engine ./koschmobile"))
@@ -88,5 +99,47 @@ class Tun2SocksOfflinePocRepositoryContractTest {
         assertTrue(script.contains("runtime_integrated=false"))
         assertTrue(script.contains("vpn_established=false"))
         assertTrue(script.contains("internet_permission_added=false"))
+    }
+
+    @Test
+    fun evidenceWorkflow_isManualAndSeparatesOnlinePreparationFromIsolatedBuild() {
+        val workflow = repositoryFile(".github/workflows/n2-forwarder-poc.yml")
+
+        assertTrue(workflow.contains("workflow_dispatch:"))
+        assertFalse(workflow.contains("pull_request:"))
+        assertFalse(workflow.contains("push:"))
+        assertTrue(workflow.contains(Tun2SocksOfflinePocContract.UPSTREAM_COMMIT))
+        assertTrue(workflow.contains(Tun2SocksOfflinePocContract.X_MOBILE_VERSION))
+        assertTrue(workflow.contains(Tun2SocksOfflinePocContract.NDK_VERSION))
+        assertTrue(workflow.contains("GO_LINUX_AMD64_SHA256"))
+        assertTrue(workflow.contains("Prepare networked dependency cache"))
+        assertTrue(workflow.contains("Run pinned builder in isolated network namespace"))
+        assertTrue(workflow.contains("sudo -E unshare --net"))
+        assertTrue(workflow.contains("KOSCH_NETWORK_NAMESPACE_ISOLATED=1"))
+        assertTrue(workflow.contains("GOPROXY: off"))
+        assertTrue(workflow.contains("GOSUMDB: off"))
+        assertTrue(workflow.contains("Verify dependency graph and merged manifest remain inert"))
+        assertTrue(workflow.contains(":app:dependencies --configuration debugRuntimeClasspath"))
+        assertTrue(workflow.contains(":app:processDebugMainManifest"))
+        assertTrue(workflow.contains("android.permission.INTERNET"))
+        assertTrue(workflow.contains("runtime_integrated=false"))
+        assertTrue(workflow.contains("vpn_established=false"))
+        assertTrue(workflow.contains("internet_permission_added=false"))
+    }
+
+    @Test
+    fun evidenceWorkflow_emitsRelocatableChecksumManifest() {
+        val workflow = repositoryFile(".github/workflows/n2-forwarder-poc.yml")
+
+        assertTrue(workflow.contains("cd \"\$out_dir\""))
+        assertTrue(workflow.contains("\"tun2socks-kosch-v2.7.0-poc.aar\""))
+        assertTrue(workflow.contains("\"tun2socks-kosch-v2.7.0-poc.evidence\""))
+        assertTrue(workflow.contains("\"n2-preparation.evidence\" > SHA256SUMS"))
+        assertTrue(workflow.contains("sha256sum -c SHA256SUMS"))
+        assertFalse(
+            workflow.contains(
+                "sha256sum \"\$artifact\" \"\$report\" \"\$out_dir/n2-preparation.evidence\"",
+            ),
+        )
     }
 }

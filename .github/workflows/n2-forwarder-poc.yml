@@ -1,0 +1,226 @@
+name: N2 Forwarder POC Evidence
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: n2-forwarder-poc-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  TUN2SOCKS_COMMIT: 8dda19e8e4613e014f0b12f3e624fdff5e5f23b3
+  GO_VERSION: 1.26.3
+  GO_LINUX_AMD64_SHA256: 2b2cfc7148493da5e73981bffbf3353af381d5f93e789c82c79aff64962eb556
+  X_MOBILE_VERSION: v0.0.0-20260821190718-4776eadac327
+  NDK_VERSION: 28.2.13676358
+
+jobs:
+  build-evidence:
+    name: Build pinned traffic-inert AAR evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out KoSch repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Require default-branch evidence run
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF" = "refs/heads/main" || {
+            echo "N2 POC evidence may only be produced from main; got $GITHUB_REF" >&2
+            exit 1
+          }
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+
+      - name: Verify source-level launcher runtime remains inert
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '^runtime_integration=false$' tools/n2-tun2socks-poc/source.lock
+          grep -q '^network_during_build=false$' tools/n2-tun2socks-poc/source.lock
+          ! grep -q 'android.permission.INTERNET' app/src/main/AndroidManifest.xml
+
+          if grep -R -n -E \
+            --include='*.kt' --include='*.java' --include='*.kts' \
+            'koschmobile|tun2socks|xjasonlyu' \
+            app/src/main app/build.gradle.kts build.gradle.kts settings.gradle.kts gradle 2>/dev/null; then
+            echo "N2 runtime integration marker found in production Android/Gradle surface" >&2
+            exit 1
+          fi
+
+      - name: Install checksum-pinned Go toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/go${GO_VERSION}.linux-amd64.tar.gz"
+          curl --fail --silent --show-error --location \
+            "https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
+            --output "$archive"
+          printf '%s  %s\n' "$GO_LINUX_AMD64_SHA256" "$archive" | sha256sum -c -
+          sudo rm -rf /usr/local/go
+          sudo tar -C /usr/local -xzf "$archive"
+          echo "/usr/local/go/bin" >> "$GITHUB_PATH"
+          /usr/local/go/bin/go version
+
+      - name: Install pinned Android NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v sdkmanager >/dev/null
+          sdkmanager "platforms;android-29" "build-tools;36.0.0" "ndk;${NDK_VERSION}"
+          ndk_home="$ANDROID_HOME/ndk/$NDK_VERSION"
+          test -f "$ndk_home/source.properties"
+          grep -Eq "Pkg.Revision[[:space:]]*=[[:space:]]*${NDK_VERSION}$" "$ndk_home/source.properties"
+          echo "ANDROID_NDK_HOME=$ndk_home" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ndk_home" >> "$GITHUB_ENV"
+
+      - name: Verify dependency graph and merged manifest remain inert
+        shell: bash
+        run: |
+          set -euo pipefail
+          dependency_report="$RUNNER_TEMP/debug-runtime-dependencies.txt"
+          ./gradlew :app:dependencies --configuration debugRuntimeClasspath > "$dependency_report"
+          if grep -Eiq 'tun2socks|koschmobile|xjasonlyu' "$dependency_report"; then
+            echo "N2 dependency is already present in debugRuntimeClasspath" >&2
+            grep -Ein 'tun2socks|koschmobile|xjasonlyu' "$dependency_report" >&2 || true
+            exit 1
+          fi
+
+          ./gradlew :app:processDebugMainManifest
+          mapfile -t merged_manifests < <(
+            find app/build/intermediates -type f -name AndroidManifest.xml -path '*debug*' | sort
+          )
+          test "${#merged_manifests[@]}" -gt 0 || {
+            echo "No debug merged manifest found after processDebugMainManifest" >&2
+            exit 1
+          }
+          for manifest in "${merged_manifests[@]}"; do
+            if grep -q 'android.permission.INTERNET' "$manifest"; then
+              echo "Merged debug manifest unexpectedly contains INTERNET: $manifest" >&2
+              exit 1
+            fi
+          done
+
+      - name: Prepare networked dependency cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PATH="/usr/local/go/bin:$PATH"
+          source_dir="$RUNNER_TEMP/tun2socks"
+          tools_dir="$RUNNER_TEMP/kosch-go-bin"
+          prep_dir="$RUNNER_TEMP/x-mobile-cache-prep"
+
+          git clone --filter=blob:none --no-checkout https://github.com/xjasonlyu/tun2socks.git "$source_dir"
+          git -C "$source_dir" fetch --depth=1 origin "$TUN2SOCKS_COMMIT"
+          git -C "$source_dir" checkout --detach "$TUN2SOCKS_COMMIT"
+          test "$(git -C "$source_dir" rev-parse HEAD)" = "$TUN2SOCKS_COMMIT"
+          test -z "$(git -C "$source_dir" status --porcelain)"
+
+          mkdir -p "$tools_dir" "$prep_dir"
+          export GOBIN="$tools_dir"
+          go install "golang.org/x/mobile/cmd/gomobile@${X_MOBILE_VERSION}"
+          go install "golang.org/x/mobile/cmd/gobind@${X_MOBILE_VERSION}"
+          "$tools_dir/gomobile" init
+
+          (
+            cd "$source_dir"
+            go mod download all
+          )
+          (
+            cd "$prep_dir"
+            go mod init kosch.local/xmobile-cache-prep
+            go mod edit -require="golang.org/x/mobile@${X_MOBILE_VERSION}"
+            go mod download all
+          )
+
+          echo "$tools_dir" >> "$GITHUB_PATH"
+          echo "N2_SOURCE_DIR=$source_dir" >> "$GITHUB_ENV"
+          echo "N2_TOOLS_DIR=$tools_dir" >> "$GITHUB_ENV"
+
+          {
+            echo "format=kosch-n2-online-preparation-evidence-v2"
+            echo "main_sha=$GITHUB_SHA"
+            echo "source_commit=$(git -C "$source_dir" rev-parse HEAD)"
+            echo "go_version=$(/usr/local/go/bin/go env GOVERSION)"
+            echo "go_archive_sha256=$GO_LINUX_AMD64_SHA256"
+            echo "x_mobile_version=$X_MOBILE_VERSION"
+            echo "ndk_version=$NDK_VERSION"
+            echo "network_preparation=true"
+            echo "runtime_integrated=false"
+            echo "vpn_established=false"
+            echo "internet_permission_added=false"
+          } > "$RUNNER_TEMP/n2-preparation.evidence"
+
+      - name: Run pinned builder in isolated network namespace
+        shell: bash
+        env:
+          GOPROXY: off
+          GOSUMDB: off
+        run: |
+          set -euo pipefail
+          out_dir="$RUNNER_TEMP/n2-aar-evidence"
+          mkdir -p "$out_dir"
+
+          sudo -E unshare --net -- bash -c '
+            set -euo pipefail
+            export PATH="/usr/local/go/bin:$N2_TOOLS_DIR:/usr/bin:/bin"
+            export HOME="/home/runner"
+            export GOPROXY=off
+            export GOSUMDB=off
+            export KOSCH_NETWORK_NAMESPACE_ISOLATED=1
+
+            interfaces="$(find /sys/class/net -mindepth 1 -maxdepth 1 -printf "%f\n" | sort)"
+            test "$interfaces" = "lo"
+            test -z "$(ip route show 2>/dev/null)"
+
+            "$GITHUB_WORKSPACE/tools/n2-tun2socks-poc/build-pinned-aar.sh" \
+              "$N2_SOURCE_DIR" \
+              "$RUNNER_TEMP/n2-aar-evidence"
+          '
+
+          cp "$RUNNER_TEMP/n2-preparation.evidence" "$out_dir/"
+
+      - name: Verify emitted evidence and archive surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          out_dir="$RUNNER_TEMP/n2-aar-evidence"
+          report="$out_dir/tun2socks-kosch-v2.7.0-poc.evidence"
+          artifact="$out_dir/tun2socks-kosch-v2.7.0-poc.aar"
+
+          test -s "$report"
+          test -s "$artifact"
+          grep -q '^format=kosch-n2-offline-aar-evidence-v5$' "$report"
+          grep -q "^commit=${TUN2SOCKS_COMMIT}$" "$report"
+          grep -q "^x_mobile_version=${X_MOBILE_VERSION}$" "$report"
+          grep -q "^ndk_version=${NDK_VERSION}$" "$report"
+          grep -q '^network_namespace_isolated=true$' "$report"
+          grep -q '^network_during_build=false$' "$report"
+          grep -q '^runtime_integrated=false$' "$report"
+          grep -q '^vpn_established=false$' "$report"
+          grep -q '^internet_permission_added=false$' "$report"
+          grep -q '^recoverable_start_api=true$' "$report"
+          grep -q '^mandatory_protect_hook=true$' "$report"
+
+          unzip -l "$artifact"
+          (
+            cd "$out_dir"
+            sha256sum \
+              "tun2socks-kosch-v2.7.0-poc.aar" \
+              "tun2socks-kosch-v2.7.0-poc.evidence" \
+              "n2-preparation.evidence" > SHA256SUMS
+            sha256sum -c SHA256SUMS
+          )
+
+      - name: Upload immutable POC evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: kosch-n2-pinned-aar-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/n2-aar-evidence/
+          if-no-files-found: error
+          retention-days: 30
