@@ -27,6 +27,7 @@ import cloud.kosch.aiandroid.WorkspaceWidgetPickerActivity
 import cloud.kosch.aiandroid.model.WorkspaceItem
 import cloud.kosch.aiandroid.model.WorkspaceItemContent
 import cloud.kosch.aiandroid.system.WidgetHostController
+import cloud.kosch.aiandroid.system.WidgetHostOwnership
 import cloud.kosch.aiandroid.ui.theme.MutedMist
 import cloud.kosch.aiandroid.ui.theme.Sky
 import cloud.kosch.aiandroid.ui.theme.Warm
@@ -62,7 +63,13 @@ fun WorkspaceWidgetHomeItem(
     }
 
     LaunchedEffect(host, home.widgetBindings) {
-        home.pruneWidgetBindings(host.hostedProviderComponents()).forEach(host::deleteId)
+        val hostedProviders = host.hostedProviderComponents()
+        val releasedBindings = home.pruneWidgetBindings(hostedProviders)
+        val orphanedHostIds = WidgetHostOwnership.orphanedIds(
+            hostedIds = hostedProviders.keys,
+            ownedIds = home.widgetBindings.values.toSet(),
+        )
+        (releasedBindings + orphanedHostIds).forEach(host::deleteId)
     }
 
     val appWidgetId = home.widgetBindingFor(item.id)
