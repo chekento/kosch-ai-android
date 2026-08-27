@@ -6,6 +6,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.kosch.aiandroid.model.DeviceWidgetBinding
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -33,6 +34,7 @@ class WorkspaceWidgetBindingStoreInstrumentationTest {
         val binding = DeviceWidgetBinding("item:user:widget-1", 42)
 
         assertTrue(store.bind(binding))
+        assertTrue(store.bind(binding))
         assertEquals(42, store.bindingFor(binding.workspaceItemId))
         assertEquals(mapOf(binding.workspaceItemId to 42), store.load())
         assertEquals(42, store.unbind(binding.workspaceItemId))
@@ -40,14 +42,26 @@ class WorkspaceWidgetBindingStoreInstrumentationTest {
     }
 
     @Test
-    fun prune_removesMissingWorkspaceItemsAndInvalidAndroidIds() {
+    fun bind_rejectsHostAliasingAndImplicitReplacement() {
+        assertTrue(store.bind(DeviceWidgetBinding("item:user:first", 41)))
+
+        assertFalse(store.bind(DeviceWidgetBinding("item:user:second", 41)))
+        assertFalse(store.bind(DeviceWidgetBinding("item:user:first", 42)))
+        assertEquals(mapOf("item:user:first" to 41), store.load())
+    }
+
+    @Test
+    fun prune_keepsOnlyExactValidatedPairs() {
         assertTrue(store.bind(DeviceWidgetBinding("item:user:keep", 41)))
-        assertTrue(store.bind(DeviceWidgetBinding("item:user:missing", 42)))
-        assertTrue(store.bind(DeviceWidgetBinding("item:user:invalid-host", 43)))
+        assertTrue(store.bind(DeviceWidgetBinding("item:user:crossed", 42)))
+        assertTrue(store.bind(DeviceWidgetBinding("item:user:missing", 43)))
 
         val released = store.prune(
-            validWorkspaceItemIds = setOf("item:user:keep", "item:user:invalid-host"),
-            validAppWidgetIds = setOf(41, 42),
+            validBindings = mapOf(
+                "item:user:keep" to 41,
+                // Same ids are individually known, but the crossed pair must still be rejected.
+                "item:user:crossed" to 43,
+            ),
         )
 
         assertEquals(setOf(42, 43), released)
