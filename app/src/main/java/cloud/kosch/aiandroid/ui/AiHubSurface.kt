@@ -58,6 +58,7 @@ import cloud.kosch.aiandroid.ai.AiHubEntry
 import cloud.kosch.aiandroid.ai.AiHubEntryKind
 import cloud.kosch.aiandroid.ai.AiHubInstallState
 import cloud.kosch.aiandroid.model.LaunchableApp
+import cloud.kosch.aiandroid.system.AiPublishedShortcutSurface
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 import cloud.kosch.aiandroid.ui.theme.Mint
 import cloud.kosch.aiandroid.ui.theme.MutedMist
@@ -145,7 +146,7 @@ fun AiHubSurface(
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("API-KEY-FREI ZUERST", color = Mint, style = MaterialTheme.typography.labelMedium)
                     Text(
-                        "KoSch nutzt lokale Regeln und veröffentlichte Android-Funktionen zuerst. Browser-KI wird nur als direkter Einstieg angeboten, wenn die App selbst einen Shortcut oder ein Widget veröffentlicht.",
+                        "KoSch nutzt lokale Regeln und veröffentlichte Android-Funktionen zuerst. Browser-KI wird nur als direkter Einstieg angeboten, wenn die App selbst einen passenden Shortcut veröffentlicht.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -235,6 +236,9 @@ fun AiHubSurface(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     items(entries, key = AiHubEntry::stableId) { entry ->
+                        val published = remember(entry.stableId, entry.installedApp?.key) {
+                            hub.publishedSurfaces(entry)
+                        }
                         AiHubCard(
                             entry = entry,
                             hasPrompt = hub.prompt.isNotBlank(),
@@ -243,6 +247,9 @@ fun AiHubSurface(
                             } else {
                                 null
                             },
+                            publishedShortcuts = published.shortcuts,
+                            publishedWidgetCount = published.widgets.size,
+                            onPublishedShortcut = hub::execute,
                             onOpen = { hub.execute(entry) },
                             onDismiss = { hub.dismiss(entry) },
                         )
@@ -260,6 +267,9 @@ private fun AiHubCard(
     entry: AiHubEntry,
     hasPrompt: Boolean,
     recommendationReason: String?,
+    publishedShortcuts: List<AiPublishedShortcutSurface>,
+    publishedWidgetCount: Int,
+    onPublishedShortcut: (AiPublishedShortcutSurface) -> Unit,
     onOpen: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -339,6 +349,42 @@ private fun AiHubCard(
                 ) {
                     entry.aiCapabilities.take(6).forEach { capability ->
                         AssistChip(onClick = {}, label = { Text(capability) })
+                    }
+                }
+            }
+
+            if (publishedShortcuts.isNotEmpty() || publishedWidgetCount > 0) {
+                Text(
+                    "VON DER APP VERÖFFENTLICHT",
+                    color = Mint,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(7.dp),
+                    verticalArrangement = Arrangement.spacedBy(7.dp),
+                ) {
+                    publishedShortcuts.take(4).forEach { shortcut ->
+                        AssistChip(
+                            onClick = { onPublishedShortcut(shortcut) },
+                            label = { Text(shortcut.label, maxLines = 1) },
+                            leadingIcon = {
+                                Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(16.dp))
+                            },
+                        )
+                    }
+                    if (publishedWidgetCount > 0) {
+                        Surface(
+                            color = Sky.copy(alpha = 0.10f),
+                            shape = RoundedCornerShape(50),
+                        ) {
+                            Text(
+                                if (publishedWidgetCount == 1) "1 Widget veröffentlicht" else "$publishedWidgetCount Widgets veröffentlicht",
+                                modifier = Modifier.padding(horizontal = 11.dp, vertical = 7.dp),
+                                color = Sky,
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
                     }
                 }
             }
