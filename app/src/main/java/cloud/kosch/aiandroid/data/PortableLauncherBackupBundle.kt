@@ -88,16 +88,18 @@ object PortableLauncherBackupBundleCodec {
         val createdAt = headerParts[2].toLongOrNull()?.takeIf { it > 0L }
             ?: throw IllegalArgumentException("Invalid launcher backup creation time")
 
-        val records = lines.drop(1).associate { line ->
+        val sectionLines = lines.drop(1)
+        require(sectionLines.size == ALLOWED_SECTIONS.size) { "Launcher backup bundle has an invalid section count" }
+        val records = linkedMapOf<String, String>()
+        sectionLines.forEach { line ->
             val separator = line.indexOf('|')
             require(separator > 0) { "Malformed launcher backup section" }
             val key = line.substring(0, separator)
             require(key in ALLOWED_SECTIONS) { "Unknown launcher backup section: $key" }
-            key to line.substring(separator + 1)
+            require(key !in records) { "Duplicate launcher backup section: $key" }
+            records[key] = line.substring(separator + 1)
         }
-        require(records.size == ALLOWED_SECTIONS.size && records.keys == ALLOWED_SECTIONS) {
-            "Launcher backup bundle is incomplete"
-        }
+        require(records.keys == ALLOWED_SECTIONS) { "Launcher backup bundle is incomplete" }
         fun section(name: String): String = unb64(records.getValue(name)).also(::requireSectionBudget)
 
         return PortableLauncherBackupBundle(
