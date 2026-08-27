@@ -37,6 +37,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         it.reconcile(homeWorkspace.document)
     }
     val customActions = CustomLauncherActionController(application)
+    val aiContextHandoff = AiContextHandoffController()
     val aiHub = AiHubController(application).also { hub ->
         // Even old/direct aiHub.open() call sites receive the same abstract context; explicit origins may override it.
         hub.setDefaultRoutingContextProvider { currentAiHubContext(AiHubOrigin.HOME) }
@@ -77,6 +78,37 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         )
     }
 
+    /** Prepares a memory-only preview. It does not open the AI Hub and transfers no file content. */
+    fun prepareCurrentFileAiHandoff(): Boolean {
+        val insight = controller.fileInsight ?: return false
+        aiContextHandoff.prepareFile(insight)
+        return true
+    }
+
+    fun cancelCurrentAiHandoff() {
+        aiContextHandoff.cancel()
+    }
+
+    /**
+     * Only the explicit UI confirmation path may call this with userConfirmed=true. The handoff draft is consumed once
+     * and the AI Hub receives only the bounded confirmed prompt payload, never the original file URI implicitly.
+     */
+    fun confirmCurrentFileAiHandoff(
+        userPrompt: String,
+        userConfirmed: Boolean,
+    ): Boolean {
+        val confirmed = aiContextHandoff.confirm(
+            userPrompt = userPrompt,
+            userConfirmed = userConfirmed,
+        ) ?: return false
+        controller.closeFileSheet()
+        openAiHub(
+            initialPrompt = confirmed.prompt,
+            requestedOrigin = AiHubOrigin.FILE,
+        )
+        return true
+    }
+
     /**
      * Projects launcher state into abstract routing hints only. No raw file metadata, prompt history, battery values,
      * contacts, screen content or camera state enters this object. Observation permissions remain fully separate.
@@ -106,6 +138,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     override fun onCleared() {
+        aiContextHandoff.cancel()
         assistant.close()
         controller.close()
         super.onCleared()
