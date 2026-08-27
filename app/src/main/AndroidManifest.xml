@@ -46,6 +46,13 @@
         </activity>
 
         <activity
+            android:name=".WorkspaceWidgetPickerActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="false"
+            android:screenOrientation="unspecified" />
+
+        <activity
             android:name=".SecurityNetworkActivity"
             android:exported="false"
             android:screenOrientation="unspecified" />
