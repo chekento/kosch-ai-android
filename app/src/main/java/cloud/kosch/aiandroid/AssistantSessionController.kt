@@ -6,10 +6,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import cloud.kosch.aiandroid.ai.AssistantLocalCore
+import cloud.kosch.aiandroid.ai.AssistantVisualContextRequestParser
 import cloud.kosch.aiandroid.ai.LauncherCommand
+import cloud.kosch.aiandroid.assistant.AssistantVisualContextRuntime
 import cloud.kosch.aiandroid.data.AssistantStore
 import cloud.kosch.aiandroid.model.AssistantMessage
 import cloud.kosch.aiandroid.model.AssistantMessageRole
+import cloud.kosch.aiandroid.model.AssistantObservationSource
 import cloud.kosch.aiandroid.model.AssistantSettings
 import cloud.kosch.aiandroid.model.AssistantVisualState
 import cloud.kosch.aiandroid.ui.components.AssistantAttentionSignal
@@ -131,6 +134,7 @@ class AssistantSessionController(context: Context) {
         requestDocument: () -> Unit,
         requestContact: () -> Unit,
         requestSpeech: (String) -> Boolean,
+        requestVisualContext: (AssistantObservationSource?) -> Boolean = { false },
     ) {
         if (!awaitingVoice) return
         awaitingVoice = false
@@ -146,6 +150,7 @@ class AssistantSessionController(context: Context) {
             requestDocument = requestDocument,
             requestContact = requestContact,
             requestSpeech = requestSpeech,
+            requestVisualContext = requestVisualContext,
         )
     }
 
@@ -161,6 +166,7 @@ class AssistantSessionController(context: Context) {
         requestDocument: () -> Unit,
         requestContact: () -> Unit,
         requestSpeech: (String) -> Boolean,
+        requestVisualContext: (AssistantObservationSource?) -> Boolean = { false },
     ) {
         if (!settings.enabled) {
             sheetVisible = true
@@ -173,6 +179,26 @@ class AssistantSessionController(context: Context) {
         append(AssistantMessageRole.USER, input)
         handoffPrompt = null
         visualState = AssistantVisualState.THINKING
+
+        val visualRequest = AssistantVisualContextRequestParser.parseRequest(input)
+        if (visualRequest != null) {
+            val accepted = requestVisualContext(visualRequest.source)
+            val sourceText = when (visualRequest.source) {
+                AssistantObservationSource.SCREEN -> "Bildschirm"
+                AssistantObservationSource.CAMERA -> "Kamera"
+                null -> "aktiven visuellen"
+            }
+            val replyText = if (accepted) {
+                "Ich fordere genau einen aktuellen $sourceText-Kontextframe an. Die Capture-Session bleibt sichtbar; dieser Frame wird noch an kein KI-Modell übertragen."
+            } else {
+                "Dafür ist noch keine passende sichtbare Screen- oder Kamera-Session freigegeben. Aktiviere die gewünschte Awareness-Funktion und bestätige Androids Consent."
+            }
+            append(AssistantMessageRole.ASSISTANT, replyText)
+            visualState = if (accepted) AssistantVisualState.WORKING else AssistantVisualState.IDLE
+            if (settings.speechOutputEnabled && replyText.isNotBlank()) requestSpeech(replyText)
+            return
+        }
+
         val reply = localCore.reply(input)
         append(AssistantMessageRole.ASSISTANT, reply.text)
         handoffPrompt = reply.handoffPrompt
@@ -201,6 +227,29 @@ class AssistantSessionController(context: Context) {
             requestSpeech(reply.text)
             // The TTS listener switches to SPEAKING only when Android reports actual playback.
         }
+    }
+
+    fun visualContextReady(metadata: AssistantVisualContextRuntime.Metadata) {
+        if (!settings.enabled) return
+        val source = when (metadata.source) {
+            AssistantObservationSource.SCREEN -> "Bildschirm"
+            AssistantObservationSource.CAMERA -> "Kamera"
+        }
+        val kib = (metadata.byteCount + 1023) / 1024
+        append(
+            AssistantMessageRole.ASSISTANT,
+            "$source-Kontextframe bereit: ${metadata.width}×${metadata.height}, ca. $kib KiB. Er liegt nur kurz im Arbeitsspeicher und wurde noch an kein KI-Modell übertragen.",
+        )
+        visualState = AssistantVisualState.IDLE
+    }
+
+    fun visualContextFailed(message: String) {
+        if (!settings.enabled) return
+        append(
+            AssistantMessageRole.ASSISTANT,
+            "Der visuelle Kontextframe ist fehlgeschlagen: ${message.take(240)}",
+        )
+        visualState = AssistantVisualState.ERROR
     }
 
     fun handoffToProvider(launcherController: LauncherController) {
