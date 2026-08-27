@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import cloud.kosch.aiandroid.ai.AssistantLocalCore
 import cloud.kosch.aiandroid.ai.AssistantVisualContextRequestParser
 import cloud.kosch.aiandroid.ai.LauncherCommand
+import cloud.kosch.aiandroid.assistant.AssistantObservationRuntime
 import cloud.kosch.aiandroid.assistant.AssistantVisualContextRuntime
 import cloud.kosch.aiandroid.data.AssistantStore
 import cloud.kosch.aiandroid.model.AssistantMessage
@@ -182,7 +183,8 @@ class AssistantSessionController(context: Context) {
 
         val visualRequest = AssistantVisualContextRequestParser.parseRequest(input)
         if (visualRequest != null) {
-            val accepted = requestVisualContext(visualRequest.source)
+            val accepted = requestVisualContext(visualRequest.source) ||
+                requestActiveVisualContext(visualRequest.source)
             val sourceText = when (visualRequest.source) {
                 AssistantObservationSource.SCREEN -> "Bildschirm"
                 AssistantObservationSource.CAMERA -> "Kamera"
@@ -317,6 +319,21 @@ class AssistantSessionController(context: Context) {
         if (!matchesActiveSpeech(utteranceId)) return
         clearSpeechSignal()
         if (settings.enabled) visualState = AssistantVisualState.ERROR
+    }
+
+    private fun requestActiveVisualContext(requestedSource: AssistantObservationSource?): Boolean {
+        val source = requestedSource ?: when {
+            AssistantObservationRuntime.screenActive -> AssistantObservationSource.SCREEN
+            AssistantObservationRuntime.cameraActive -> AssistantObservationSource.CAMERA
+            else -> return false
+        }
+        val active = when (source) {
+            AssistantObservationSource.SCREEN -> AssistantObservationRuntime.screenActive
+            AssistantObservationSource.CAMERA -> AssistantObservationRuntime.cameraActive
+        }
+        if (!active) return false
+        AssistantVisualContextRuntime.request(source)
+        return true
     }
 
     private fun updateSettings(updated: AssistantSettings) {
