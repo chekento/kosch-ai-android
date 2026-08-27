@@ -2,7 +2,6 @@ package cloud.kosch.aiandroid.model
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
-import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -53,8 +52,11 @@ class WorkspaceWidgetEditorTest {
         val copy = duplicated.pages.first { it.id == "page:user:2" }.items.single()
         assertNotEquals(original.id, copy.id)
         assertEquals(original.content, copy.content)
-        // Android appWidgetId is intentionally absent from portable WorkspaceItemContent.Widget.
-        assertNull((copy.content as WorkspaceItemContent.Widget).providerComponent.takeIf(String::isBlank))
+        assertEquals(
+            "com.example/.ClockWidget",
+            (copy.content as WorkspaceItemContent.Widget).providerComponent,
+        )
+        // Android appWidgetId is structurally absent from WorkspaceItemContent.Widget and must be rebound device-locally.
     }
 
     @Test(expected = IllegalArgumentException::class)
