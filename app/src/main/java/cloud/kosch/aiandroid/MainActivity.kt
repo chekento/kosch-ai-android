@@ -33,6 +33,8 @@ import cloud.kosch.aiandroid.system.HomeRoleController
 import cloud.kosch.aiandroid.system.ProfessionalShortcut
 import cloud.kosch.aiandroid.system.ProfessionalShortcutResolver
 import cloud.kosch.aiandroid.system.WidgetHostController
+import cloud.kosch.aiandroid.ui.AiHubEntryButton
+import cloud.kosch.aiandroid.ui.AiHubSurface
 import cloud.kosch.aiandroid.ui.DragDropWorkspaceHomeScreen
 import cloud.kosch.aiandroid.ui.LauncherRoot
 import cloud.kosch.aiandroid.ui.SettingsCenterSurface
@@ -212,6 +214,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             val settings = launcherViewModel.settings
+            val aiHub = launcherViewModel.aiHub
             val assistantPresentation = settings.document.assistant
             KoSchLauncherTheme(
                 dynamicColor = settings.document.appearance.useMaterialYouAccents,
@@ -260,12 +263,24 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    if (unifiedHomeVisible) {
+                    if (unifiedHomeVisible && !aiHub.visible) {
                         SettingsEntryButton(
-                            onClick = { settings.open() },
+                            onClick = {
+                                aiHub.close()
+                                settings.open()
+                            },
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
                                 .padding(end = 18.dp, top = 76.dp),
+                        )
+                        AiHubEntryButton(
+                            onClick = {
+                                settings.close()
+                                aiHub.open()
+                            },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(end = 18.dp, top = 122.dp),
                         )
                     }
 
@@ -294,6 +309,12 @@ class MainActivity : ComponentActivity() {
                             home = launcherViewModel.homeWorkspace,
                             assistant = launcherViewModel.assistant,
                             onDismiss = settings::close,
+                        )
+                    }
+                    if (aiHub.visible) {
+                        AiHubSurface(
+                            hub = aiHub,
+                            apps = controller.apps,
                         )
                     }
                 }
@@ -353,6 +374,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_ESCAPE && launcherViewModel.aiHub.visible) {
+            launcherViewModel.aiHub.close()
+            return true
+        }
         if (keyCode == KeyEvent.KEYCODE_ESCAPE && launcherViewModel.settings.visible) {
             launcherViewModel.settings.close()
             return true
