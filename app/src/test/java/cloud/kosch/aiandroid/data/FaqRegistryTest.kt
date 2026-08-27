@@ -29,6 +29,7 @@ class FaqRegistryTest {
         assertTrue(FaqRegistry.entries.any { it.id == "assistant-opt-in" })
         assertTrue(FaqRegistry.entries.any { it.id == "assistant-visual-runtime" })
         assertTrue(FaqRegistry.entries.any { it.id == "assistant-lipsync" })
+        assertTrue(FaqRegistry.entries.any { it.id == "assistant-attention" })
     }
 
     @Test

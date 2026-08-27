@@ -12,6 +12,7 @@ The KoSch Assistant is an **optional** launcher companion. It is designed to rem
 - Android Text-to-Speech is optional, disabled by default and not initialized while Assistant or speech output is disabled;
 - TTS range callbacks and synthesized PCM level drive an ephemeral 15-viseme mouth signal where the selected engine supports them;
 - reduced motion is independently selectable and Android's disabled-animator setting is also respected;
+- direct presses on the visible avatar become a short-lived normalized gaze target, followed by a bounded activation microexpression;
 - local launcher commands are interpreted by `KoSch Local Core`;
 - free-form generative requests remain in the Assistant session and expose an explicit provider-selection handoff;
 - no hidden provider call and no claim that the offline APK contains an LLM.
@@ -31,6 +32,8 @@ The foundation does **not** add:
 - wake-word or background microphone capture.
 
 Speech input is handled by Android's recognizer UI. File actions reuse SAF plus `DocumentGrantManager`. Contact actions use the one-time phone contact picker. Generative text is handed off only after the user chooses a provider.
+
+The attention response uses only the press position inside the currently visible avatar bounds. It does not use a camera, eye tracking, device motion, proximity sensing or a background observer. Coordinates and reaction timestamps remain ephemeral ViewModel state, are not audited and are never written to settings or backup.
 
 Only these Assistant settings are persisted in `kosch_assistant_settings`:
 
@@ -55,7 +58,7 @@ The runtime-facing states are:
 7. `OFFLINE`
 8. `ERROR`
 
-The APK currently uses a state-aware procedural full-robot fallback with a portal-only disabled state, appearance/reverse-disappearance, independent gaze/blink, state poses and speech mouth motion. This makes missing or not-yet-exported sprites non-fatal and keeps the HOME shell usable.
+The APK currently uses a state-aware procedural full-robot fallback with a portal-only disabled state, appearance/reverse-disappearance, independent gaze/blink, state poses and speech mouth motion. Ambient gaze interpolates between targets instead of snapping, while a direct press temporarily takes precedence and decays smoothly after release. A successful activation adds one brief wink/smile response without hiding error or disabled states. This makes missing or not-yet-exported sprites non-fatal and keeps the HOME shell usable.
 
 The matrix WebP compositor is implemented but activates only after all 150 files and measured eye/mouth anchors pass the manifest gate. It draws the loaded body, eye and mouth layers together; a corrupt active frame returns to the complete procedural fallback instead of showing a partial face.
 
@@ -97,4 +100,4 @@ The runtime catalog follows the project asset matrix so the Default Assistant ca
 - full sprite export from the supplied overview artwork;
 - autonomous Android actions.
 
-Final asset export, calibrated activation and the embedded model remain in issue #17. The B-C behavior and TTS signal runtime are documented in `ASSISTANT_RUNTIME_BC.md`. The future local generative route must enter through an isolated `LocalModelBackend` and preserve the same opt-in, privacy, cancellation and provider-choice boundaries.
+Final asset export, calibrated activation and the embedded model remain in issue #17. The B-C behavior and TTS signal runtime are documented in `ASSISTANT_RUNTIME_BC.md`; the permission-free attention layer is documented in `ASSISTANT_RUNTIME_D.md`. The future local generative route must enter through an isolated `LocalModelBackend` and preserve the same opt-in, privacy, cancellation and provider-choice boundaries.

@@ -55,6 +55,7 @@ fun AssistantAvatarFallback(
     state: AssistantVisualState,
     modifier: Modifier = Modifier,
     speechSignal: AssistantSpeechSignal = AssistantSpeechSignal.Idle,
+    attentionSignal: AssistantAttentionSignal = AssistantAttentionSignal.Idle,
     reducedMotion: Boolean = false,
 ) {
     val context = LocalContext.current
@@ -99,6 +100,7 @@ fun AssistantAvatarFallback(
         stateElapsedMillis = stateElapsedMillis,
         nowUptimeMillis = nowUptimeMillis,
         speechSignal = speechSignal,
+        attentionSignal = attentionSignal,
         reducedMotion = reducedMotion,
     )
     val appearanceFrame = when {
@@ -534,10 +536,22 @@ private fun DrawScope.drawRobotEyes(
 
     listOf(-1f, 1f).forEach { direction ->
         val eyeCenter = Offset(center.x + direction * separation, center.y) + gaze
+        val winkLeft = frame.eye == AssistantEyeShape.WINK_LEFT && direction < 0f
+        val winkRight = frame.eye == AssistantEyeShape.WINK_RIGHT && direction > 0f
         if (state == AssistantVisualState.ERROR) {
             val half = unit * 0.04f
             drawLine(accent, eyeCenter - Offset(half, half), eyeCenter + Offset(half, half), unit * 0.018f)
             drawLine(accent, eyeCenter - Offset(half, -half), eyeCenter + Offset(half, -half), unit * 0.018f)
+        } else if (winkLeft || winkRight) {
+            drawArc(
+                color = accent,
+                startAngle = 198f,
+                sweepAngle = 144f,
+                useCenter = false,
+                topLeft = Offset(eyeCenter.x - eyeWidth / 2f, eyeCenter.y - unit * 0.01f),
+                size = Size(eyeWidth, unit * 0.065f),
+                style = Stroke(width = unit * 0.019f),
+            )
         } else if (frame.eye == AssistantEyeShape.HAPPY) {
             drawArc(
                 color = accent,

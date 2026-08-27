@@ -8,6 +8,7 @@ import cloud.kosch.aiandroid.LauncherController
 import cloud.kosch.aiandroid.model.AssistantMessageRole
 import cloud.kosch.aiandroid.model.AssistantSettings
 import cloud.kosch.aiandroid.model.AssistantVisualState
+import cloud.kosch.aiandroid.ui.components.AssistantAttentionSignal
 import cloud.kosch.aiandroid.ui.components.AssistantViseme
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -104,6 +105,29 @@ class AssistantStoreInstrumentationTest {
             assertFalse(session.speechSignal.active)
             assertEquals(AssistantVisualState.IDLE, session.visualState)
             assertFalse(AssistantSessionController(context).speechSignal.active)
+        } finally {
+            store.save(original)
+        }
+    }
+
+    @Test
+    fun touchAttention_isBoundedSessionOnlyAndClearedWhenDisabled() {
+        val store = AssistantStore(context)
+        val original = store.load()
+        try {
+            store.save(original.copy(enabled = true))
+            val session = AssistantSessionController(context)
+
+            session.pointerAttention(normalizedX = 4f, normalizedY = -4f, pressed = true)
+            assertEquals(1f, session.attentionSignal.targetX, 0.0001f)
+            assertEquals(-1f, session.attentionSignal.targetY, 0.0001f)
+            assertTrue(session.attentionSignal.pressed)
+
+            val freshSession = AssistantSessionController(context)
+            assertEquals(AssistantAttentionSignal.Idle, freshSession.attentionSignal)
+
+            session.setEnabled(false)
+            assertEquals(AssistantAttentionSignal.Idle, session.attentionSignal)
         } finally {
             store.save(original)
         }
