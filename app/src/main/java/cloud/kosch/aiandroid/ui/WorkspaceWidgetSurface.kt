@@ -23,7 +23,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import cloud.kosch.aiandroid.WorkspaceHomeController
-import cloud.kosch.aiandroid.WorkspaceWidgetChangeSignal
 import cloud.kosch.aiandroid.WorkspaceWidgetPickerActivity
 import cloud.kosch.aiandroid.model.WorkspaceItem
 import cloud.kosch.aiandroid.model.WorkspaceItemContent
@@ -55,17 +54,14 @@ fun WorkspaceWidgetHomeItem(
     val context = LocalContext.current
     val widget = item.content as? WorkspaceItemContent.Widget ?: return
     val host = remember(context.applicationContext) {
-        WidgetHostController(context.applicationContext, WidgetHostController.WORKSPACE_HOST_ID)
+        WorkspaceWidgetHostPool.acquire(context.applicationContext)
     }
-    val revision = WorkspaceWidgetChangeSignal.revision
 
     DisposableEffect(host) {
-        host.startListening()
-        onDispose { host.stopListening() }
+        onDispose { WorkspaceWidgetHostPool.release(host) }
     }
 
-    LaunchedEffect(revision) {
-        if (revision > 0L) home.reload()
+    LaunchedEffect(host, home.widgetBindings) {
         home.pruneWidgetBindings(host.hostedProviderComponents()).forEach(host::deleteId)
     }
 
@@ -149,5 +145,29 @@ private fun MissingWorkspaceWidget(
                 style = MaterialTheme.typography.labelSmall,
             )
         }
+    }
+}
+
+/** One AppWidgetHost listener per process for all V7 widgets; Compose items hold lightweight references only. */
+private object WorkspaceWidgetHostPool {
+    private var controller: WidgetHostController? = null
+    private var references: Int = 0
+
+    @Synchronized
+    fun acquire(context: Context): WidgetHostController {
+        val host = controller ?: WidgetHostController(
+            context.applicationContext,
+            WidgetHostController.WORKSPACE_HOST_ID,
+        ).also { controller = it }
+        if (references == 0) host.startListening()
+        references += 1
+        return host
+    }
+
+    @Synchronized
+    fun release(host: WidgetHostController) {
+        if (controller !== host || references <= 0) return
+        references -= 1
+        if (references == 0) host.stopListening()
     }
 }
