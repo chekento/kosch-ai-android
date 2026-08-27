@@ -31,13 +31,18 @@ object AssistantPortablePreferencesCodec {
         require(payload.toByteArray(StandardCharsets.UTF_8).size <= MAX_BYTES) {
             "Assistant preferences payload too large"
         }
-        val values = payload.lineSequence()
-            .filter(String::isNotBlank)
-            .associate { line ->
-                val separator = line.indexOf('=')
-                require(separator > 0) { "Malformed assistant preferences record" }
-                line.substring(0, separator) to line.substring(separator + 1)
-            }
+        val lines = payload.lineSequence().filter(String::isNotBlank).toList()
+        require(lines.size == ALLOWED_KEYS.size) { "Assistant preferences payload is incomplete" }
+        val values = linkedMapOf<String, String>()
+        lines.forEach { line ->
+            val separator = line.indexOf('=')
+            require(separator > 0) { "Malformed assistant preferences record" }
+            val key = line.substring(0, separator)
+            require(key in ALLOWED_KEYS) { "Unknown assistant preferences field: $key" }
+            require(key !in values) { "Duplicate assistant preferences field: $key" }
+            values[key] = line.substring(separator + 1)
+        }
+        require(values.keys == ALLOWED_KEYS) { "Assistant preferences payload is incomplete" }
         require(values["schema"] == SCHEMA_VERSION.toString()) { "Unsupported assistant preferences schema" }
         val character = unb64(values.getValue("character"))
         val name = unb64(values.getValue("name"))
@@ -69,7 +74,7 @@ object AssistantPortablePreferencesCodec {
             "Invalid assistant character id"
         }
         val name = preferences.assistantName.trim()
-        require(name.length <= MAX_ASSISTANT_NAME_LENGTH && name.none(Char::isISOControl)) {
+        require(name.length <= MAX_ASSISTANT_NAME_LENGTH && name.none { it.isISOControl() }) {
             "Invalid assistant name"
         }
         val wake = preferences.customWakeWord.trim()
@@ -91,6 +96,15 @@ object AssistantPortablePreferencesCodec {
         throw IllegalArgumentException("Invalid assistant preferences encoding", exception)
     }
 
+    private val ALLOWED_KEYS = linkedSetOf(
+        "schema",
+        "character",
+        "name",
+        "presence",
+        "wake",
+        "customWake",
+        "localWakeOnly",
+    )
     private const val SCHEMA_VERSION = 1
     private const val MAX_BYTES = 16 * 1024
     private const val MAX_IDENTIFIER_LENGTH = 48
