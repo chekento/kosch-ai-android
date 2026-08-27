@@ -3,6 +3,7 @@ package cloud.kosch.aiandroid.ui
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -37,10 +38,8 @@ import cloud.kosch.aiandroid.model.AssistantSystemVoiceOption
 import cloud.kosch.aiandroid.model.AssistantVoiceGender
 import cloud.kosch.aiandroid.model.AssistantVisualState
 import cloud.kosch.aiandroid.model.AssistantWakeWordMode
-import cloud.kosch.aiandroid.ui.theme.Mint
 import cloud.kosch.aiandroid.ui.theme.MutedMist
 import cloud.kosch.aiandroid.ui.theme.RaisedSurface
-import cloud.kosch.aiandroid.ui.theme.Sky
 import cloud.kosch.aiandroid.ui.theme.Warm
 import java.util.Locale
 
@@ -289,7 +288,7 @@ fun AssistantControlCenter(
 private fun ControlSection(
     title: String,
     body: String,
-    content: @Composable Column.() -> Unit,
+    content: @Composable ColumnScope.() -> Unit,
 ) {
     Surface(color = RaisedSurface, shape = RoundedCornerShape(18.dp)) {
         Column(
