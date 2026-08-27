@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import cloud.kosch.aiandroid.ai.AiHubCatalog
 import cloud.kosch.aiandroid.ai.AiHubContextPolicy
+import cloud.kosch.aiandroid.ai.AiHubDecisionConfidence
 import cloud.kosch.aiandroid.ai.AiHubDecisionPolicy
 import cloud.kosch.aiandroid.ai.AiHubEntry
 import cloud.kosch.aiandroid.ai.AiHubEntryKind
@@ -74,18 +75,23 @@ class AiHubController(context: Context) {
         apps: List<LaunchableApp>,
         limit: Int = 4,
     ): List<AiHubRecommendation> {
-        if (limit <= 0) return emptyList()
-        val intent = inferredTask()
-        val availableEntries = entries(apps)
-        val base = AiHubTaskRouter.rank(prompt, availableEntries, availableEntries.size)
-        val contextual = AiHubContextPolicy.apply(routingContext, base)
-        return AiHubPreferencePolicy
-            .apply(intent, preferredTargetIds[intent], contextual)
-            .take(limit)
+        val ranked = rankedRecommendations(apps, limit)
+        val decision = AiHubDecisionPolicy.decide(ranked) ?: return ranked
+        return ranked.mapIndexed { index, recommendation ->
+            when {
+                index == 0 -> recommendation.copy(
+                    reason = "${decision.confidence.title} · ${decision.explanation} · ${recommendation.reason}",
+                )
+                index == 1 && decision.confidence == AiHubDecisionConfidence.LOW -> recommendation.copy(
+                    reason = "Alternative auf Augenhöhe · ${recommendation.reason}",
+                )
+                else -> recommendation
+            }
+        }
     }
 
     fun routeDecision(apps: List<LaunchableApp>): AiHubRouteDecision? =
-        AiHubDecisionPolicy.decide(recommendations(apps))
+        AiHubDecisionPolicy.decide(rankedRecommendations(apps, DEFAULT_RECOMMENDATION_LIMIT))
 
     fun bestRecommendation(apps: List<LaunchableApp>): AiHubRecommendation? =
         routeDecision(apps)?.primary
@@ -261,7 +267,22 @@ class AiHubController(context: Context) {
         return saved
     }
 
+    private fun rankedRecommendations(
+        apps: List<LaunchableApp>,
+        limit: Int,
+    ): List<AiHubRecommendation> {
+        if (limit <= 0) return emptyList()
+        val intent = inferredTask()
+        val availableEntries = entries(apps)
+        val base = AiHubTaskRouter.rank(prompt, availableEntries, availableEntries.size)
+        val contextual = AiHubContextPolicy.apply(routingContext, base)
+        return AiHubPreferencePolicy
+            .apply(intent, preferredTargetIds[intent], contextual)
+            .take(limit)
+    }
+
     private companion object {
         const val MAX_PROMPT_CHARS = 32_000
+        const val DEFAULT_RECOMMENDATION_LIMIT = 4
     }
 }
