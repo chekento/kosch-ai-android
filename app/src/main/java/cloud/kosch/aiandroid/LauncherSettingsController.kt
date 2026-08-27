@@ -6,11 +6,29 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import cloud.kosch.aiandroid.data.LauncherSettingsStore
 import cloud.kosch.aiandroid.data.WorkspaceStore
+import cloud.kosch.aiandroid.model.AccessibilitySettings
+import cloud.kosch.aiandroid.model.AdvancedSettings
+import cloud.kosch.aiandroid.model.AiSettings
+import cloud.kosch.aiandroid.model.AppSpaceSettings
 import cloud.kosch.aiandroid.model.AppearanceSettings
+import cloud.kosch.aiandroid.model.AutomationSettings
+import cloud.kosch.aiandroid.model.BackupSettings
+import cloud.kosch.aiandroid.model.DockSettings
+import cloud.kosch.aiandroid.model.FolderSettings
+import cloud.kosch.aiandroid.model.GestureSettings
 import cloud.kosch.aiandroid.model.HomeSettings
 import cloud.kosch.aiandroid.model.LauncherAssistantSettings
 import cloud.kosch.aiandroid.model.LauncherSettingsDocument
+import cloud.kosch.aiandroid.model.NotificationSettings
+import cloud.kosch.aiandroid.model.PageSettings
+import cloud.kosch.aiandroid.model.PenSettings
+import cloud.kosch.aiandroid.model.PrivacySettings
+import cloud.kosch.aiandroid.model.SearchSettings
 import cloud.kosch.aiandroid.model.SettingsSection
+import cloud.kosch.aiandroid.model.SystemIntegrationSettings
+import cloud.kosch.aiandroid.model.ThemeSettings
+import cloud.kosch.aiandroid.model.VoiceSettings
+import cloud.kosch.aiandroid.model.WidgetSettings
 import cloud.kosch.aiandroid.model.WorkspaceDocument
 import cloud.kosch.aiandroid.model.WorkspaceGridReflow
 
@@ -19,7 +37,8 @@ import cloud.kosch.aiandroid.model.WorkspaceGridReflow
  *
  * The controller owns only portable launcher preferences. Credentials, widget host ids and Android grants live in
  * their dedicated stores. Disruptive Home changes are coordinated with the v7 Workspace document before settings
- * are committed so a failed reflow cannot leave settings and workspace out of sync.
+ * are committed so a failed reflow cannot leave settings and workspace out of sync. Every portable settings domain
+ * has one explicit apply route and therefore shares the same atomic store + single-level undo semantics.
  */
 class LauncherSettingsController(context: Context) {
     private val store = LauncherSettingsStore(context.applicationContext)
@@ -97,11 +116,65 @@ class LauncherSettingsController(context: Context) {
         return true
     }
 
+    fun applyPages(settings: PageSettings): Boolean =
+        persistSection(document.copy(pages = settings), "Seiten-Einstellungen gespeichert")
+
+    fun applyApps(settings: AppSpaceSettings): Boolean =
+        persistSection(document.copy(apps = settings), "App-Drawer-Einstellungen gespeichert")
+
+    fun applyDock(settings: DockSettings): Boolean =
+        persistSection(document.copy(dock = settings.normalized()), "Dock-Einstellungen gespeichert")
+
+    fun applyFolders(settings: FolderSettings): Boolean =
+        persistSection(document.copy(folders = settings), "Ordner-Einstellungen gespeichert")
+
+    fun applyWidgets(settings: WidgetSettings): Boolean =
+        persistSection(document.copy(widgets = settings.normalized()), "Widget-Einstellungen gespeichert")
+
     fun applyAppearance(settings: AppearanceSettings): Boolean =
         persistSection(document.copy(appearance = settings.normalized()), "Darstellung gespeichert")
 
+    fun applyTheme(settings: ThemeSettings): Boolean =
+        persistSection(document.copy(theme = settings), "Theme-Einstellungen gespeichert")
+
     fun applyAssistant(settings: LauncherAssistantSettings): Boolean =
-        persistSection(document.copy(assistant = settings.normalized()), "Assistent-Einstellungen gespeichert")
+        persistSection(document.copy(assistant = settings.normalized()), "Assistent-Darstellung gespeichert")
+
+    fun applyAi(settings: AiSettings): Boolean =
+        persistSection(document.copy(ai = settings.normalized()), "KI-Routing gespeichert")
+
+    fun applyVoice(settings: VoiceSettings): Boolean =
+        persistSection(document.copy(voice = settings), "Portable Sprachpräferenzen gespeichert")
+
+    fun applyGestures(settings: GestureSettings): Boolean =
+        persistSection(document.copy(gestures = settings.normalized()), "Gesten gespeichert")
+
+    fun applySearch(settings: SearchSettings): Boolean =
+        persistSection(document.copy(search = settings), "Such-Einstellungen gespeichert")
+
+    fun applyNotifications(settings: NotificationSettings): Boolean =
+        persistSection(document.copy(notifications = settings), "Badge-Einstellungen gespeichert")
+
+    fun applyPen(settings: PenSettings): Boolean =
+        persistSection(document.copy(pen = settings), "Smartpen-Einstellungen gespeichert")
+
+    fun applyAutomation(settings: AutomationSettings): Boolean =
+        persistSection(document.copy(automation = settings), "Automations-Einstellungen gespeichert")
+
+    fun applyAccessibility(settings: AccessibilitySettings): Boolean =
+        persistSection(document.copy(accessibility = settings), "Barrierefreiheits-Einstellungen gespeichert")
+
+    fun applyPrivacy(settings: PrivacySettings): Boolean =
+        persistSection(document.copy(privacy = settings.normalized()), "Datenschutz-Einstellungen gespeichert")
+
+    fun applyBackup(settings: BackupSettings): Boolean =
+        persistSection(document.copy(backup = settings), "Backup-Einstellungen gespeichert")
+
+    fun applySystem(settings: SystemIntegrationSettings): Boolean =
+        persistSection(document.copy(system = settings), "Systemintegrations-Einstellungen gespeichert")
+
+    fun applyAdvanced(settings: AdvancedSettings): Boolean =
+        persistSection(document.copy(advanced = settings), "Erweiterte Einstellungen gespeichert")
 
     fun undo(home: WorkspaceHomeController): Boolean {
         val previousSettings = undoDocument ?: return false
