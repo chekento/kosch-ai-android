@@ -66,6 +66,10 @@ class AssistantAgentController(context: Context) {
         )
     }
 
+    fun setLocalWakeWordOnly(enabled: Boolean) {
+        updatePreferences(preferences.copy(localWakeWordOnly = enabled))
+    }
+
     /**
      * This is the only capability-enabling path for screen/camera awareness. UI code must call it
      * directly from a user gesture. Agent plans, providers and automations must not call it.
@@ -90,6 +94,10 @@ class AssistantAgentController(context: Context) {
 
     fun setActionExecutionEnabled(enabled: Boolean) {
         updatePreferences(preferences.copy(actionExecutionEnabled = enabled))
+    }
+
+    fun setConfirmationRequiredForExternalActions(enabled: Boolean) {
+        updatePreferences(preferences.copy(confirmationRequiredForExternalActions = enabled))
     }
 
     fun armWakeWord() {
