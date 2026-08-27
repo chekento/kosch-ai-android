@@ -57,7 +57,7 @@ class Tun2SocksOfflinePocRepositoryContractTest {
     }
 
     @Test
-    fun builder_isPinnedOfflineAndBindsOnlyFacade() {
+    fun builder_isPinnedNetworkIsolatedAndBindsOnlyFacade() {
         val script = pocFile("build-pinned-aar.sh")
 
         assertTrue(script.contains(Tun2SocksOfflinePocContract.UPSTREAM_COMMIT))
@@ -71,6 +71,9 @@ class Tun2SocksOfflinePocRepositoryContractTest {
         assertTrue(script.contains("ndk_version="))
         assertTrue(script.contains("GOPROXY=off"))
         assertTrue(script.contains("GOSUMDB=off"))
+        assertTrue(script.contains("KOSCH_NETWORK_NAMESPACE_ISOLATED"))
+        assertTrue(script.contains("find /sys/class/net"))
+        assertTrue(script.contains("network_namespace_isolated=true"))
         assertTrue(script.contains("apply --check"))
         assertTrue(script.contains("for tool in git go gomobile gobind sha256sum unzip jar awk grep"))
         assertTrue(script.contains("go mod edit -require="))
@@ -99,7 +102,7 @@ class Tun2SocksOfflinePocRepositoryContractTest {
     }
 
     @Test
-    fun evidenceWorkflow_isManualAndSeparatesOnlinePreparationFromOfflineBuild() {
+    fun evidenceWorkflow_isManualAndSeparatesOnlinePreparationFromIsolatedBuild() {
         val workflow = repositoryFile(".github/workflows/n2-forwarder-poc.yml")
 
         assertTrue(workflow.contains("workflow_dispatch:"))
@@ -110,9 +113,15 @@ class Tun2SocksOfflinePocRepositoryContractTest {
         assertTrue(workflow.contains(Tun2SocksOfflinePocContract.NDK_VERSION))
         assertTrue(workflow.contains("GO_LINUX_AMD64_SHA256"))
         assertTrue(workflow.contains("Prepare networked dependency cache"))
-        assertTrue(workflow.contains("Run pinned builder offline"))
+        assertTrue(workflow.contains("Run pinned builder in isolated network namespace"))
+        assertTrue(workflow.contains("sudo -E unshare --net"))
+        assertTrue(workflow.contains("KOSCH_NETWORK_NAMESPACE_ISOLATED=1"))
         assertTrue(workflow.contains("GOPROXY: off"))
         assertTrue(workflow.contains("GOSUMDB: off"))
+        assertTrue(workflow.contains("Verify dependency graph and merged manifest remain inert"))
+        assertTrue(workflow.contains(":app:dependencies --configuration debugRuntimeClasspath"))
+        assertTrue(workflow.contains(":app:processDebugMainManifest"))
+        assertTrue(workflow.contains("android.permission.INTERNET"))
         assertTrue(workflow.contains("runtime_integrated=false"))
         assertTrue(workflow.contains("vpn_established=false"))
         assertTrue(workflow.contains("internet_permission_added=false"))
