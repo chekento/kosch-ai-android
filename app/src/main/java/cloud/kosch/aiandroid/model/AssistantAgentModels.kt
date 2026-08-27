@@ -70,6 +70,7 @@ data class AssistantCharacterProfile(
  */
 data class AssistantAgentPreferences(
     val characterId: String = "default",
+    val assistantName: String = "",
     val presenceMode: AssistantPresenceMode = AssistantPresenceMode.AMBIENT,
     val wakeWordMode: AssistantWakeWordMode = AssistantWakeWordMode.OFF,
     val customWakeWord: String = "",
