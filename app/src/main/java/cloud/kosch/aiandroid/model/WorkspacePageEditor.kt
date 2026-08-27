@@ -235,21 +235,23 @@ object WorkspacePageEditor {
         return normalized.copy(pages = pages).normalized()
     }
 
-    /** Packs a user page from top-left while preserving item order, size and content. */
+    /**
+     * Packs a user page toward top-left while preserving final item order, size and content.
+     *
+     * Placement search is intentionally not performed in persisted item order. Large/constrained items are
+     * solved first with bounded deterministic backtracking, then their solved bounds are mapped back onto the
+     * original list. If the bounded search cannot improve a currently valid page, auto-arrange is a no-op rather
+     * than throwing or losing an item.
+     */
     fun compactUserPage(document: WorkspaceDocument, pageId: String): WorkspaceDocument {
         val normalized = document.normalized()
         val page = normalized.pages.firstOrNull { it.id == pageId }
             ?: throw IllegalArgumentException("Workspace page does not exist")
         require(page.sceneAdapter == null) { "Legacy scene pages cannot be auto-arranged" }
-        val packed = mutableListOf<WorkspaceItem>()
-        page.items.forEach { item ->
-            val bounds = firstFreeBounds(
-                grid = normalized.grid,
-                items = packed,
-                columnSpan = item.bounds.columnSpan,
-                rowSpan = item.bounds.rowSpan,
-            ) ?: throw IllegalStateException("Workspace page cannot be compacted without losing an item")
-            packed += item.copy(bounds = bounds)
+
+        val solvedBounds = WorkspaceCompactSolver.solve(normalized.grid, page.items) ?: return normalized
+        val packed = page.items.map { item ->
+            item.copy(bounds = solvedBounds[item.id] ?: item.bounds)
         }
         if (packed == page.items) return normalized
         return normalized.copy(
