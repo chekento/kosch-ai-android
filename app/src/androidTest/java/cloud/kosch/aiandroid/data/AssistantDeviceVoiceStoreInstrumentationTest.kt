@@ -7,7 +7,10 @@ import cloud.kosch.aiandroid.AssistantVoiceController
 import cloud.kosch.aiandroid.model.AssistantSystemVoiceOption
 import cloud.kosch.aiandroid.model.AssistantVoiceGender
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -35,10 +38,12 @@ class AssistantDeviceVoiceStoreInstrumentationTest {
     }
 
     @Test
-    fun controller_onlyAssignsVoicesReportedByCurrentTtsRuntime() {
+    fun controller_onlyAssignsVoicesReportedByCurrentTtsRuntime_andKeepsGenderSlotsDistinct() {
         val store = AssistantDeviceVoiceStore(context)
         val original = store.load()
         try {
+            store.assign(AssistantVoiceGender.FEMALE, null)
+            store.assign(AssistantVoiceGender.MALE, null)
             val controller = AssistantVoiceController(context)
             controller.updateAvailableVoices(
                 listOf(
@@ -59,11 +64,18 @@ class AssistantDeviceVoiceStoreInstrumentationTest {
                 ),
             )
 
-            controller.assignFromUser(AssistantVoiceGender.FEMALE, "local_voice_one")
+            assertTrue(controller.assignFromUser(AssistantVoiceGender.FEMALE, "local_voice_one"))
             assertEquals("local_voice_one", controller.assignedVoiceName(AssistantVoiceGender.FEMALE))
             assertEquals(false, controller.assignedVoice(AssistantVoiceGender.FEMALE)?.networkRequired)
 
-            controller.assignFromUser(AssistantVoiceGender.FEMALE, null)
+            assertFalse(controller.assignFromUser(AssistantVoiceGender.MALE, "local_voice_one"))
+            assertNull(controller.assignedVoiceName(AssistantVoiceGender.MALE))
+            assertNotNull(controller.statusMessage)
+
+            assertTrue(controller.assignFromUser(AssistantVoiceGender.MALE, "network_voice_two"))
+            assertEquals("network_voice_two", controller.assignedVoiceName(AssistantVoiceGender.MALE))
+
+            assertTrue(controller.assignFromUser(AssistantVoiceGender.FEMALE, null))
             assertNull(controller.assignedVoiceName(AssistantVoiceGender.FEMALE))
         } finally {
             store.assign(AssistantVoiceGender.FEMALE, original.femaleVoiceName)
