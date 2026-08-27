@@ -38,6 +38,13 @@ object AssistantVisualContextRuntime {
         val jpegBytes: ByteArray,
     )
 
+    data class Event(
+        val status: Status,
+        val metadata: Metadata?,
+        val failureMessage: String?,
+        val generation: Long,
+    )
+
     var status by mutableStateOf(Status.IDLE)
         private set
     var requestedSource by mutableStateOf<AssistantObservationSource?>(null)
@@ -54,6 +61,12 @@ object AssistantVisualContextRuntime {
     private var claimedRequestId: Long? = null
     private var jpegPayload: ByteArray? = null
     private var requestCreatedAtEpochMillis = 0L
+    private var eventListener: ((Event) -> Unit)? = null
+
+    @Synchronized
+    fun setEventListener(listener: ((Event) -> Unit)?) {
+        eventListener = listener
+    }
 
     @Synchronized
     fun request(source: AssistantObservationSource): Long {
@@ -118,6 +131,7 @@ object AssistantVisualContextRuntime {
         status = Status.READY
         failureMessage = null
         generation += 1L
+        emitLocked()
         return true
     }
 
@@ -160,6 +174,7 @@ object AssistantVisualContextRuntime {
     fun resetForTest() {
         clearLocked()
         nextRequestId = 1L
+        eventListener = null
         generation += 1L
     }
 
@@ -172,6 +187,7 @@ object AssistantVisualContextRuntime {
         status = Status.FAILED
         failureMessage = message.take(240)
         generation += 1L
+        emitLocked()
     }
 
     private fun expireLocked(nowEpochMillis: Long) {
@@ -188,6 +204,18 @@ object AssistantVisualContextRuntime {
             clearLocked()
             generation += 1L
         }
+    }
+
+    private fun emitLocked() {
+        val listener = eventListener ?: return
+        listener(
+            Event(
+                status = status,
+                metadata = metadata,
+                failureMessage = failureMessage,
+                generation = generation,
+            ),
+        )
     }
 
     private fun clearLocked() {
