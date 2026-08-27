@@ -50,6 +50,29 @@
             </intent-filter>
         </activity>
 
+        <!--
+             Official, user-initiated Android ingress for highlighted/shared text. This endpoint receives only the
+             text Android explicitly supplies after PROCESS_TEXT/ACTION_SEND; it has no additional permission and
+             still places the payload behind KoSch's explicit disclosure-scope consent surface.
+        -->
+        <activity
+            android:name=".AiTextIngressActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:label="Mit KoSch fragen"
+            android:screenOrientation="unspecified">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name=".WorkspaceWidgetPickerActivity"
             android:exported="false"
