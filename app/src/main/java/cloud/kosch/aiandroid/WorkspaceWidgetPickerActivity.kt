@@ -90,7 +90,10 @@ class WorkspaceWidgetPickerActivity : ComponentActivity() {
 
         val remapItemId = remapWorkspaceItemId
         val committed = if (remapItemId == null) {
-            WorkspaceHomeController(applicationContext).addWidget(appWidgetId, providerComponent)
+            WorkspaceHomeController(
+                context = applicationContext,
+                registerAsActive = false,
+            ).addWidget(appWidgetId, providerComponent)
         } else {
             val result = WorkspaceWidgetRemapCoordinator(applicationContext).remap(
                 workspaceItemId = remapItemId,
@@ -108,7 +111,7 @@ class WorkspaceWidgetPickerActivity : ComponentActivity() {
         if (!committed) {
             widgetHost.deleteId(appWidgetId)
         }
-        WorkspaceWidgetChangeSignal.notifyChanged()
+        WorkspaceHomeController.notifyPersistedChange()
         setResult(if (committed) Activity.RESULT_OK else Activity.RESULT_CANCELED)
         finish()
     }
