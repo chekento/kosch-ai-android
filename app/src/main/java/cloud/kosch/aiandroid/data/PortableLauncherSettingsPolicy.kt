@@ -9,6 +9,10 @@ import cloud.kosch.aiandroid.model.LauncherSettingsDocument
  * Settings-Center schema fields still exist for additive codec compatibility, but they are shadow fields only:
  * imports, local launcher-settings persistence and portable exports are projected back to neutral defaults.
  * Presentation choices remain portable.
+ *
+ * Backup security invariants are projected here as well. Legacy schema booleans that describe whether secrets or
+ * device ids may be exported are retained for wire compatibility, but they are not permissions: both are forced on
+ * for save/import/export so a tampered settings document can never weaken the actual backup trust boundary.
  */
 object PortableLauncherSettingsPolicy {
     fun project(document: LauncherSettingsDocument): LauncherSettingsDocument {
@@ -22,6 +26,10 @@ object PortableLauncherSettingsPolicy {
                 liveChatEnabled = defaults.liveChatEnabled,
                 voiceInputEnabled = defaults.voiceInputEnabled,
                 speechOutputEnabled = defaults.speechOutputEnabled,
+            ),
+            backup = normalized.backup.copy(
+                excludeSecretsAlways = true,
+                excludeWidgetHostIdsAlways = true,
             ),
         ).normalized()
     }
