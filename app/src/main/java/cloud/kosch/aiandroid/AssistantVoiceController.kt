@@ -22,28 +22,41 @@ class AssistantVoiceController(context: Context) {
     var availableVoices by mutableStateOf<List<AssistantSystemVoiceOption>>(emptyList())
         private set
 
+    var statusMessage by mutableStateOf<String?>(null)
+        private set
+
     fun updateAvailableVoices(voices: Collection<AssistantSystemVoiceOption>) {
         availableVoices = voices
             .distinctBy { it.name }
             .sortedWith(compareBy<AssistantSystemVoiceOption>({ it.networkRequired }, { it.languageTag }, { it.name }))
     }
 
-    fun assignFromUser(gender: AssistantVoiceGender, voiceName: String?) {
+    fun assignFromUser(gender: AssistantVoiceGender, voiceName: String?): Boolean {
         val normalized = voiceName?.trim()?.takeIf { it.isNotEmpty() }
+        if (normalized != null && availableVoices.none { it.name == normalized }) {
+            statusMessage = "TTS-Stimme ist auf diesem Gerät nicht verfügbar"
+            return false
+        }
         if (normalized != null) {
-            require(availableVoices.any { it.name == normalized }) { "TTS-Stimme ist auf diesem Gerät nicht verfügbar" }
-            when (gender) {
-                AssistantVoiceGender.FEMALE -> require(assignments.maleVoiceName != normalized) {
-                    "Dieselbe TTS-Stimme darf nicht gleichzeitig weiblichem und männlichem Slot zugeordnet sein"
-                }
-                AssistantVoiceGender.MALE -> require(assignments.femaleVoiceName != normalized) {
-                    "Dieselbe TTS-Stimme darf nicht gleichzeitig männlichem und weiblichem Slot zugeordnet sein"
-                }
-                AssistantVoiceGender.NEUTRAL -> Unit
+            val conflict = when (gender) {
+                AssistantVoiceGender.FEMALE -> assignments.maleVoiceName == normalized
+                AssistantVoiceGender.MALE -> assignments.femaleVoiceName == normalized
+                AssistantVoiceGender.NEUTRAL -> false
+            }
+            if (conflict) {
+                statusMessage = "Weiblicher und männlicher Voice-Slot müssen unterschiedliche Stimmen verwenden"
+                return false
             }
         }
-        store.assign(gender, normalized)
-        assignments = assignments.withAssignment(gender, normalized)
+        return runCatching {
+            store.assign(gender, normalized)
+            assignments = assignments.withAssignment(gender, normalized)
+            statusMessage = null
+            true
+        }.getOrElse {
+            statusMessage = "Stimmenzuordnung konnte nicht gespeichert werden"
+            false
+        }
     }
 
     fun assignedVoiceName(gender: AssistantVoiceGender): String? = assignments.forGender(gender)
