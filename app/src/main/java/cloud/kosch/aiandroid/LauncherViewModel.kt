@@ -37,7 +37,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         it.reconcile(homeWorkspace.document)
     }
     val customActions = CustomLauncherActionController(application)
-    val aiHub = AiHubController(application)
+    val aiHub = AiHubController(application).also { hub ->
+        // Even old/direct aiHub.open() call sites receive the same abstract context; explicit origins may override it.
+        hub.setDefaultRoutingContextProvider { currentAiHubContext(AiHubOrigin.HOME) }
+    }
 
     init {
         // Migrate every legacy provider entry path to the task-aware AI Hub without duplicating command parsing.
