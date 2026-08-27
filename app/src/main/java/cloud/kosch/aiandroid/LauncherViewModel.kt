@@ -2,6 +2,7 @@ package cloud.kosch.aiandroid
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import cloud.kosch.aiandroid.data.WorkspaceWidgetHostRecovery
 
 /**
  * Owns launcher, unified Home, Settings Center and assistant runtimes across Activity recreation.
@@ -12,6 +13,12 @@ import androidx.lifecycle.AndroidViewModel
  */
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
     val controller = LauncherController(application).also(LauncherController::start)
+
+    init {
+        // AppWidgetHost ids survive process death. Reconcile them before Home loads the device-local binding map.
+        WorkspaceWidgetHostRecovery(application).reconcile()
+    }
+
     val homeWorkspace = WorkspaceHomeController(application)
     val settings = LauncherSettingsController(application)
     val assistant = AssistantSessionController(application)
