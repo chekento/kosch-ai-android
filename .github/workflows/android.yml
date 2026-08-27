@@ -46,12 +46,14 @@ jobs:
 
       - name: Enforce launcher permission budget
         run: |
-          unexpected=$(grep '<uses-permission' app/src/main/AndroidManifest.xml | grep -v 'android.permission.ACCESS_NETWORK_STATE' || true)
+          allowed='android.permission.ACCESS_NETWORK_STATE|android.permission.CAMERA|android.permission.FOREGROUND_SERVICE|android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION'
+          unexpected=$(grep '<uses-permission' app/src/main/AndroidManifest.xml | grep -Ev "$allowed" || true)
           if [ -n "$unexpected" ]; then
             echo "Unexpected uses-permission declaration:"
             echo "$unexpected"
             exit 1
           fi
+          test "$(grep -c '<uses-permission' app/src/main/AndroidManifest.xml)" -eq 4
           test -s app/src/main/baseline-prof.txt
 
       - name: Verify, lint and assemble
@@ -65,6 +67,18 @@ jobs:
             echo "INTERNET permission must not enter the offline launcher APK"
             exit 1
           fi
+          if echo "$packaged_permissions" | grep -q 'android.permission.RECORD_AUDIO'; then
+            echo "RECORD_AUDIO must not enter before the explicit local wake-word stage"
+            exit 1
+          fi
+          for permission in \
+            android.permission.ACCESS_NETWORK_STATE \
+            android.permission.CAMERA \
+            android.permission.FOREGROUND_SERVICE \
+            android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION
+          do
+            echo "$packaged_permissions" | grep -q "$permission"
+          done
 
       - name: Prepare installable APK and checksum
         run: |
