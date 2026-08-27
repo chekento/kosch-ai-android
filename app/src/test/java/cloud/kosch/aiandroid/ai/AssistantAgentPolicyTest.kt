@@ -97,7 +97,7 @@ class AssistantAgentPolicyTest {
     }
 
     @Test
-    fun wakeWordResolver_keepsCharacterIndependentFromRuntime() {
+    fun wakeWordResolver_supportsComputerAssistantNameAndSafeCustomDrafts() {
         val character = AssistantCharacterCatalog.resolve("anime_female")
         assertNull(
             AssistantWakeWordResolver.resolve(
@@ -116,6 +116,35 @@ class AssistantAgentPolicyTest {
             character.displayName,
             AssistantWakeWordResolver.resolve(
                 preferences = AssistantAgentPreferences(wakeWordMode = AssistantWakeWordMode.ASSISTANT_NAME),
+                character = character,
+            ),
+        )
+        assertEquals(
+            "Aira",
+            AssistantWakeWordResolver.resolve(
+                preferences = AssistantAgentPreferences(
+                    wakeWordMode = AssistantWakeWordMode.ASSISTANT_NAME,
+                    assistantName = "Aira",
+                ),
+                character = character,
+            ),
+        )
+        assertNull(
+            AssistantWakeWordResolver.resolve(
+                preferences = AssistantAgentPreferences(
+                    wakeWordMode = AssistantWakeWordMode.CUSTOM,
+                    customWakeWord = "A",
+                ),
+                character = character,
+            ),
+        )
+        assertEquals(
+            "AI",
+            AssistantWakeWordResolver.resolve(
+                preferences = AssistantAgentPreferences(
+                    wakeWordMode = AssistantWakeWordMode.CUSTOM,
+                    customWakeWord = "AI",
+                ),
                 character = character,
             ),
         )
