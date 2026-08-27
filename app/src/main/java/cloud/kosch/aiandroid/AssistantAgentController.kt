@@ -72,11 +72,20 @@ class AssistantAgentController(context: Context) {
      * Disabling remains allowed from any safety/lifecycle path.
      */
     fun setObservationEnabledFromUser(source: AssistantObservationSource, enabled: Boolean) {
-        setObservationEnabledInternal(source, enabled)
+        val updated = observationPreference(source, enabled)
+        if (enabled) {
+            store.saveUserObservationOptIn(updated)
+            preferences = updated
+        } else {
+            updatePreferences(updated)
+            if (activeObservation == source) stopObservation()
+        }
     }
 
     fun disableObservation(source: AssistantObservationSource) {
-        setObservationEnabledInternal(source, false)
+        val updated = observationPreference(source, false)
+        updatePreferences(updated)
+        if (activeObservation == source) stopObservation()
     }
 
     fun setActionExecutionEnabled(enabled: Boolean) {
@@ -161,14 +170,11 @@ class AssistantAgentController(context: Context) {
         explicitUserConfirmation = explicitUserConfirmation,
     )
 
-    private fun setObservationEnabledInternal(source: AssistantObservationSource, enabled: Boolean) {
-        val updated = when (source) {
+    private fun observationPreference(source: AssistantObservationSource, enabled: Boolean): AssistantAgentPreferences =
+        when (source) {
             AssistantObservationSource.SCREEN -> preferences.copy(screenObservationEnabled = enabled)
             AssistantObservationSource.CAMERA -> preferences.copy(cameraObservationEnabled = enabled)
         }
-        updatePreferences(updated)
-        if (!enabled && activeObservation == source) stopObservation()
-    }
 
     private fun transitionActive(next: AssistantAgentState) {
         if (state != AssistantAgentState.DISABLED) {
