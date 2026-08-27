@@ -6,12 +6,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import cloud.kosch.aiandroid.ai.AiHubCatalog
+import cloud.kosch.aiandroid.ai.AiHubContextPolicy
 import cloud.kosch.aiandroid.ai.AiHubEntry
 import cloud.kosch.aiandroid.ai.AiHubEntryKind
 import cloud.kosch.aiandroid.ai.AiHubLaunchPlan
 import cloud.kosch.aiandroid.ai.AiHubLaunchPlanner
 import cloud.kosch.aiandroid.ai.AiHubPreferencePolicy
 import cloud.kosch.aiandroid.ai.AiHubRecommendation
+import cloud.kosch.aiandroid.ai.AiHubRoutingContext
 import cloud.kosch.aiandroid.ai.AiHubShortcutRoutePolicy
 import cloud.kosch.aiandroid.ai.AiHubTaskIntent
 import cloud.kosch.aiandroid.ai.AiHubTaskRouter
@@ -31,6 +33,9 @@ import cloud.kosch.aiandroid.system.SystemActionGateway
  * inventory remains owned by LauncherController/AppCatalog and is supplied as an immutable snapshot. Launching uses
  * Android's official LauncherApps, Share, browser, shortcut and Play Store routes; no Accessibility automation or
  * undocumented prompt injection.
+ *
+ * Routing order is deliberate: semantic task -> privacy-minimal local context -> valid device-local preference ->
+ * published Android shortcut / normal safe Android route. Context never grants a capability or observation right.
  */
 class AiHubController(context: Context) {
     private val appContext = context.applicationContext
@@ -51,6 +56,8 @@ class AiHubController(context: Context) {
         private set
     var preferredTargetIds by mutableStateOf(preferenceStore.snapshot())
         private set
+    var routingContext by mutableStateOf(AiHubRoutingContext())
+        private set
 
     fun entries(apps: List<LaunchableApp>): List<AiHubEntry> = AiHubCatalog.entries(apps, hiddenIds)
 
@@ -62,8 +69,9 @@ class AiHubController(context: Context) {
         val intent = inferredTask()
         val availableEntries = entries(apps)
         val base = AiHubTaskRouter.rank(prompt, availableEntries, availableEntries.size)
+        val contextual = AiHubContextPolicy.apply(routingContext, base)
         return AiHubPreferencePolicy
-            .apply(intent, preferredTargetIds[intent], base)
+            .apply(intent, preferredTargetIds[intent], contextual)
             .take(limit)
     }
 
@@ -139,8 +147,12 @@ class AiHubController(context: Context) {
         return true
     }
 
-    fun open(initialPrompt: String = "") {
+    fun open(
+        initialPrompt: String = "",
+        context: AiHubRoutingContext = AiHubRoutingContext(),
+    ) {
         publishedSurfaceCache.clear()
+        routingContext = context
         prompt = initialPrompt.take(MAX_PROMPT_CHARS)
         notice = null
         visible = true
