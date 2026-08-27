@@ -81,6 +81,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -114,8 +115,8 @@ import java.util.Locale
 /**
  * First user-facing surface backed directly by WorkspaceDocument v7.
  *
- * Pointer drag/drop intentionally follows in the next interaction slice. Every placement operation here is
- * already available through explicit buttons so keyboard and accessibility users are not dependent on drag.
+ * Every placement operation remains available through explicit controls so keyboard and accessibility users are
+ * not dependent on direct manipulation. V7 widgets keep their Android host ids outside the portable document.
  */
 @Composable
 fun UnifiedWorkspaceHomeScreen(
@@ -297,7 +298,7 @@ private fun UnifiedHomeHeader(
                 Icon(Icons.Rounded.Edit, contentDescription = if (editMode) "Edit-Modus beenden" else "Homescreen bearbeiten")
             }
             IconButton(onClick = onAdd) {
-                Icon(Icons.Rounded.Add, contentDescription = "App, Ordner oder Seite hinzufügen")
+                Icon(Icons.Rounded.Add, contentDescription = "App, Ordner, Widget oder Seite hinzufügen")
             }
             IconButton(onClick = onPageManage) {
                 Icon(Icons.Rounded.MoreVert, contentDescription = "Home-Seiten verwalten")
@@ -377,7 +378,7 @@ private fun UnifiedGrid(
             ) {
                 Icon(Icons.Rounded.Add, contentDescription = null, tint = Mint, modifier = Modifier.size(36.dp))
                 Text("Diese Home-Seite ist noch leer", fontWeight = FontWeight.SemiBold)
-                Text("Tippe oben auf + und platziere Apps oder Ordner.", color = MutedMist)
+                Text("Tippe oben auf + und platziere Apps, Ordner oder Widgets.", color = MutedMist)
             }
         }
 
@@ -414,7 +415,12 @@ private fun UnifiedGrid(
                         onClick = { onOpenFolder(content.folderId) },
                         onEdit = { onEditItem(item.id) },
                     )
-                    is WorkspaceItemContent.Widget -> MissingWidgetPlaceholder(item, editMode) { onEditItem(item.id) }
+                    is WorkspaceItemContent.Widget -> WorkspaceWidgetHomeItem(
+                        item = item,
+                        home = home,
+                        editMode = editMode,
+                        onEdit = { onEditItem(item.id) },
+                    )
                 }
             }
         }
@@ -544,20 +550,6 @@ private fun FolderHomeItem(
 }
 
 @Composable
-private fun MissingWidgetPlaceholder(item: WorkspaceItem, editMode: Boolean, onEdit: () -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxSize().clickable(enabled = editMode, onClick = onEdit),
-        color = Warm.copy(alpha = 0.10f),
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, Warm.copy(alpha = 0.30f)),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text("Widget · Remap folgt", color = Warm, style = MaterialTheme.typography.labelSmall)
-        }
-    }
-}
-
-@Composable
 private fun UnifiedHomeDock(
     controller: LauncherController,
     onOpenApps: () -> Unit,
@@ -635,6 +627,7 @@ private fun AddToHomeSheet(
     home: WorkspaceHomeController,
     onDismiss: () -> Unit,
 ) {
+    val context = LocalContext.current
     var tab by remember { mutableStateOf(AddTab.APPS) }
     var query by remember { mutableStateOf("") }
     ModalBottomSheet(
@@ -653,18 +646,24 @@ private fun AddToHomeSheet(
                 }
                 IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, contentDescription = "Schließen") }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 FilterChip(selected = tab == AddTab.APPS, onClick = { tab = AddTab.APPS }, label = { Text("Apps") })
                 FilterChip(selected = tab == AddTab.FOLDERS, onClick = { tab = AddTab.FOLDERS }, label = { Text("Ordner") })
+                FilterChip(selected = tab == AddTab.WIDGETS, onClick = { tab = AddTab.WIDGETS }, label = { Text("Widgets") })
                 AssistChip(onClick = { home.createPage() }, label = { Text("+ Seite") })
             }
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it.take(80) },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Suchen") },
-                singleLine = true,
-            )
+            if (tab != AddTab.WIDGETS) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it.take(80) },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Suchen") },
+                    singleLine = true,
+                )
+            }
             when (tab) {
                 AddTab.APPS -> {
                     val visible = controller.apps
@@ -709,6 +708,35 @@ private fun AddToHomeSheet(
                         }
                         if (controller.folders.isEmpty()) {
                             item { Text("Noch keine Launcher-Ordner vorhanden.", color = MutedMist) }
+                        }
+                    }
+                }
+                AddTab.WIDGETS -> {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = RaisedSurface,
+                        shape = RoundedCornerShape(18.dp),
+                        border = BorderStroke(1.dp, Sky.copy(alpha = 0.24f)),
+                    ) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                        ) {
+                            Text("Android-Widgets", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                "Die Auswahl und Konfiguration übernimmt Android. KoSch speichert nur Provider und Rasterposition portabel; die Host-ID bleibt auf diesem Gerät.",
+                                color = MutedMist,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            Button(
+                                onClick = {
+                                    launchWorkspaceWidgetPicker(context)
+                                    onDismiss()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Widget auswählen")
+                            }
                         }
                     }
                 }
@@ -794,6 +822,7 @@ private fun WorkspaceItemEditor(
     itemId: String,
     onDismiss: () -> Unit,
 ) {
+    val context = LocalContext.current
     val item = home.activePage.items.firstOrNull { it.id == itemId }
     if (item == null) {
         LaunchedEffect(itemId) { onDismiss() }
@@ -805,6 +834,17 @@ private fun WorkspaceItemEditor(
         text = {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("Raster: ${item.bounds.column}, ${item.bounds.row} · ${item.bounds.columnSpan}×${item.bounds.rowSpan}", color = MutedMist)
+                if (item.content is WorkspaceItemContent.Widget) {
+                    OutlinedButton(
+                        onClick = {
+                            launchWorkspaceWidgetPicker(context, itemId)
+                            onDismiss()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("Widget neu zuordnen")
+                    }
+                }
                 IconButton(onClick = { home.moveItemBy(itemId, 0, -1) }) {
                     Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Element nach oben verschieben")
                 }
@@ -882,5 +922,5 @@ private fun InlineFolderSheet(
 }
 
 private const val MAX_COMMAND_LENGTH = 4_096
-private enum class AddTab { APPS, FOLDERS }
+private enum class AddTab { APPS, FOLDERS, WIDGETS }
 private enum class PageDialogMode { MANAGE }
