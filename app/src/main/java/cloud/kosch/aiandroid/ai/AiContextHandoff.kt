@@ -9,6 +9,7 @@ enum class AiContextHandoffKind(val title: String) {
     PEN_SKETCH("Skizze"),
     WEB_PAGE("Webseite"),
     SCREEN_FRAME("Bildschirmframe"),
+    SELECTED_TEXT("Markierter Text"),
 }
 
 data class AiContextHandoffDraft(
@@ -125,6 +126,27 @@ object AiContextHandoffPolicy {
         excerpt = localDescription,
         fallbackTitle = "Ausgewählter Bildschirmframe",
     )
+
+    /**
+     * Android PROCESS_TEXT / ACTION_SEND entry. The caller supplies only text explicitly selected/shared by the user;
+     * source package, clipboard history and surrounding document content are intentionally not represented here.
+     */
+    fun fromSelectedText(
+        text: CharSequence,
+        title: String? = null,
+    ): AiContextHandoffDraft {
+        val selected = text.toString().trim().take(AiContextHandoffDraft.MAX_EXCERPT_CHARS)
+        require(selected.isNotBlank()) { "Selected text must not be blank" }
+        return fromTextContext(
+            kind = AiContextHandoffKind.SELECTED_TEXT,
+            title = title.orEmpty(),
+            mimeType = "text/plain",
+            sizeBytes = selected.toByteArray(Charsets.UTF_8).size.toLong(),
+            summary = "Vom Nutzer über Android bewusst ausgewählter Text · ${selected.length} Zeichen. Der eigentliche Text bleibt bis zum Auszug-Opt-in lokal.",
+            excerpt = selected,
+            fallbackTitle = "Ausgewählter Text",
+        )
+    }
 
     fun confirm(
         draft: AiContextHandoffDraft,
