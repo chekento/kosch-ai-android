@@ -32,6 +32,15 @@ class AssistantVoiceController(context: Context) {
         val normalized = voiceName?.trim()?.takeIf { it.isNotEmpty() }
         if (normalized != null) {
             require(availableVoices.any { it.name == normalized }) { "TTS-Stimme ist auf diesem Gerät nicht verfügbar" }
+            when (gender) {
+                AssistantVoiceGender.FEMALE -> require(assignments.maleVoiceName != normalized) {
+                    "Dieselbe TTS-Stimme darf nicht gleichzeitig weiblichem und männlichem Slot zugeordnet sein"
+                }
+                AssistantVoiceGender.MALE -> require(assignments.femaleVoiceName != normalized) {
+                    "Dieselbe TTS-Stimme darf nicht gleichzeitig männlichem und weiblichem Slot zugeordnet sein"
+                }
+                AssistantVoiceGender.NEUTRAL -> Unit
+            }
         }
         store.assign(gender, normalized)
         assignments = assignments.withAssignment(gender, normalized)
