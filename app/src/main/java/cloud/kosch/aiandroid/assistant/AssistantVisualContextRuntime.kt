@@ -170,6 +170,15 @@ object AssistantVisualContextRuntime {
         generation += 1L
     }
 
+    /** Clears a READY payload only if it still belongs to the expected request. */
+    @Synchronized
+    fun discard(requestId: Long): Boolean {
+        if (status != Status.READY || metadata?.requestId != requestId) return false
+        clearLocked()
+        generation += 1L
+        return true
+    }
+
     @Synchronized
     fun resetForTest() {
         clearLocked()
@@ -233,7 +242,7 @@ object AssistantVisualContextRuntime {
         (((rotationDegrees % 360) + 360) % 360 / 90) * 90
 
     const val MAX_CONTEXT_BYTES = 512 * 1024
+    const val READY_TTL_MILLIS = 30_000L
     private const val REQUEST_TTL_MILLIS = 10_000L
-    private const val READY_TTL_MILLIS = 30_000L
     private const val MIME_JPEG = "image/jpeg"
 }
