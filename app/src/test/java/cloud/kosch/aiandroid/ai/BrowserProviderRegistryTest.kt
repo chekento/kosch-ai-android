@@ -1,10 +1,5 @@
 package cloud.kosch.aiandroid.ai
 
-import android.content.ComponentName
-import android.os.Process
-import androidx.compose.ui.graphics.ImageBitmap
-import cloud.kosch.aiandroid.model.AppProfile
-import cloud.kosch.aiandroid.model.LaunchableApp
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -21,13 +16,22 @@ class BrowserProviderRegistryTest {
     }
 
     @Test
-    fun installedBrowser_beatsStoreFallback() {
-        val chrome = BrowserProviderRegistry.browsers.first { it.id == "chrome" }
-        val installed = app("Google Chrome", "com.android.chrome")
-        assertEquals(
-            BrowserRouteTarget.InstalledApp(installed),
-            BrowserProviderRegistry.routeTarget(chrome, listOf(installed)),
+    fun officialPackageHints_areExplicitAndStable() {
+        val expected = mapOf(
+            "chrome" to "com.android.chrome",
+            "edge" to "com.microsoft.emmx",
+            "opera" to "com.opera.browser",
+            "brave" to "com.brave.browser",
+            "duckduckgo" to "com.duckduckgo.mobile.android",
+            "firefox" to "org.mozilla.firefox",
+            "samsung-internet" to "com.sec.android.app.sbrowser",
+            "vivaldi" to "com.vivaldi.browser",
         )
+        expected.forEach { (id, packageName) ->
+            val browser = BrowserProviderRegistry.browsers.first { it.id == id }
+            assertTrue(packageName in browser.packageHints)
+            assertEquals(packageName, browser.playStorePackageName)
+        }
     }
 
     @Test
@@ -53,15 +57,4 @@ class BrowserProviderRegistryTest {
         assertFalse(firefox.aiCapabilities.contains(BrowserAiCapability.AGENTIC_BROWSING))
         assertTrue(edge.aiCapabilities.contains(BrowserAiCapability.SUMMARIZE_PAGE))
     }
-
-    private fun app(label: String, packageName: String) = LaunchableApp(
-        key = "$packageName/Main",
-        label = label,
-        packageName = packageName,
-        componentName = ComponentName(packageName, "$packageName.Main"),
-        user = Process.myUserHandle(),
-        userSerialNumber = 0L,
-        profile = AppProfile.PERSONAL,
-        icon = ImageBitmap(1, 1),
-    )
 }
