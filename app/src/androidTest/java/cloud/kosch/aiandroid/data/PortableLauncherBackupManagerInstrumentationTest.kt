@@ -109,7 +109,9 @@ class PortableLauncherBackupManagerInstrumentationTest {
             ),
         )
 
-        val payload = manager.createPortablePayload(nowEpochMillis = 1_800_000_000_000L)
+        // WorkspaceStore deliberately rejects snapshots with implausible future creation times. Use the device clock
+        // so this end-to-end test exercises a payload that could actually have been produced on the device.
+        val payload = manager.createPortablePayload(nowEpochMillis = System.currentTimeMillis())
 
         assertTrue(settingsStore.save(LauncherSettingsDocument()))
         assertTrue(scopedStore.reset())
