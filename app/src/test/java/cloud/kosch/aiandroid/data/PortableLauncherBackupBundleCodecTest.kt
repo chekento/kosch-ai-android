@@ -36,6 +36,13 @@ class PortableLauncherBackupBundleCodecTest {
     }
 
     @Test
+    fun legacyPayloadLargerThanNewBundleBudget_stillFallsThroughToLegacyDecoder() {
+        val legacy = ByteArray(4 * 1024 * 1024 + 1) { 'x'.code.toByte() }
+        legacy[0] = '{'.code.toByte()
+        assertNull(PortableLauncherBackupBundleCodec.decodeOrNull(legacy))
+    }
+
+    @Test
     fun missingUnknownOrDuplicateSections_areRejected() {
         val encoded = PortableLauncherBackupBundleCodec.encode(bundle).decodeToString()
         val missing = encoded.lineSequence().filterNot { it.startsWith("actions|") }.joinToString("\n").encodeToByteArray()
