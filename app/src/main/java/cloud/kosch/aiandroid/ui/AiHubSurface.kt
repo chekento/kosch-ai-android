@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -171,7 +170,7 @@ fun AiHubSurface(
                 }
                 if (hub.hiddenIds.isNotEmpty()) {
                     AssistChip(
-                        onClick = hub::restoreAll,
+                        onClick = { hub.restoreAll() },
                         label = { Text("${hub.hiddenIds.size} wiederherstellen") },
                         leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp)) },
                     )
@@ -193,7 +192,7 @@ fun AiHubSurface(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("Keine sichtbaren Einträge", color = MutedMist)
                         if (hub.hiddenIds.isNotEmpty()) {
-                            TextButton(onClick = hub::restoreAll) { Text("Ausgeblendete Vorschläge zurückholen") }
+                            TextButton(onClick = { hub.restoreAll() }) { Text("Ausgeblendete Vorschläge zurückholen") }
                         }
                     }
                 }
