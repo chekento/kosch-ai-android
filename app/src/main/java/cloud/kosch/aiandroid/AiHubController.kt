@@ -9,6 +9,9 @@ import cloud.kosch.aiandroid.ai.AiHubCatalog
 import cloud.kosch.aiandroid.ai.AiHubEntry
 import cloud.kosch.aiandroid.ai.AiHubLaunchPlan
 import cloud.kosch.aiandroid.ai.AiHubLaunchPlanner
+import cloud.kosch.aiandroid.ai.AiHubRecommendation
+import cloud.kosch.aiandroid.ai.AiHubTaskIntent
+import cloud.kosch.aiandroid.ai.AiHubTaskRouter
 import cloud.kosch.aiandroid.data.DismissedSuggestionStore
 import cloud.kosch.aiandroid.model.LaunchableApp
 import cloud.kosch.aiandroid.system.SystemActionGateway
@@ -36,6 +39,13 @@ class AiHubController(context: Context) {
         private set
 
     fun entries(apps: List<LaunchableApp>): List<AiHubEntry> = AiHubCatalog.entries(apps, hiddenIds)
+
+    fun recommendations(
+        apps: List<LaunchableApp>,
+        limit: Int = 4,
+    ): List<AiHubRecommendation> = AiHubTaskRouter.rank(prompt, entries(apps), limit)
+
+    fun inferredTask(): AiHubTaskIntent = AiHubTaskRouter.infer(prompt)
 
     fun open(initialPrompt: String = "") {
         prompt = initialPrompt.take(MAX_PROMPT_CHARS)
