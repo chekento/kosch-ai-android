@@ -12,6 +12,7 @@ import cloud.kosch.aiandroid.model.AssistantMessage
 import cloud.kosch.aiandroid.model.AssistantMessageRole
 import cloud.kosch.aiandroid.model.AssistantSettings
 import cloud.kosch.aiandroid.model.AssistantVisualState
+import cloud.kosch.aiandroid.ui.components.AssistantAttentionSignal
 import cloud.kosch.aiandroid.ui.components.AssistantSpeechSignal
 import cloud.kosch.aiandroid.ui.components.AssistantVisemeMapper
 import kotlin.math.sqrt
@@ -42,6 +43,8 @@ class AssistantSessionController(context: Context) {
         private set
     var speechSignal by mutableStateOf(AssistantSpeechSignal.Idle)
         private set
+    var attentionSignal by mutableStateOf(AssistantAttentionSignal.Idle)
+        private set
 
     fun open() {
         sheetVisible = true
@@ -58,6 +61,7 @@ class AssistantSessionController(context: Context) {
         updateSettings(settings.copy(enabled = enabled))
         awaitingVoice = false
         clearSpeechSignal()
+        if (!enabled) attentionSignal = AssistantAttentionSignal.Idle
         visualState = if (enabled) AssistantVisualState.IDLE else AssistantVisualState.DISABLED
         if (enabled && messages.isEmpty()) {
             append(
@@ -81,10 +85,26 @@ class AssistantSessionController(context: Context) {
         updateSettings(settings.copy(reducedMotion = enabled))
     }
 
+    fun pointerAttention(normalizedX: Float, normalizedY: Float, pressed: Boolean) {
+        if (!settings.enabled) return
+        attentionSignal = attentionSignal.pointer(
+            normalizedX = normalizedX,
+            normalizedY = normalizedY,
+            isPressed = pressed,
+            nowUptimeMillis = SystemClock.uptimeMillis(),
+        )
+    }
+
+    fun attentionActivated() {
+        if (!settings.enabled) return
+        attentionSignal = attentionSignal.activate(SystemClock.uptimeMillis())
+    }
+
     fun clearSession() {
         messages = emptyList()
         handoffPrompt = null
         clearSpeechSignal()
+        attentionSignal = AssistantAttentionSignal.Idle
         visualState = if (settings.enabled) AssistantVisualState.IDLE else AssistantVisualState.DISABLED
     }
 

@@ -47,8 +47,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -56,7 +54,7 @@ import cloud.kosch.aiandroid.AssistantSessionController
 import cloud.kosch.aiandroid.LauncherController
 import cloud.kosch.aiandroid.model.AssistantMessageRole
 import cloud.kosch.aiandroid.model.AssistantVisualState
-import cloud.kosch.aiandroid.ui.components.AssistantAvatarFallback
+import cloud.kosch.aiandroid.ui.components.AssistantInteractiveAvatar
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 import cloud.kosch.aiandroid.ui.theme.Mint
 import cloud.kosch.aiandroid.ui.theme.MutedMist
@@ -83,17 +81,20 @@ fun AssistantHost(
                     modifier = Modifier
                         .align(Alignment.BottomEnd)
                         .padding(end = 16.dp, bottom = 104.dp)
-                        .size(width = 76.dp, height = 68.dp)
-                        .clickable(onClick = assistant::open)
-                        .semantics { contentDescription = "KoSch Assistent öffnen" },
+                        .size(width = 76.dp, height = 68.dp),
                     color = DeepSurface.copy(alpha = 0.97f),
                     shape = RoundedCornerShape(23.dp),
                     tonalElevation = 10.dp,
                 ) {
-                    AssistantAvatarFallback(
+                    AssistantInteractiveAvatar(
                         state = assistant.visualState,
                         speechSignal = assistant.speechSignal,
                         reducedMotion = effectiveReducedMotion,
+                        attentionSignal = assistant.attentionSignal,
+                        contentDescription = "KoSch Assistent öffnen",
+                        onPointerAttention = assistant::pointerAttention,
+                        onActivate = assistant::attentionActivated,
+                        onClick = assistant::open,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -164,10 +165,15 @@ private fun AssistantSheet(
                     color = RaisedSurface,
                     shape = RoundedCornerShape(22.dp),
                 ) {
-                    AssistantAvatarFallback(
+                    AssistantInteractiveAvatar(
                         state = assistant.visualState,
                         speechSignal = assistant.speechSignal,
                         reducedMotion = effectiveReducedMotion,
+                        attentionSignal = assistant.attentionSignal,
+                        contentDescription = "KoSch Assistent begrüßen",
+                        onPointerAttention = assistant::pointerAttention,
+                        onActivate = assistant::attentionActivated,
+                        onClick = {},
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

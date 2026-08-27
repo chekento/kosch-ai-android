@@ -15,9 +15,6 @@ import android.speech.tts.UtteranceProgressListener
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -26,10 +23,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.lifecycle.ViewModelProvider
 import cloud.kosch.aiandroid.LauncherViewModel
 import cloud.kosch.aiandroid.model.AssistantVisualState
@@ -238,28 +231,21 @@ fun CompanionFace(
     }
 
     val visualState = assistant?.visualState ?: AssistantVisualState.IDLE
-    Box(
-        modifier = modifier
-            .semantics {
-                role = Role.Button
-                contentDescription = if (assistant?.settings?.enabled == true) {
-                    "KoSch Assistant öffnen"
-                } else {
-                    "KoSch Assistant einrichten"
-                }
-            }
-            .clickable(
-                role = Role.Button,
-                onClick = { assistant?.open() ?: onClick() },
-            ),
-    ) {
-        AssistantAvatarFallback(
-            state = visualState,
-            speechSignal = assistant?.speechSignal ?: AssistantSpeechSignal.Idle,
-            reducedMotion = effectiveReducedMotion,
-            modifier = Modifier.fillMaxSize(),
-        )
-    }
+    AssistantInteractiveAvatar(
+        state = visualState,
+        speechSignal = assistant?.speechSignal ?: AssistantSpeechSignal.Idle,
+        reducedMotion = effectiveReducedMotion,
+        attentionSignal = assistant?.attentionSignal ?: AssistantAttentionSignal.Idle,
+        contentDescription = if (assistant?.settings?.enabled == true) {
+            "KoSch Assistant öffnen"
+        } else {
+            "KoSch Assistant einrichten"
+        },
+        onPointerAttention = { x, y, pressed -> assistant?.pointerAttention(x, y, pressed) },
+        onActivate = { assistant?.attentionActivated() },
+        onClick = { assistant?.open() ?: onClick() },
+        modifier = modifier,
+    )
 
     if (assistant != null && launcherController != null) {
         AssistantHost(

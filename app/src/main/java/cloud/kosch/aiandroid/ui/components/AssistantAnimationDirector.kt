@@ -73,14 +73,32 @@ object AssistantAnimationDirector {
         stateElapsedMillis: Long,
         nowUptimeMillis: Long,
         speechSignal: AssistantSpeechSignal = AssistantSpeechSignal.Idle,
+        attentionSignal: AssistantAttentionSignal = AssistantAttentionSignal.Idle,
         reducedMotion: Boolean = false,
     ): AssistantAnimationFrame {
         val elapsed = stateElapsedMillis.coerceAtLeast(0L)
         val baseEye = baseEye(state, elapsed, reducedMotion)
-        val eye = if (reducedMotion || state == AssistantVisualState.DISABLED || state == AssistantVisualState.ERROR) {
-            baseEye
+        val attentionAllowed = state != AssistantVisualState.DISABLED && state != AssistantVisualState.ERROR
+        val trackingWeight = if (attentionAllowed) attentionSignal.trackingWeight(nowUptimeMillis) else 0f
+        val reactionWeight = if (state == AssistantVisualState.IDLE) {
+            attentionSignal.reactionWeight(nowUptimeMillis)
         } else {
-            blinkFrame(elapsed, blinkPeriod(state)) ?: baseEye
+            0f
+        }
+        val attentionWeight = maxOf(trackingWeight, reactionWeight * 0.82f)
+        val eye = when {
+            state == AssistantVisualState.DISABLED || state == AssistantVisualState.ERROR -> baseEye
+            reactionWeight > 0f -> if (attentionSignal.targetX <= 0f) {
+                AssistantEyeShape.WINK_LEFT
+            } else {
+                AssistantEyeShape.WINK_RIGHT
+            }
+            state == AssistantVisualState.IDLE && trackingWeight > 0.08f -> gazeShape(
+                attentionSignal.targetX,
+                attentionSignal.targetY,
+            )
+            reducedMotion -> baseEye
+            else -> blinkFrame(elapsed, blinkPeriod(state)) ?: baseEye
         }
         val mouth = when (state) {
             AssistantVisualState.SPEAKING -> AssistantMouthShape.Viseme(
@@ -89,7 +107,11 @@ object AssistantAnimationDirector {
             AssistantVisualState.IDLE -> {
                 val quietSmile = !reducedMotion && elapsed % 14_000L in 11_900L..13_100L
                 AssistantMouthShape.Emotion(
-                    if (quietSmile) AssistantMouthEmotion.SMILE else AssistantMouthEmotion.NEUTRAL,
+                    if (reactionWeight > 0f || quietSmile) {
+                        AssistantMouthEmotion.SMILE
+                    } else {
+                        AssistantMouthEmotion.NEUTRAL
+                    },
                 )
             }
             AssistantVisualState.OFFLINE -> AssistantMouthShape.Emotion(AssistantMouthEmotion.SAD)
@@ -114,7 +136,7 @@ object AssistantAnimationDirector {
                 else -> 0.007
             }).toFloat()
         }
-        val headTilt = if (reducedMotion) {
+        val baseHeadTilt = if (reducedMotion) {
             when (state) {
                 AssistantVisualState.THINKING -> -2.2f
                 AssistantVisualState.ERROR -> 2.2f
@@ -128,17 +150,26 @@ object AssistantAnimationDirector {
                 else -> (sin(phase / 4.6) * 0.55).toFloat()
             }
         }
-        val glow = if (reducedMotion) {
+        val headTilt = if (reducedMotion || !attentionAllowed) {
+            baseHeadTilt
+        } else {
+            (baseHeadTilt + attentionSignal.targetX * attentionWeight * 2.4f).coerceIn(-4.5f, 4.5f)
+        }
+        val baseGlow = if (reducedMotion) {
             stateGlow(state)
         } else {
             (stateGlow(state) + sin(phase / 1.9).toFloat() * 0.08f).coerceIn(0.18f, 1f)
         }
+        val glow = (baseGlow + attentionWeight * 0.08f).coerceIn(0.18f, 1f)
+        val ambientGaze = ambientGaze(state, elapsed, reducedMotion, baseEye)
+        val gazeX = lerp(ambientGaze.x, attentionSignal.targetX, attentionWeight)
+        val gazeY = lerp(ambientGaze.y, attentionSignal.targetY, attentionWeight)
 
         return AssistantAnimationFrame(
             eye = eye,
             mouth = mouth,
-            gazeX = eye.gazeX(),
-            gazeY = eye.gazeY(),
+            gazeX = gazeX,
+            gazeY = gazeY,
             eyeOpen = eye.openness(),
             mouthOpen = mouth.openness(speechSignal.amplitude),
             bodyScale = bodyScale,
@@ -209,7 +240,75 @@ object AssistantAnimationDirector {
         AssistantVisualState.OFFLINE -> 0.48f
         AssistantVisualState.ERROR -> 0.82f
     }
+
+    private fun ambientGaze(
+        state: AssistantVisualState,
+        elapsedMillis: Long,
+        reducedMotion: Boolean,
+        baseEye: AssistantEyeShape,
+    ): AssistantGaze {
+        if (reducedMotion) return AssistantGaze(baseEye.gazeX(), baseEye.gazeY())
+        val targets = when (state) {
+            AssistantVisualState.IDLE -> idleGazeTargets
+            AssistantVisualState.THINKING -> thinkingGazeTargets
+            else -> return AssistantGaze(baseEye.gazeX(), baseEye.gazeY())
+        }
+        val slotMillis = if (state == AssistantVisualState.IDLE) 1_180L else 1_250L
+        val index = ((elapsedMillis / slotMillis) % targets.size).toInt()
+        val previousIndex = if (elapsedMillis < slotMillis) 0 else (index - 1 + targets.size) % targets.size
+        val localProgress = ((elapsedMillis % slotMillis).toFloat() / 230f).coerceIn(0f, 1f)
+        val eased = localProgress * localProgress * (3f - 2f * localProgress)
+        return AssistantGaze(
+            x = lerp(targets[previousIndex].x, targets[index].x, eased),
+            y = lerp(targets[previousIndex].y, targets[index].y, eased),
+        )
+    }
+
+    private val idleGazeTargets = listOf(
+        AssistantGaze(0f, 0f),
+        AssistantGaze(0f, 0f),
+        AssistantGaze(-1f, 0f),
+        AssistantGaze(0f, 0f),
+        AssistantGaze(0f, 0f),
+        AssistantGaze(1f, 0f),
+        AssistantGaze(0f, 0f),
+        AssistantGaze(0.75f, -0.72f),
+    )
+
+    private val thinkingGazeTargets = listOf(
+        AssistantGaze(0.78f, -0.82f),
+        AssistantGaze(-0.78f, -0.82f),
+    )
 }
+
+private data class AssistantGaze(val x: Float, val y: Float)
+
+private fun gazeShape(x: Float, y: Float): AssistantEyeShape {
+    val horizontal = when {
+        x < -0.34f -> -1
+        x > 0.34f -> 1
+        else -> 0
+    }
+    val vertical = when {
+        y < -0.34f -> -1
+        y > 0.34f -> 1
+        else -> 0
+    }
+    return when (horizontal to vertical) {
+        -1 to -1 -> AssistantEyeShape.UP_LEFT
+        0 to -1 -> AssistantEyeShape.UP
+        1 to -1 -> AssistantEyeShape.UP_RIGHT
+        -1 to 0 -> AssistantEyeShape.LEFT
+        1 to 0 -> AssistantEyeShape.RIGHT
+        -1 to 1 -> AssistantEyeShape.DOWN_LEFT
+        0 to 1 -> AssistantEyeShape.DOWN
+        1 to 1 -> AssistantEyeShape.DOWN_RIGHT
+        else -> AssistantEyeShape.CENTER
+    }
+}
+
+private fun lerp(start: Float, end: Float, amount: Float): Float =
+    start + (end - start) * amount.coerceIn(0f, 1f)
 
 private fun AssistantEyeShape.gazeX(): Float = when (this) {
     AssistantEyeShape.LEFT,
