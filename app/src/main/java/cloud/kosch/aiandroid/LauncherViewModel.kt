@@ -5,7 +5,8 @@ import androidx.lifecycle.AndroidViewModel
 import cloud.kosch.aiandroid.data.WorkspaceWidgetHostRecovery
 
 /**
- * Owns launcher, unified Home, Settings Center, portable custom actions and Assistant runtimes across Activity recreation.
+ * Owns launcher, unified Home, Settings Center, AI/browser Hub, portable custom actions and Assistant runtimes across
+ * Activity recreation.
  *
  * Device-local widget host ownership is reconciled before Home loads. Portable launcher settings and scoped
  * page/object overrides stay independent from Assistant session/agent/device-voice stores: the Settings Center may
@@ -27,6 +28,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         it.reconcile(homeWorkspace.document)
     }
     val customActions = CustomLauncherActionController(application)
+    val aiHub = AiHubController(application)
     val assistant = AssistantSessionController(application)
     val assistantAgent = AssistantAgentController(application).also {
         it.setAssistantEnabled(assistant.settings.enabled)
