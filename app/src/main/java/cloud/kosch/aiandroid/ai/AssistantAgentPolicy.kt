@@ -69,6 +69,8 @@ object AssistantWakeWordResolver {
         AssistantWakeWordMode.OFF -> null
         AssistantWakeWordMode.COMPUTER -> "Computer"
         AssistantWakeWordMode.ASSISTANT_NAME -> preferences.assistantName.trim().ifEmpty { character.displayName }
-        AssistantWakeWordMode.CUSTOM -> preferences.customWakeWord.trim().takeIf { it.isNotEmpty() }
+        AssistantWakeWordMode.CUSTOM -> preferences.customWakeWord.trim().takeIf { it.length >= MIN_CUSTOM_WAKE_WORD_LENGTH }
     }
+
+    private const val MIN_CUSTOM_WAKE_WORD_LENGTH = 2
 }
