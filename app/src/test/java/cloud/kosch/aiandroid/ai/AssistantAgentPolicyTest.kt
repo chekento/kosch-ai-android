@@ -3,15 +3,19 @@ package cloud.kosch.aiandroid.ai
 import cloud.kosch.aiandroid.model.AssistantActionRisk
 import cloud.kosch.aiandroid.model.AssistantAgentPreferences
 import cloud.kosch.aiandroid.model.AssistantObservationSource
+import cloud.kosch.aiandroid.model.AssistantVoiceGender
 import cloud.kosch.aiandroid.model.AssistantWakeWordMode
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Test
 
 class AssistantAgentPolicyTest {
     @Test
-    fun observation_requiresCapabilityAndVisibleConsentedSession() {
+    fun observation_isOffByDefaultAndRequiresCapabilityAndVisibleConsentedSession() {
         val disabled = AssistantAgentPreferences()
+        assertFalse(disabled.screenObservationEnabled)
+        assertFalse(disabled.cameraObservationEnabled)
         assertEquals(
             AssistantPolicyDecision.BLOCK_CAPABILITY_DISABLED,
             AssistantAgentPolicy.observationDecision(
@@ -118,11 +122,35 @@ class AssistantAgentPolicyTest {
     }
 
     @Test
-    fun builtInCharacterIdsAreUniqueAndResolvable() {
+    fun builtInCharactersHaveGenderMatchedVoiceProfiles() {
         val profiles = AssistantCharacterCatalog.all()
         assertEquals(profiles.size, profiles.map { it.id }.toSet().size)
         assertEquals("default", AssistantCharacterCatalog.resolve("missing").id)
-        assertEquals("anime_female", AssistantCharacterCatalog.resolve("anime_female").id)
-        assertEquals("anime_male", AssistantCharacterCatalog.resolve("anime_male").id)
+
+        val female = AssistantCharacterCatalog.resolve("anime_female")
+        val femaleVoice = requireNotNull(AssistantBuiltInVoiceCatalog.resolve(female.voiceProfileId))
+        assertEquals(AssistantVoiceGender.FEMALE, female.voiceGender)
+        assertEquals(AssistantVoiceGender.FEMALE, femaleVoice.gender)
+        assertEquals(AssistantVoiceDecision.ALLOW, AssistantVoicePolicy.decision(female, femaleVoice))
+        assertEquals(
+            AssistantVoiceDecision.REJECT_GENDER_MISMATCH,
+            AssistantVoicePolicy.decision(
+                female,
+                requireNotNull(AssistantBuiltInVoiceCatalog.resolve("male_default")),
+            ),
+        )
+
+        val male = AssistantCharacterCatalog.resolve("anime_male")
+        val maleVoice = requireNotNull(AssistantBuiltInVoiceCatalog.resolve(male.voiceProfileId))
+        assertEquals(AssistantVoiceGender.MALE, male.voiceGender)
+        assertEquals(AssistantVoiceGender.MALE, maleVoice.gender)
+        assertEquals(AssistantVoiceDecision.ALLOW, AssistantVoicePolicy.decision(male, maleVoice))
+        assertEquals(
+            AssistantVoiceDecision.REJECT_GENDER_MISMATCH,
+            AssistantVoicePolicy.decision(
+                male,
+                requireNotNull(AssistantBuiltInVoiceCatalog.resolve("female_default")),
+            ),
+        )
     }
 }
