@@ -10,6 +10,7 @@ import cloud.kosch.aiandroid.ai.AiHubEntryKind
 import cloud.kosch.aiandroid.model.HomePage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -40,6 +41,8 @@ class AiHubInstrumentationTest {
             assertTextPresent("AI & Browser Hub")
             assertTextPresent("Smart")
             assertTextPresent("KoSch empfiehlt")
+            assertTextPresent("BESTE ROUTE")
+            assertNotNull(viewModel.aiHub.bestRecommendation(viewModel.controller.apps))
 
             composeTestRule.onNodeWithText("Browser", useUnmergedTree = true).performClick()
             composeTestRule.waitForIdle()
@@ -100,6 +103,7 @@ class AiHubInstrumentationTest {
             assertEquals(prompt, viewModel.aiHub.prompt)
             assertTextPresent("AI & Browser Hub")
             assertTextPresent("Recherche")
+            assertTextPresent("BESTE ROUTE")
         } finally {
             composeTestRule.runOnUiThread {
                 viewModel.controller.closeProviderChooser()
