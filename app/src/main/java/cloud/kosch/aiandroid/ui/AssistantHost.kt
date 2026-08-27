@@ -50,7 +50,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import cloud.kosch.aiandroid.AssistantAgentController
 import cloud.kosch.aiandroid.AssistantSessionController
+import cloud.kosch.aiandroid.AssistantVoiceController
 import cloud.kosch.aiandroid.LauncherController
 import cloud.kosch.aiandroid.model.AssistantMessageRole
 import cloud.kosch.aiandroid.model.AssistantVisualState
@@ -65,11 +67,14 @@ import cloud.kosch.aiandroid.ui.theme.Warm
 @Composable
 fun AssistantHost(
     assistant: AssistantSessionController,
+    agent: AssistantAgentController,
+    voice: AssistantVoiceController,
     launcherController: LauncherController,
     requestVoiceInput: () -> Unit,
     requestDocument: () -> Unit,
     requestContact: () -> Unit,
     requestSpeech: (String) -> Boolean,
+    requestVoicePreview: (voiceName: String) -> Boolean,
     stopSpeech: () -> Unit,
     showFloatingTrigger: Boolean = true,
 ) {
@@ -95,6 +100,7 @@ fun AssistantHost(
                         onPointerAttention = assistant::pointerAttention,
                         onActivate = assistant::attentionActivated,
                         onClick = assistant::open,
+                        assistantId = agent.character.assetPackId,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -116,11 +122,14 @@ fun AssistantHost(
     if (assistant.sheetVisible) {
         AssistantSheet(
             assistant = assistant,
+            agent = agent,
+            voice = voice,
             launcherController = launcherController,
             requestVoiceInput = requestVoiceInput,
             requestDocument = requestDocument,
             requestContact = requestContact,
             requestSpeech = requestSpeech,
+            requestVoicePreview = requestVoicePreview,
             stopSpeech = stopSpeech,
             effectiveReducedMotion = effectiveReducedMotion,
         )
@@ -131,16 +140,20 @@ fun AssistantHost(
 @Composable
 private fun AssistantSheet(
     assistant: AssistantSessionController,
+    agent: AssistantAgentController,
+    voice: AssistantVoiceController,
     launcherController: LauncherController,
     requestVoiceInput: () -> Unit,
     requestDocument: () -> Unit,
     requestContact: () -> Unit,
     requestSpeech: (String) -> Boolean,
+    requestVoicePreview: (voiceName: String) -> Boolean,
     stopSpeech: () -> Unit,
     effectiveReducedMotion: Boolean,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var input by remember { mutableStateOf("") }
+    var controlsVisible by remember { mutableStateOf(false) }
     val messages = assistant.messages
 
     ModalBottomSheet(
@@ -174,6 +187,7 @@ private fun AssistantSheet(
                         onPointerAttention = assistant::pointerAttention,
                         onActivate = assistant::attentionActivated,
                         onClick = {},
+                        assistantId = agent.character.assetPackId,
                         modifier = Modifier.fillMaxSize(),
                     )
                 }
@@ -185,170 +199,185 @@ private fun AssistantSheet(
                         style = MaterialTheme.typography.labelMedium,
                     )
                     Text(
-                        "Default Assistant · lokaler Shell-Core",
+                        "${agent.character.displayName} · lokaler Shell-Core",
                         color = MutedMist,
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
+                TextButton(onClick = { controlsVisible = !controlsVisible }) {
+                    Text(if (controlsVisible) "Chat" else "Steuerung")
+                }
             }
 
-            AssistantToggleRow(
-                title = "Assistant aktiv",
-                body = "Aus bedeutet: kein Assistant-Voice und kein laufender Chat. Der Ask-Dock bleibt als Launcher-Steuerung verfügbar.",
-                checked = assistant.settings.enabled,
-                onCheckedChange = { enabled ->
-                    if (!enabled) stopSpeech()
-                    assistant.setEnabled(enabled)
-                },
-            )
-            AssistantToggleRow(
-                title = "Voice Input",
-                body = "Nur nach Tippen; Androids Speech-UI übernimmt die Aufnahme.",
-                checked = assistant.settings.voiceInputEnabled,
-                enabled = assistant.settings.enabled,
-                onCheckedChange = assistant::setVoiceInputEnabled,
-            )
-            AssistantToggleRow(
-                title = "Antworten vorlesen",
-                body = "Android Text-to-Speech; Mundbewegung folgt Textbereichen und lokalem Audiopegel.",
-                checked = assistant.settings.speechOutputEnabled,
-                enabled = assistant.settings.enabled,
-                onCheckedChange = { enabled ->
-                    if (!enabled) stopSpeech()
-                    assistant.setSpeechOutputEnabled(enabled)
-                },
-            )
-            AssistantToggleRow(
-                title = "Bewegung reduzieren",
-                body = "Stoppt Schweben, Blickwanderung und Effektloops. Zustände und vereinfachte Sprachbewegung bleiben erkennbar; Androids Systemeinstellung gilt zusätzlich.",
-                checked = assistant.settings.reducedMotion,
-                enabled = assistant.settings.enabled,
-                onCheckedChange = assistant::setReducedMotion,
-            )
-
-            Surface(color = Mint.copy(alpha = 0.09f), shape = RoundedCornerShape(16.dp)) {
-                Text(
-                    "Chatverlauf bleibt nur in dieser laufenden Assistant-Sitzung. Der Offline-Build enthält noch kein generatives LLM. Freie KI-Anfragen werden erst nach deiner ausdrücklichen Anbieterwahl weitergegeben.",
-                    modifier = Modifier.padding(12.dp),
-                    color = MutedMist,
-                    style = MaterialTheme.typography.bodySmall,
+            if (controlsVisible) {
+                AssistantControlCenter(
+                    assistant = assistant,
+                    agent = agent,
+                    voice = voice,
+                    requestVoicePreview = requestVoicePreview,
+                    stopSpeech = stopSpeech,
+                    modifier = Modifier.weight(1f),
                 )
-            }
-
-            LazyColumn(
-                modifier = Modifier.weight(1f).fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(messages, key = { it.id }) { message ->
-                    val user = message.role == AssistantMessageRole.USER
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = if (user) Arrangement.End else Arrangement.Start,
-                    ) {
-                        Surface(
-                            color = if (user) Sky.copy(alpha = 0.16f) else RaisedSurface,
-                            shape = RoundedCornerShape(16.dp),
-                            modifier = Modifier.fillMaxWidth(if (user) 0.82f else 0.9f),
-                        ) {
-                            Text(
-                                message.text,
-                                modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        }
-                    }
-                }
-            }
-
-            assistant.handoffPrompt?.let {
-                Button(
-                    onClick = { assistant.handoffToProvider(launcherController) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Rounded.OpenInNew, contentDescription = null)
-                    Spacer(Modifier.width(7.dp))
-                    Text("KI-Anbieter auswählen und übergeben")
-                }
-            }
-
-            OutlinedTextField(
-                value = input,
-                onValueChange = { input = it.take(4_096) },
-                enabled = assistant.settings.enabled,
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Mit Assistant schreiben") },
-                placeholder = { Text("Öffne Kamera … oder freie KI-Frage") },
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(
-                    onSend = {
-                        submitAssistantInput(
-                            input = input,
-                            assistant = assistant,
-                            launcherController = launcherController,
-                            requestVoiceInput = requestVoiceInput,
-                            requestDocument = requestDocument,
-                            requestContact = requestContact,
-                            requestSpeech = requestSpeech,
-                            onConsumed = { input = "" },
-                        )
+            } else {
+                AssistantToggleRow(
+                    title = "Assistant aktiv",
+                    body = "Aus bedeutet: kein Assistant-Voice und kein laufender Chat. Der Ask-Dock bleibt als Launcher-Steuerung verfügbar.",
+                    checked = assistant.settings.enabled,
+                    onCheckedChange = { enabled ->
+                        if (!enabled) stopSpeech()
+                        assistant.setEnabled(enabled)
+                        agent.setAssistantEnabled(enabled)
                     },
-                ),
-                trailingIcon = {
-                    Row {
-                        if (assistant.speechSignal.active) {
-                            IconButton(
-                                onClick = stopSpeech,
+                )
+                AssistantToggleRow(
+                    title = "Voice Input",
+                    body = "Nur nach Tippen; Androids Speech-UI übernimmt die Aufnahme.",
+                    checked = assistant.settings.voiceInputEnabled,
+                    enabled = assistant.settings.enabled,
+                    onCheckedChange = assistant::setVoiceInputEnabled,
+                )
+                AssistantToggleRow(
+                    title = "Antworten vorlesen",
+                    body = "Android Text-to-Speech; Mundbewegung folgt Textbereichen und lokalem Audiopegel.",
+                    checked = assistant.settings.speechOutputEnabled,
+                    enabled = assistant.settings.enabled,
+                    onCheckedChange = { enabled ->
+                        if (!enabled) stopSpeech()
+                        assistant.setSpeechOutputEnabled(enabled)
+                    },
+                )
+                AssistantToggleRow(
+                    title = "Bewegung reduzieren",
+                    body = "Stoppt Schweben, Blickwanderung und Effektloops. Zustände und vereinfachte Sprachbewegung bleiben erkennbar; Androids Systemeinstellung gilt zusätzlich.",
+                    checked = assistant.settings.reducedMotion,
+                    enabled = assistant.settings.enabled,
+                    onCheckedChange = assistant::setReducedMotion,
+                )
+
+                Surface(color = Mint.copy(alpha = 0.09f), shape = RoundedCornerShape(16.dp)) {
+                    Text(
+                        "Chatverlauf bleibt nur in dieser laufenden Assistant-Sitzung. Der Offline-Build enthält noch kein generatives LLM. Freie KI-Anfragen werden erst nach deiner ausdrücklichen Anbieterwahl weitergegeben.",
+                        modifier = Modifier.padding(12.dp),
+                        color = MutedMist,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+
+                LazyColumn(
+                    modifier = Modifier.weight(1f).fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(messages, key = { it.id }) { message ->
+                        val user = message.role == AssistantMessageRole.USER
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = if (user) Arrangement.End else Arrangement.Start,
+                        ) {
+                            Surface(
+                                color = if (user) Sky.copy(alpha = 0.16f) else RaisedSurface,
+                                shape = RoundedCornerShape(16.dp),
+                                modifier = Modifier.fillMaxWidth(if (user) 0.82f else 0.9f),
                             ) {
-                                Icon(Icons.Rounded.Stop, contentDescription = "Vorlesen stoppen")
+                                Text(
+                                    message.text,
+                                    modifier = Modifier.padding(horizontal = 13.dp, vertical = 10.dp),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                )
                             }
                         }
-                        IconButton(
-                            enabled = assistant.settings.enabled && assistant.settings.voiceInputEnabled,
-                            onClick = {
-                                stopSpeech()
-                                assistant.requestVoice(requestVoiceInput)
-                            },
-                        ) {
-                            Icon(Icons.Rounded.KeyboardVoice, contentDescription = "Spracheingabe")
-                        }
                     }
-                },
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                OutlinedButton(
-                    enabled = assistant.settings.enabled && input.isNotBlank(),
-                    onClick = {
-                        submitAssistantInput(
-                            input = input,
-                            assistant = assistant,
-                            launcherController = launcherController,
-                            requestVoiceInput = requestVoiceInput,
-                            requestDocument = requestDocument,
-                            requestContact = requestContact,
-                            requestSpeech = requestSpeech,
-                            onConsumed = { input = "" },
-                        )
-                    },
-                    modifier = Modifier.weight(1f),
-                ) {
-                    Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
-                    Text("Senden")
                 }
-                TextButton(
-                    onClick = {
-                        stopSpeech()
-                        assistant.clearSession()
+
+                assistant.handoffPrompt?.let {
+                    Button(
+                        onClick = { assistant.handoffToProvider(launcherController) },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Rounded.OpenInNew, contentDescription = null)
+                        Spacer(Modifier.width(7.dp))
+                        Text("KI-Anbieter auswählen und übergeben")
+                    }
+                }
+
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = { input = it.take(4_096) },
+                    enabled = assistant.settings.enabled,
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Mit Assistant schreiben") },
+                    placeholder = { Text("Öffne Kamera … oder freie KI-Frage") },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
+                    keyboardActions = KeyboardActions(
+                        onSend = {
+                            submitAssistantInput(
+                                input = input,
+                                assistant = assistant,
+                                launcherController = launcherController,
+                                requestVoiceInput = requestVoiceInput,
+                                requestDocument = requestDocument,
+                                requestContact = requestContact,
+                                requestSpeech = requestSpeech,
+                                onConsumed = { input = "" },
+                            )
+                        },
+                    ),
+                    trailingIcon = {
+                        Row {
+                            if (assistant.speechSignal.active) {
+                                IconButton(
+                                    onClick = stopSpeech,
+                                ) {
+                                    Icon(Icons.Rounded.Stop, contentDescription = "Vorlesen stoppen")
+                                }
+                            }
+                            IconButton(
+                                enabled = assistant.settings.enabled && assistant.settings.voiceInputEnabled,
+                                onClick = {
+                                    stopSpeech()
+                                    assistant.requestVoice(requestVoiceInput)
+                                },
+                            ) {
+                                Icon(Icons.Rounded.KeyboardVoice, contentDescription = "Spracheingabe")
+                            }
+                        }
                     },
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Icon(Icons.Rounded.DeleteOutline, contentDescription = null)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Chat löschen")
+                    OutlinedButton(
+                        enabled = assistant.settings.enabled && input.isNotBlank(),
+                        onClick = {
+                            submitAssistantInput(
+                                input = input,
+                                assistant = assistant,
+                                launcherController = launcherController,
+                                requestVoiceInput = requestVoiceInput,
+                                requestDocument = requestDocument,
+                                requestContact = requestContact,
+                                requestSpeech = requestSpeech,
+                                onConsumed = { input = "" },
+                            )
+                        },
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null)
+                        Spacer(Modifier.width(6.dp))
+                        Text("Senden")
+                    }
+                    TextButton(
+                        onClick = {
+                            stopSpeech()
+                            assistant.clearSession()
+                        },
+                    ) {
+                        Icon(Icons.Rounded.DeleteOutline, contentDescription = null)
+                        Spacer(Modifier.width(4.dp))
+                        Text("Chat löschen")
+                    }
                 }
             }
             Spacer(Modifier.height(18.dp))
