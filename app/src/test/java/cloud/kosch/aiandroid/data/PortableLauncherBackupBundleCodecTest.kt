@@ -36,7 +36,7 @@ class PortableLauncherBackupBundleCodecTest {
     }
 
     @Test
-    fun missingOrUnknownSections_areRejected() {
+    fun missingUnknownOrDuplicateSections_areRejected() {
         val encoded = PortableLauncherBackupBundleCodec.encode(bundle).decodeToString()
         val missing = encoded.lineSequence().filterNot { it.startsWith("actions|") }.joinToString("\n").encodeToByteArray()
         assertThrows(IllegalArgumentException::class.java) {
@@ -46,6 +46,12 @@ class PortableLauncherBackupBundleCodecTest {
         val unknown = (encoded + "unknown|eA\n").encodeToByteArray()
         assertThrows(IllegalArgumentException::class.java) {
             PortableLauncherBackupBundleCodec.decodeOrNull(unknown)
+        }
+
+        val assistantLine = encoded.lineSequence().first { it.startsWith("assistant|") }
+        val duplicate = (encoded + assistantLine + "\n").encodeToByteArray()
+        assertThrows(IllegalArgumentException::class.java) {
+            PortableLauncherBackupBundleCodec.decodeOrNull(duplicate)
         }
     }
 }
