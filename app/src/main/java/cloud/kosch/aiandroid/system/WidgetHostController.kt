@@ -9,9 +9,12 @@ import android.view.View
 import android.view.ViewGroup
 import cloud.kosch.aiandroid.model.WidgetSizePreset
 
-class WidgetHostController(context: Context) {
+class WidgetHostController(
+    context: Context,
+    hostId: Int = LEGACY_HOST_ID,
+) {
     private val appContext = context.applicationContext
-    private val host = AppWidgetHost(appContext, HOST_ID)
+    private val host = AppWidgetHost(appContext, hostId)
     private val manager = AppWidgetManager.getInstance(appContext)
 
     fun startListening() = host.startListening()
@@ -90,8 +93,9 @@ class WidgetHostController(context: Context) {
         }
     }
 
-    private companion object {
-        const val HOST_ID = 0x4B4F5343 // "KOSC"
-        const val MIN_WIDGET_DP = 40
+    companion object {
+        const val LEGACY_HOST_ID = 0x4B4F5343 // "KOSC"
+        const val WORKSPACE_HOST_ID = 0x4B4F5357 // "KOSW"
+        private const val MIN_WIDGET_DP = 40
     }
 }
