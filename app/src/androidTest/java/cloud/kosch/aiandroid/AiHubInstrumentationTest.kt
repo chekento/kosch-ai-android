@@ -6,6 +6,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import cloud.kosch.aiandroid.ai.AiHubEntryKind
 import cloud.kosch.aiandroid.model.HomePage
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -43,14 +44,31 @@ class AiHubInstrumentationTest {
             composeTestRule.onNodeWithText("Browser", useUnmergedTree = true).performClick()
             composeTestRule.waitForIdle()
 
+            // LazyColumn only composes the currently visible cards. Verify the visible Browser surface here and
+            // assert the complete catalog against the controller snapshot below instead of depending on scroll state.
             assertTextPresent("Android Systembrowser")
             assertTextPresent("Google Chrome")
-            assertTextPresent("Microsoft Edge")
-            assertTextPresent("Opera Browser")
-            assertTextPresent("Brave Browser")
-            assertTextPresent("DuckDuckGo Browser")
-            assertTextPresent("Mozilla Firefox")
-            assertTextPresent("PLAY STORE")
+
+            val browserTitles = viewModel.aiHub.entries(viewModel.controller.apps)
+                .filter { it.kind == AiHubEntryKind.BROWSER || it.kind == AiHubEntryKind.SYSTEM_BROWSER }
+                .mapTo(linkedSetOf()) { it.title }
+            listOf(
+                "Android Systembrowser",
+                "Google Chrome",
+                "Microsoft Edge",
+                "Opera Browser",
+                "Brave Browser",
+                "DuckDuckGo Browser",
+                "Mozilla Firefox",
+            ).forEach { title ->
+                assertTrue("Expected Browser catalog entry '$title'", title in browserTitles)
+            }
+            assertTrue(
+                "Expected at least one Browser install route through Play Store",
+                viewModel.aiHub.entries(viewModel.controller.apps)
+                    .filter { it.kind == AiHubEntryKind.BROWSER }
+                    .any { it.playStorePackageName != null },
+            )
         } finally {
             composeTestRule.runOnUiThread {
                 viewModel.aiHub.close()
