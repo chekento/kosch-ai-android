@@ -7,7 +7,10 @@ import cloud.kosch.aiandroid.AssistantSessionController
 import cloud.kosch.aiandroid.LauncherController
 import cloud.kosch.aiandroid.model.AssistantMessageRole
 import cloud.kosch.aiandroid.model.AssistantSettings
+import cloud.kosch.aiandroid.model.AssistantVisualState
+import cloud.kosch.aiandroid.ui.components.AssistantViseme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -26,6 +29,7 @@ class AssistantStoreInstrumentationTest {
                 enabled = true,
                 voiceInputEnabled = false,
                 speechOutputEnabled = true,
+                reducedMotion = true,
                 assistantId = "default",
             )
             store.save(expected)
@@ -68,6 +72,38 @@ class AssistantStoreInstrumentationTest {
             assertTrue(freshSession.messages.isEmpty())
             assertEquals(null, freshSession.handoffPrompt)
             assertTrue(freshSession.settings.enabled)
+        } finally {
+            store.save(original)
+        }
+    }
+
+    @Test
+    fun ttsVisualSignals_areEphemeralBoundedAndIgnoreStaleCallbacks() {
+        val store = AssistantStore(context)
+        val original = store.load()
+        try {
+            store.save(original.copy(enabled = true, speechOutputEnabled = true))
+            val session = AssistantSessionController(context)
+
+            session.speechQueued("active", "Hallo Welt")
+            assertEquals(AssistantVisualState.IDLE, session.visualState)
+            session.speechStarted("active")
+            assertEquals(AssistantVisualState.SPEAKING, session.visualState)
+            assertTrue(session.speechSignal.active)
+
+            session.speechRange("active", start = 0, end = 5)
+            assertTrue(session.speechSignal.rangeTimed)
+            assertTrue(session.speechSignal.rangeVisemes.any { it != AssistantViseme.SIL })
+
+            session.speechAudioLevel("stale", normalizedRms = 1f)
+            assertEquals(0f, session.speechSignal.amplitude, 0.0001f)
+            session.speechAudioLevel("active", normalizedRms = 1f)
+            assertTrue(session.speechSignal.amplitude > 0f)
+
+            session.speechInterrupted("active")
+            assertFalse(session.speechSignal.active)
+            assertEquals(AssistantVisualState.IDLE, session.visualState)
+            assertFalse(AssistantSessionController(context).speechSignal.active)
         } finally {
             store.save(original)
         }

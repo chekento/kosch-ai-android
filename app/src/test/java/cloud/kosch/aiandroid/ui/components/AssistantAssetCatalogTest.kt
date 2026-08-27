@@ -32,6 +32,26 @@ class AssistantAssetCatalogTest {
             AssistantAssetCatalog.visemes,
         )
         assertEquals("asst_default_mouth_viseme_aa.webp", AssistantAssetCatalog.mouthVisemeFile("aa"))
+        assertEquals(
+            "asst_default_mouth_viseme_oh.webp",
+            AssistantAssetCatalog.mouthVisemeFile(AssistantViseme.OH),
+        )
+    }
+
+    @Test
+    fun independentEyeAndMouthShapes_resolveToMatrixNames() {
+        assertEquals(
+            "asst_default_eye_blink_half_1.webp",
+            AssistantAssetCatalog.eyeFile(AssistantEyeShape.BLINK_HALF_1),
+        )
+        assertEquals(
+            "asst_default_mouth_frown.webp",
+            AssistantAssetCatalog.mouthEmotionFile(AssistantMouthEmotion.FROWN),
+        )
+        assertEquals(
+            "asst_default_mouth_viseme_th.webp",
+            AssistantAssetCatalog.mouthFile(AssistantMouthShape.Viseme(AssistantViseme.TH)),
+        )
     }
 
     @Test

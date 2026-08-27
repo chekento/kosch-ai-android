@@ -24,6 +24,21 @@ class AssistantAssetRuntime(context: Context) {
     fun loadState(
         state: AssistantVisualState,
         assistantId: String = AssistantAssetCatalog.DEFAULT_ASSISTANT_ID,
+        eyeShape: AssistantEyeShape = when (state) {
+            AssistantVisualState.LISTENING,
+            AssistantVisualState.WORKING,
+            -> AssistantEyeShape.FOCUS
+            AssistantVisualState.THINKING -> AssistantEyeShape.UP_RIGHT
+            AssistantVisualState.SPEAKING -> AssistantEyeShape.HAPPY
+            AssistantVisualState.OFFLINE -> AssistantEyeShape.WORRIED
+            AssistantVisualState.ERROR -> AssistantEyeShape.CONFUSED
+            else -> AssistantEyeShape.CENTER
+        },
+        mouthShape: AssistantMouthShape = if (state == AssistantVisualState.SPEAKING) {
+            AssistantMouthShape.Viseme(AssistantViseme.AA)
+        } else {
+            AssistantMouthShape.Emotion(AssistantMouthEmotion.NEUTRAL)
+        },
     ): AssistantSpriteFrame? {
         val bodyFile = AssistantAssetCatalog.bodyFile(state, assistantId) ?: return null
         val body = load(
@@ -32,19 +47,16 @@ class AssistantAssetRuntime(context: Context) {
         ) ?: return null
 
         val eye = load(
-            path = AssistantAssetPaths.overlay(assistantId, AssistantAssetCatalog.eyeFile(state, assistantId)),
+            path = AssistantAssetPaths.overlay(assistantId, AssistantAssetCatalog.eyeFile(eyeShape, assistantId)),
             contract = AssistantAssetContract.OVERLAY,
-        )
+        ) ?: return null
         val mouth = load(
             path = AssistantAssetPaths.overlay(
                 assistantId,
-                AssistantAssetCatalog.mouthVisemeFile(
-                    if (state == AssistantVisualState.SPEAKING) "aa" else "sil",
-                    assistantId,
-                ),
+                AssistantAssetCatalog.mouthFile(mouthShape, assistantId),
             ),
             contract = AssistantAssetContract.OVERLAY,
-        )
+        ) ?: return null
 
         return AssistantSpriteFrame(body = body, eye = eye, mouth = mouth)
     }
@@ -109,8 +121,8 @@ class AssistantAssetRuntime(context: Context) {
 
 data class AssistantSpriteFrame(
     val body: AssistantDecodedAsset,
-    val eye: AssistantDecodedAsset?,
-    val mouth: AssistantDecodedAsset?,
+    val eye: AssistantDecodedAsset,
+    val mouth: AssistantDecodedAsset,
 )
 
 data class AssistantDecodedAsset(

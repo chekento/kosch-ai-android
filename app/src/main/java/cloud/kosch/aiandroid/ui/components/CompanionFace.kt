@@ -1,9 +1,11 @@
 package cloud.kosch.aiandroid.ui.components
 
+import android.animation.ValueAnimator
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.media.AudioFormat
 import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract
@@ -34,6 +36,7 @@ import cloud.kosch.aiandroid.model.AssistantVisualState
 import cloud.kosch.aiandroid.system.DocumentGrantManager
 import cloud.kosch.aiandroid.ui.AssistantHost
 import java.util.Locale
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * Existing Ask-Dock companion, now upgraded into the optional Assistant entry point.
@@ -60,6 +63,7 @@ fun CompanionFace(
     var ttsEngine by remember { mutableStateOf<TextToSpeech?>(null) }
     var ttsReady by remember { mutableStateOf(false) }
     val speechRuntimeEnabled = assistant?.settings?.enabled == true && assistant.settings.speechOutputEnabled
+    val effectiveReducedMotion = assistant?.settings?.reducedMotion == true || !ValueAnimator.areAnimatorsEnabled()
 
     DisposableEffect(context, assistant, speechRuntimeEnabled) {
         if (assistant == null || !speechRuntimeEnabled) {
@@ -68,6 +72,7 @@ fun CompanionFace(
             onDispose { }
         } else {
             var engineReference: TextToSpeech? = null
+            val audioFormats = ConcurrentHashMap<String, Int>()
             val engine = TextToSpeech(context.applicationContext) { status ->
                 val current = engineReference
                 if (current != null) {
@@ -84,20 +89,48 @@ fun CompanionFace(
             engine.setOnUtteranceProgressListener(
                 object : UtteranceProgressListener() {
                     override fun onStart(utteranceId: String?) {
-                        mainHandler.post(assistant::speechStarted)
+                        mainHandler.post { assistant.speechStarted(utteranceId) }
                     }
 
                     override fun onDone(utteranceId: String?) {
-                        mainHandler.post(assistant::speechFinished)
+                        utteranceId?.let(audioFormats::remove)
+                        mainHandler.post { assistant.speechFinished(utteranceId) }
                     }
 
                     @Deprecated("Deprecated in Java")
                     override fun onError(utteranceId: String?) {
-                        mainHandler.post(assistant::speechFailed)
+                        utteranceId?.let(audioFormats::remove)
+                        mainHandler.post { assistant.speechFailed(utteranceId) }
                     }
 
                     override fun onError(utteranceId: String?, errorCode: Int) {
-                        mainHandler.post(assistant::speechFailed)
+                        utteranceId?.let(audioFormats::remove)
+                        mainHandler.post { assistant.speechFailed(utteranceId) }
+                    }
+
+                    override fun onStop(utteranceId: String?, interrupted: Boolean) {
+                        utteranceId?.let(audioFormats::remove)
+                        mainHandler.post { assistant.speechInterrupted(utteranceId) }
+                    }
+
+                    override fun onBeginSynthesis(
+                        utteranceId: String?,
+                        sampleRateInHz: Int,
+                        audioFormat: Int,
+                        channelCount: Int,
+                    ) {
+                        if (utteranceId != null) audioFormats[utteranceId] = audioFormat
+                    }
+
+                    override fun onAudioAvailable(utteranceId: String?, audio: ByteArray?) {
+                        val samples = audio ?: return
+                        val encoding = utteranceId?.let(audioFormats::get) ?: AudioFormat.ENCODING_PCM_16BIT
+                        val level = AssistantPcmAmplitude.normalizedRms(samples, encoding)
+                        mainHandler.post { assistant.speechAudioLevel(utteranceId, level) }
+                    }
+
+                    override fun onRangeStart(utteranceId: String?, start: Int, end: Int, frame: Int) {
+                        mainHandler.post { assistant.speechRange(utteranceId, start, end) }
                     }
                 },
             )
@@ -105,6 +138,7 @@ fun CompanionFace(
             onDispose {
                 engine.stop()
                 engine.shutdown()
+                assistant.speechInterrupted()
                 if (ttsEngine === engine) ttsEngine = null
                 ttsReady = false
             }
@@ -151,19 +185,23 @@ fun CompanionFace(
             launcherController?.postNotice("Android Text-to-Speech ist auf diesem Gerät nicht bereit")
             false
         } else {
-            val result = engine.speak(
-                text,
-                TextToSpeech.QUEUE_FLUSH,
-                null,
-                "kosch-assistant-${System.nanoTime()}",
-            )
-            if (result == TextToSpeech.ERROR) assistant?.speechFailed()
+            val utteranceId = "kosch-assistant-${System.nanoTime()}"
+            assistant?.speechQueued(utteranceId, text)
+            val result = runCatching {
+                engine.speak(
+                    text,
+                    TextToSpeech.QUEUE_FLUSH,
+                    null,
+                    utteranceId,
+                )
+            }.getOrDefault(TextToSpeech.ERROR)
+            if (result == TextToSpeech.ERROR) assistant?.speechFailed(utteranceId)
             result != TextToSpeech.ERROR
         }
     }
     val stopSpeech: () -> Unit = {
         ttsEngine?.stop()
-        assistant?.speechFinished()
+        assistant?.speechInterrupted()
     }
 
     lateinit var requestAssistantVoice: () -> Unit
@@ -186,6 +224,7 @@ fun CompanionFace(
         if (assistant == null || launcherController == null) {
             onClick()
         } else {
+            ttsEngine?.stop()
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
                 putExtra(RecognizerIntent.EXTRA_PROMPT, "Was möchtest du den KoSch Assistant fragen?")
@@ -216,6 +255,8 @@ fun CompanionFace(
     ) {
         AssistantAvatarFallback(
             state = visualState,
+            speechSignal = assistant?.speechSignal ?: AssistantSpeechSignal.Idle,
+            reducedMotion = effectiveReducedMotion,
             modifier = Modifier.fillMaxSize(),
         )
     }
