@@ -264,6 +264,10 @@ class AssistantSessionController(context: Context) {
             AssistantMessageRole.ASSISTANT,
             "$source-Kontextframe bereit: ${metadata.width}×${metadata.height}, ca. $kib KiB. Er liegt nur kurz im Arbeitsspeicher und wurde noch an kein KI-Modell übertragen.",
         )
+        mainHandler.postDelayed(
+            { AssistantVisualContextRuntime.discard(metadata.requestId) },
+            AssistantVisualContextRuntime.READY_TTL_MILLIS,
+        )
         visualState = AssistantVisualState.IDLE
     }
 
@@ -338,7 +342,7 @@ class AssistantSessionController(context: Context) {
         }
     }
 
-    fun speechFailed(utteranceId: String? = speechSignal.utteranceId) {
+    fun speechFailed(utteranceId: String? = speechSignal.utteranceanceId) {
         if (!matchesActiveSpeech(utteranceId)) return
         clearSpeechSignal()
         if (settings.enabled) visualState = AssistantVisualState.ERROR
