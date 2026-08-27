@@ -21,6 +21,10 @@ object AssistantObservationRuntime {
         private set
     var screenHeight by mutableStateOf(0)
         private set
+    var screenFailureGeneration by mutableLongStateOf(0L)
+        private set
+    var screenFailureMessage by mutableStateOf<String?>(null)
+        private set
 
     var cameraActive by mutableStateOf(false)
         private set
@@ -28,6 +32,7 @@ object AssistantObservationRuntime {
         private set
 
     fun screenStarted(width: Int, height: Int) {
+        screenFailureMessage = null
         screenWidth = width.coerceAtLeast(0)
         screenHeight = height.coerceAtLeast(0)
         screenFrameCount = 0L
@@ -43,6 +48,16 @@ object AssistantObservationRuntime {
         screenWidth = 0
         screenHeight = 0
         screenFrameCount = 0L
+    }
+
+    fun screenFailed(message: String) {
+        screenStopped()
+        screenFailureMessage = message.take(240)
+        screenFailureGeneration += 1L
+    }
+
+    fun clearScreenFailure() {
+        screenFailureMessage = null
     }
 
     fun cameraStarted() {
