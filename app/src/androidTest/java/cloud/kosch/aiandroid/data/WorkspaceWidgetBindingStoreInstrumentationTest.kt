@@ -51,6 +51,33 @@ class WorkspaceWidgetBindingStoreInstrumentationTest {
     }
 
     @Test
+    fun replace_commitsNewPairBeforeReturningOldHostId() {
+        assertTrue(store.bind(DeviceWidgetBinding("item:user:first", 41)))
+
+        val replaced = store.replace(DeviceWidgetBinding("item:user:first", 42))
+
+        assertTrue(replaced.committed)
+        assertEquals(41, replaced.releasedAppWidgetId)
+        assertEquals(mapOf("item:user:first" to 42), store.load())
+
+        val idempotent = store.replace(DeviceWidgetBinding("item:user:first", 42))
+        assertTrue(idempotent.committed)
+        assertNull(idempotent.releasedAppWidgetId)
+    }
+
+    @Test
+    fun replace_rejectsHostIdOwnedByAnotherItemWithoutMutation() {
+        assertTrue(store.bind(DeviceWidgetBinding("item:user:first", 41)))
+        assertTrue(store.bind(DeviceWidgetBinding("item:user:second", 42)))
+
+        val rejected = store.replace(DeviceWidgetBinding("item:user:first", 42))
+
+        assertFalse(rejected.committed)
+        assertNull(rejected.releasedAppWidgetId)
+        assertEquals(mapOf("item:user:first" to 41, "item:user:second" to 42), store.load())
+    }
+
+    @Test
     fun prune_keepsOnlyExactValidatedPairs() {
         assertTrue(store.bind(DeviceWidgetBinding("item:user:keep", 41)))
         assertTrue(store.bind(DeviceWidgetBinding("item:user:crossed", 42)))
