@@ -10,10 +10,12 @@ import cloud.kosch.aiandroid.ai.AiHubEntry
 import cloud.kosch.aiandroid.ai.AiHubEntryKind
 import cloud.kosch.aiandroid.ai.AiHubLaunchPlan
 import cloud.kosch.aiandroid.ai.AiHubLaunchPlanner
+import cloud.kosch.aiandroid.ai.AiHubPreferencePolicy
 import cloud.kosch.aiandroid.ai.AiHubRecommendation
 import cloud.kosch.aiandroid.ai.AiHubTaskIntent
 import cloud.kosch.aiandroid.ai.AiHubTaskRouter
 import cloud.kosch.aiandroid.ai.AiPublishedShortcutKind
+import cloud.kosch.aiandroid.data.AiHubPreferenceStore
 import cloud.kosch.aiandroid.data.DismissedSuggestionStore
 import cloud.kosch.aiandroid.model.LaunchableApp
 import cloud.kosch.aiandroid.system.AiPublishedShortcutSurface
@@ -24,14 +26,15 @@ import cloud.kosch.aiandroid.system.SystemActionGateway
 /**
  * User-owned AI/browser overview state.
  *
- * The controller stores only dismissed card ids and transient UI text. Installed-app inventory remains owned by
- * LauncherController/AppCatalog and is supplied as an immutable snapshot. Launching uses Android's official
- * LauncherApps, Share, browser, shortcut and Play Store routes; no Accessibility automation or undocumented prompt
- * injection.
+ * The controller stores only dismissed card ids, per-task preferred stable ids and transient UI text. Installed-app
+ * inventory remains owned by LauncherController/AppCatalog and is supplied as an immutable snapshot. Launching uses
+ * Android's official LauncherApps, Share, browser, shortcut and Play Store routes; no Accessibility automation or
+ * undocumented prompt injection.
  */
 class AiHubController(context: Context) {
     private val appContext = context.applicationContext
     private val dismissedStore = DismissedSuggestionStore(appContext)
+    private val preferenceStore = AiHubPreferenceStore(appContext)
     private val systemActions = SystemActionGateway(appContext)
     private val launcherApps = appContext.getSystemService(LauncherApps::class.java)
     private val publishedSurfaceDiscovery = AiPublishedSurfaceDiscovery(appContext)
@@ -45,15 +48,51 @@ class AiHubController(context: Context) {
         private set
     var hiddenIds by mutableStateOf(dismissedStore.hiddenIds())
         private set
+    var preferredTargetIds by mutableStateOf(preferenceStore.snapshot())
+        private set
 
     fun entries(apps: List<LaunchableApp>): List<AiHubEntry> = AiHubCatalog.entries(apps, hiddenIds)
 
     fun recommendations(
         apps: List<LaunchableApp>,
         limit: Int = 4,
-    ): List<AiHubRecommendation> = AiHubTaskRouter.rank(prompt, entries(apps), limit)
+    ): List<AiHubRecommendation> {
+        if (limit <= 0) return emptyList()
+        val intent = inferredTask()
+        val availableEntries = entries(apps)
+        val base = AiHubTaskRouter.rank(prompt, availableEntries, availableEntries.size)
+        return AiHubPreferencePolicy
+            .apply(intent, preferredTargetIds[intent], base)
+            .take(limit)
+    }
 
     fun inferredTask(): AiHubTaskIntent = AiHubTaskRouter.infer(prompt)
+
+    fun canPreferForCurrentTask(entry: AiHubEntry): Boolean =
+        AiHubPreferencePolicy.canPrefer(inferredTask(), entry)
+
+    fun isPreferredForCurrentTask(entry: AiHubEntry): Boolean =
+        preferredTargetIds[inferredTask()] == entry.stableId
+
+    fun togglePreferredForCurrentTask(entry: AiHubEntry): Boolean {
+        val intent = inferredTask()
+        if (!AiHubPreferencePolicy.canPrefer(intent, entry)) return false
+        val alreadyPreferred = preferredTargetIds[intent] == entry.stableId
+        val saved = if (alreadyPreferred) {
+            preferenceStore.clear(intent)
+        } else {
+            preferenceStore.setPreferred(intent, entry.stableId)
+        }
+        if (saved) {
+            preferredTargetIds = preferenceStore.snapshot()
+            notice = if (alreadyPreferred) {
+                "Bevorzugtes Ziel für ${intent.title} entfernt"
+            } else {
+                "${entry.title} wird für ${intent.title} bevorzugt"
+            }
+        }
+        return saved
+    }
 
     fun publishedSurfaces(entry: AiHubEntry): AiPublishedSurfaceSnapshot {
         val app = entry.installedApp ?: return AiPublishedSurfaceSnapshot()
