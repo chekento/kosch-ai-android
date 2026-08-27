@@ -47,7 +47,7 @@ class UnifiedWorkspaceHomeInstrumentationTest {
                 .onNodeWithText("App fehlt", useUnmergedTree = true)
                 .fetchSemanticsNode()
             composeTestRule
-                .onNodeWithContentDescription("App, Ordner oder Seite hinzufügen", useUnmergedTree = true)
+                .onNodeWithContentDescription("App, Ordner, Widget oder Seite hinzufügen", useUnmergedTree = true)
                 .fetchSemanticsNode()
 
             // PR #41 is intentionally independent from the separate Assistant runtime track.
