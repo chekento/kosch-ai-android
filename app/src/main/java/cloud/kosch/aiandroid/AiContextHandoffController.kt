@@ -6,6 +6,7 @@ import androidx.compose.runtime.setValue
 import cloud.kosch.aiandroid.ai.AiConfirmedContextHandoff
 import cloud.kosch.aiandroid.ai.AiContextHandoffDraft
 import cloud.kosch.aiandroid.ai.AiContextHandoffPolicy
+import cloud.kosch.aiandroid.ai.AiContextHandoffSelection
 import cloud.kosch.aiandroid.model.FileInsight
 
 /**
@@ -24,6 +25,11 @@ class AiContextHandoffController {
         return prepared
     }
 
+    fun prepare(draft: AiContextHandoffDraft): AiContextHandoffDraft {
+        this.draft = draft
+        return draft
+    }
+
     fun cancel() {
         draft = null
     }
@@ -31,12 +37,14 @@ class AiContextHandoffController {
     fun confirm(
         userPrompt: String,
         userConfirmed: Boolean,
+        selection: AiContextHandoffSelection = AiContextHandoffSelection.MINIMAL,
     ): AiConfirmedContextHandoff? {
         val current = draft ?: return null
         val confirmed = AiContextHandoffPolicy.confirm(
             draft = current,
             userPrompt = userPrompt,
             userConfirmed = userConfirmed,
+            selection = selection,
         )
         draft = null
         return confirmed
