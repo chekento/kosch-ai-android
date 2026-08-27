@@ -33,10 +33,37 @@ data class AiContextHandoffDraft(
     }
 }
 
+/**
+ * User-owned disclosure scope. Minimal is deliberately conservative: title + local summary only.
+ * MIME/size and the longer excerpt require separate opt-in and can be exposed independently in UI.
+ */
+data class AiContextHandoffSelection(
+    val includeTitle: Boolean = true,
+    val includeMetadata: Boolean = false,
+    val includeSummary: Boolean = true,
+    val includeExcerpt: Boolean = false,
+) {
+    init {
+        require(includeTitle || includeMetadata || includeSummary || includeExcerpt) {
+            "At least one context field must be selected"
+        }
+    }
+
+    companion object {
+        val MINIMAL = AiContextHandoffSelection()
+        val SUMMARY_AND_EXCERPT = AiContextHandoffSelection(includeExcerpt = true)
+        val FULL_TEXT_PREVIEW = AiContextHandoffSelection(
+            includeMetadata = true,
+            includeExcerpt = true,
+        )
+    }
+}
+
 data class AiConfirmedContextHandoff(
     val draftId: String,
     val kind: AiContextHandoffKind,
     val prompt: String,
+    val selection: AiContextHandoffSelection,
 )
 
 /**
@@ -44,23 +71,66 @@ data class AiConfirmedContextHandoff(
  * `userConfirmed=true` argument supplied by the UI/controller handling the user action.
  */
 object AiContextHandoffPolicy {
-    fun fromFile(insight: FileInsight): AiContextHandoffDraft = AiContextHandoffDraft(
-        id = UUID.randomUUID().toString(),
+    fun fromFile(insight: FileInsight): AiContextHandoffDraft = fromTextContext(
         kind = AiContextHandoffKind.FILE,
-        title = insight.displayName.trim().ifBlank { "Ausgewählte Datei" }.take(MAX_TITLE_CHARS),
-        mimeType = insight.mimeType.trim().takeIf(String::isNotBlank)?.take(MAX_MIME_CHARS),
-        sizeBytes = insight.sizeBytes?.takeIf { it >= 0L },
-        localSummary = insight.summary.trim().take(AiContextHandoffDraft.MAX_SUMMARY_CHARS),
-        localExcerpt = insight.preview
-            ?.trim()
-            ?.takeIf(String::isNotBlank)
-            ?.take(AiContextHandoffDraft.MAX_EXCERPT_CHARS),
+        title = insight.displayName,
+        mimeType = insight.mimeType,
+        sizeBytes = insight.sizeBytes,
+        summary = insight.summary,
+        excerpt = insight.preview,
+        fallbackTitle = "Ausgewählte Datei",
+    )
+
+    fun fromPenSketch(
+        title: String,
+        summary: String,
+        textualDescription: String? = null,
+        sizeBytes: Long? = null,
+    ): AiContextHandoffDraft = fromTextContext(
+        kind = AiContextHandoffKind.PEN_SKETCH,
+        title = title,
+        mimeType = "image/svg+xml",
+        sizeBytes = sizeBytes,
+        summary = summary,
+        excerpt = textualDescription,
+        fallbackTitle = "Ausgewählte Skizze",
+    )
+
+    /** URL/navigation locator is intentionally not part of this model. Only the locally selected/extracted text is. */
+    fun fromWebPage(
+        title: String,
+        summary: String,
+        selectedText: String? = null,
+    ): AiContextHandoffDraft = fromTextContext(
+        kind = AiContextHandoffKind.WEB_PAGE,
+        title = title,
+        mimeType = "text/html",
+        sizeBytes = null,
+        summary = summary,
+        excerpt = selectedText,
+        fallbackTitle = "Ausgewählte Webseite",
+    )
+
+    /** Binary pixels stay outside prompt state. This represents only a local textual description of one chosen frame. */
+    fun fromScreenFrameDescription(
+        title: String,
+        summary: String,
+        localDescription: String? = null,
+    ): AiContextHandoffDraft = fromTextContext(
+        kind = AiContextHandoffKind.SCREEN_FRAME,
+        title = title,
+        mimeType = "image/jpeg",
+        sizeBytes = null,
+        summary = summary,
+        excerpt = localDescription,
+        fallbackTitle = "Ausgewählter Bildschirmframe",
     )
 
     fun confirm(
         draft: AiContextHandoffDraft,
         userPrompt: String,
         userConfirmed: Boolean,
+        selection: AiContextHandoffSelection = AiContextHandoffSelection.MINIMAL,
     ): AiConfirmedContextHandoff {
         require(userConfirmed) { "AI context handoff requires explicit user confirmation" }
         val instruction = userPrompt.trim().take(MAX_USER_PROMPT_CHARS)
@@ -69,22 +139,50 @@ object AiContextHandoffPolicy {
                 append(instruction).append("\n\n")
             }
             append("Explizit freigegebener Kontext (${draft.kind.title}):\n")
-            append("Titel: ").append(draft.title).append('\n')
-            draft.mimeType?.let { append("Typ: ").append(it).append('\n') }
-            draft.sizeBytes?.let { append("Größe: ").append(it).append(" Bytes\n") }
-            if (draft.localSummary.isNotBlank()) {
+            if (selection.includeTitle) {
+                append("Titel: ").append(draft.title).append('\n')
+            }
+            if (selection.includeMetadata) {
+                draft.mimeType?.let { append("Typ: ").append(it).append('\n') }
+                draft.sizeBytes?.let { append("Größe: ").append(it).append(" Bytes\n") }
+            }
+            if (selection.includeSummary && draft.localSummary.isNotBlank()) {
                 append("Lokale Zusammenfassung: ").append(draft.localSummary).append('\n')
             }
-            draft.localExcerpt?.let {
-                append("\nBegrenzter lokaler Auszug:\n").append(it)
+            if (selection.includeExcerpt) {
+                draft.localExcerpt?.let {
+                    append("\nBegrenzter lokaler Auszug:\n").append(it)
+                }
             }
         }.take(MAX_CONFIRMED_PROMPT_CHARS)
         return AiConfirmedContextHandoff(
             draftId = draft.id,
             kind = draft.kind,
             prompt = prompt,
+            selection = selection,
         )
     }
+
+    private fun fromTextContext(
+        kind: AiContextHandoffKind,
+        title: String,
+        mimeType: String?,
+        sizeBytes: Long?,
+        summary: String,
+        excerpt: String?,
+        fallbackTitle: String,
+    ): AiContextHandoffDraft = AiContextHandoffDraft(
+        id = UUID.randomUUID().toString(),
+        kind = kind,
+        title = title.trim().ifBlank { fallbackTitle }.take(MAX_TITLE_CHARS),
+        mimeType = mimeType?.trim()?.takeIf(String::isNotBlank)?.take(MAX_MIME_CHARS),
+        sizeBytes = sizeBytes?.takeIf { it >= 0L },
+        localSummary = summary.trim().take(AiContextHandoffDraft.MAX_SUMMARY_CHARS),
+        localExcerpt = excerpt
+            ?.trim()
+            ?.takeIf(String::isNotBlank)
+            ?.take(AiContextHandoffDraft.MAX_EXCERPT_CHARS),
+    )
 
     private const val MAX_TITLE_CHARS = 240
     private const val MAX_MIME_CHARS = 160
