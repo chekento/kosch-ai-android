@@ -21,7 +21,7 @@ import cloud.kosch.aiandroid.model.AssistantWakeWordMode
  *
  * This controller never acquires Android capture permissions itself and never persists capture
  * grants. Platform consent must be supplied by a visible Activity boundary for each observation
- * session.
+ * session. Screen/camera capability opt-in may only be enabled through an explicit user action.
  */
 class AssistantAgentController(context: Context) {
     private val store = AssistantAgentStore(context.applicationContext)
@@ -66,13 +66,17 @@ class AssistantAgentController(context: Context) {
         )
     }
 
-    fun setObservationEnabled(source: AssistantObservationSource, enabled: Boolean) {
-        val updated = when (source) {
-            AssistantObservationSource.SCREEN -> preferences.copy(screenObservationEnabled = enabled)
-            AssistantObservationSource.CAMERA -> preferences.copy(cameraObservationEnabled = enabled)
-        }
-        updatePreferences(updated)
-        if (!enabled && activeObservation == source) stopObservation()
+    /**
+     * This is the only capability-enabling path for screen/camera awareness. UI code must call it
+     * directly from a user gesture. Agent plans, providers and automations must not call it.
+     * Disabling remains allowed from any safety/lifecycle path.
+     */
+    fun setObservationEnabledFromUser(source: AssistantObservationSource, enabled: Boolean) {
+        setObservationEnabledInternal(source, enabled)
+    }
+
+    fun disableObservation(source: AssistantObservationSource) {
+        setObservationEnabledInternal(source, false)
     }
 
     fun setActionExecutionEnabled(enabled: Boolean) {
@@ -156,6 +160,15 @@ class AssistantAgentController(context: Context) {
         risk = risk,
         explicitUserConfirmation = explicitUserConfirmation,
     )
+
+    private fun setObservationEnabledInternal(source: AssistantObservationSource, enabled: Boolean) {
+        val updated = when (source) {
+            AssistantObservationSource.SCREEN -> preferences.copy(screenObservationEnabled = enabled)
+            AssistantObservationSource.CAMERA -> preferences.copy(cameraObservationEnabled = enabled)
+        }
+        updatePreferences(updated)
+        if (!enabled && activeObservation == source) stopObservation()
+    }
 
     private fun transitionActive(next: AssistantAgentState) {
         if (state != AssistantAgentState.DISABLED) {
