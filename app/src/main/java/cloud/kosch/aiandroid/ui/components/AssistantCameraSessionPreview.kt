@@ -17,6 +17,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import cloud.kosch.aiandroid.assistant.AssistantObservationRuntime
@@ -56,7 +57,6 @@ fun AssistantCameraSessionPreview(
             onDispose { analysisExecutor.shutdownNow() }
         } else {
             var provider: ProcessCameraProvider? = null
-            var preview: Preview? = null
             var analysis: ImageAnalysis? = null
             var started = false
 
@@ -83,7 +83,6 @@ fun AssistantCameraSessionPreview(
                         resolvedAnalysis,
                     )
                     provider = resolvedProvider
-                    preview = resolvedPreview
                     analysis = resolvedAnalysis
                     started = true
                     AssistantObservationRuntime.cameraStarted()
