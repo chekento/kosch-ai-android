@@ -21,6 +21,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val assistantVoice = AssistantVoiceController(application)
 
     override fun onCleared() {
+        assistant.close()
         controller.close()
         super.onCleared()
     }
