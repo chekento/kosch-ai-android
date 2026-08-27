@@ -2,12 +2,14 @@ package cloud.kosch.aiandroid.ui
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -46,7 +48,7 @@ import cloud.kosch.aiandroid.ui.theme.Sky
  * Reusable explicit-consent UI for file, pen, web and screen context handoffs.
  * Nothing in this composable launches or shares content directly; the caller receives a user-authored selection only.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun AiContextHandoffConsentSurface(
     draft: AiContextHandoffDraft,
@@ -178,7 +180,7 @@ fun AiContextHandoffConsentSurface(
                 color = MutedMist,
                 style = MaterialTheme.typography.labelSmall,
             )
-            androidx.compose.foundation.layout.Spacer(Modifier.width(1.dp).padding(bottom = 18.dp))
+            Spacer(Modifier.height(18.dp))
         }
     }
 }
