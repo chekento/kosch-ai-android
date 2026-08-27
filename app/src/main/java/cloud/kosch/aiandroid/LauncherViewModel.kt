@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import cloud.kosch.aiandroid.ai.AiContextHandoffSelection
 import cloud.kosch.aiandroid.ai.AiHubContextSignal
 import cloud.kosch.aiandroid.ai.AiHubOrigin
 import cloud.kosch.aiandroid.ai.AiHubRoutingContext
@@ -91,15 +92,17 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     /**
      * Only the explicit UI confirmation path may call this with userConfirmed=true. The handoff draft is consumed once
-     * and the AI Hub receives only the bounded confirmed prompt payload, never the original file URI implicitly.
+     * and the AI Hub receives only the bounded selected prompt payload, never the original file URI implicitly.
      */
     fun confirmCurrentFileAiHandoff(
         userPrompt: String,
         userConfirmed: Boolean,
+        selection: AiContextHandoffSelection = AiContextHandoffSelection.MINIMAL,
     ): Boolean {
         val confirmed = aiContextHandoff.confirm(
             userPrompt = userPrompt,
             userConfirmed = userConfirmed,
+            selection = selection,
         ) ?: return false
         controller.closeFileSheet()
         openAiHub(
