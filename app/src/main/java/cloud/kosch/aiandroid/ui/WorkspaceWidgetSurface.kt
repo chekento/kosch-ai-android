@@ -15,7 +15,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -58,7 +57,7 @@ fun WorkspaceWidgetHomeItem(
     val host = remember(context.applicationContext) {
         WidgetHostController(context.applicationContext, WidgetHostController.WORKSPACE_HOST_ID)
     }
-    val revision by remember { WorkspaceWidgetChangeSignal::revision }
+    val revision = WorkspaceWidgetChangeSignal.revision
 
     DisposableEffect(host) {
         host.startListening()
