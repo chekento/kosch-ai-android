@@ -47,7 +47,6 @@ class AssistantVoiceController(context: Context) {
     fun isReady(gender: AssistantVoiceGender): Boolean = when (gender) {
         AssistantVoiceGender.NEUTRAL -> true
         AssistantVoiceGender.FEMALE,
-        AssistantVoiceGender.MALE,
-        -> assignedVoice(gender) != null
+        AssistantVoiceGender.MALE -> assignedVoice(gender) != null
     }
 }
