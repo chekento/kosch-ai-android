@@ -66,6 +66,7 @@ import cloud.kosch.aiandroid.ui.theme.Sky
 import cloud.kosch.aiandroid.ui.theme.Violet
 
 private enum class AiHubFilter(val title: String) {
+    SMART("Smart"),
     ALL("Alle"),
     AI("KI-Apps"),
     LOCAL("Lokal"),
@@ -94,13 +95,17 @@ fun AiHubSurface(
     apps: List<LaunchableApp>,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var filter by remember { mutableStateOf(AiHubFilter.ALL) }
-    val entries = hub.entries(apps).filter { entry ->
-        when (filter) {
-            AiHubFilter.ALL -> true
-            AiHubFilter.AI -> entry.kind == AiHubEntryKind.LLM_APP
-            AiHubFilter.LOCAL -> entry.kind == AiHubEntryKind.LOCAL_LLM_APP
-            AiHubFilter.BROWSERS -> entry.kind == AiHubEntryKind.BROWSER || entry.kind == AiHubEntryKind.SYSTEM_BROWSER
+    var filter by remember { mutableStateOf(AiHubFilter.SMART) }
+    val allEntries = hub.entries(apps)
+    val recommendations = hub.recommendations(apps)
+    val recommendationReasons = recommendations.associate { it.entry.stableId to it.reason }
+    val entries = when (filter) {
+        AiHubFilter.SMART -> recommendations.map { it.entry }
+        AiHubFilter.ALL -> allEntries
+        AiHubFilter.AI -> allEntries.filter { it.kind == AiHubEntryKind.LLM_APP }
+        AiHubFilter.LOCAL -> allEntries.filter { it.kind == AiHubEntryKind.LOCAL_LLM_APP }
+        AiHubFilter.BROWSERS -> allEntries.filter {
+            it.kind == AiHubEntryKind.BROWSER || it.kind == AiHubEntryKind.SYSTEM_BROWSER
         }
     }
 
@@ -151,8 +156,8 @@ fun AiHubSurface(
                 value = hub.prompt,
                 onValueChange = hub::updatePrompt,
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text("Optionaler Text für eine KI-App") },
-                placeholder = { Text("Bei Browsern wird Text nicht automatisch in deren KI eingespritzt") },
+                label = { Text("Was möchtest du tun?") },
+                placeholder = { Text("z. B. Recherchiere aktuelle Quellen · Fasse diese Seite zusammen · lokal/offline") },
                 minLines = 2,
                 maxLines = 4,
             )
@@ -174,6 +179,34 @@ fun AiHubSurface(
                         label = { Text("${hub.hiddenIds.size} wiederherstellen") },
                         leadingIcon = { Icon(Icons.Rounded.Refresh, contentDescription = null, modifier = Modifier.size(18.dp)) },
                     )
+                }
+            }
+
+            if (filter == AiHubFilter.SMART) {
+                Surface(
+                    color = Sky.copy(alpha = 0.08f),
+                    shape = RoundedCornerShape(14.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(9.dp),
+                    ) {
+                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = Sky)
+                        Column {
+                            Text(
+                                "KoSch empfiehlt · ${hub.inferredTask().title}",
+                                color = Sky,
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                "Verfügbarkeit und bestätigte Fähigkeiten werden lokal bewertet.",
+                                color = MutedMist,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
                 }
             }
 
@@ -205,6 +238,11 @@ fun AiHubSurface(
                         AiHubCard(
                             entry = entry,
                             hasPrompt = hub.prompt.isNotBlank(),
+                            recommendationReason = if (filter == AiHubFilter.SMART) {
+                                recommendationReasons[entry.stableId]
+                            } else {
+                                null
+                            },
                             onOpen = { hub.execute(entry) },
                             onDismiss = { hub.dismiss(entry) },
                         )
@@ -221,6 +259,7 @@ fun AiHubSurface(
 private fun AiHubCard(
     entry: AiHubEntry,
     hasPrompt: Boolean,
+    recommendationReason: String?,
     onOpen: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -270,6 +309,15 @@ private fun AiHubCard(
                         Icon(Icons.Rounded.DeleteOutline, contentDescription = "${entry.title} ausblenden")
                     }
                 }
+            }
+
+            recommendationReason?.let { reason ->
+                Text(
+                    "EMPFOHLEN · $reason",
+                    color = Mint,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
             }
 
             Text(
