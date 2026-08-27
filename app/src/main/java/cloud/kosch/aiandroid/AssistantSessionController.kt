@@ -342,7 +342,7 @@ class AssistantSessionController(context: Context) {
         }
     }
 
-    fun speechFailed(utteranceId: String? = speechSignal.utteranceanceId) {
+    fun speechFailed(utteranceId: String? = speechSignal.utteranceId) {
         if (!matchesActiveSpeech(utteranceId)) return
         clearSpeechSignal()
         if (settings.enabled) visualState = AssistantVisualState.ERROR
