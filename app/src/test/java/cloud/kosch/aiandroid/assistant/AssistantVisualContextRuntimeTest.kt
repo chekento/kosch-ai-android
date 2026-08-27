@@ -87,4 +87,32 @@ class AssistantVisualContextRuntimeTest {
         assertEquals(AssistantVisualContextRuntime.Status.FAILED, AssistantVisualContextRuntime.status)
         assertEquals("camera closed", AssistantVisualContextRuntime.failureMessage)
     }
+
+    @Test
+    fun delayedCleanup_forOldRequestCannotDiscardNewReadyFrame() {
+        val first = publishSmallFrame(AssistantObservationSource.SCREEN)
+        val second = publishSmallFrame(AssistantObservationSource.CAMERA)
+
+        assertFalse(AssistantVisualContextRuntime.discard(first))
+        assertEquals(AssistantVisualContextRuntime.Status.READY, AssistantVisualContextRuntime.status)
+        assertEquals(second, AssistantVisualContextRuntime.metadata?.requestId)
+        assertTrue(AssistantVisualContextRuntime.discard(second))
+        assertEquals(AssistantVisualContextRuntime.Status.IDLE, AssistantVisualContextRuntime.status)
+    }
+
+    private fun publishSmallFrame(source: AssistantObservationSource): Long {
+        val requestId = AssistantVisualContextRuntime.request(source)
+        assertEquals(requestId, AssistantVisualContextRuntime.claimCapture(source))
+        assertTrue(
+            AssistantVisualContextRuntime.publishJpeg(
+                requestId = requestId,
+                source = source,
+                width = 640,
+                height = 360,
+                rotationDegrees = 0,
+                jpegBytes = ByteArray(8 * 1024) { 7 },
+            ),
+        )
+        return requestId
+    }
 }
