@@ -18,7 +18,8 @@ data class AiPublishedWidgetSurface(
 )
 
 class AiPublishedSurfaceDiscovery(context: Context) {
-    private val appWidgetManager = AppWidgetManager.getInstance(context.applicationContext)
+    private val appContext = context.applicationContext
+    private val appWidgetManager = AppWidgetManager.getInstance(appContext)
 
     fun widgets(packageName: String, user: UserHandle): List<AiPublishedWidgetSurface> {
         val normalized = packageName.trim().takeIf { it.isNotBlank() } ?: return emptyList()
@@ -29,7 +30,7 @@ class AiPublishedSurfaceDiscovery(context: Context) {
                 .map { info ->
                     AiPublishedWidgetSurface(
                         providerComponent = info.provider.flattenToString(),
-                        label = info.loadLabel(context.packageManager)?.toString()?.trim().orEmpty()
+                        label = info.loadLabel(appContext.packageManager)?.toString()?.trim().orEmpty()
                             .ifBlank { info.provider.shortClassName },
                         minWidthDp = info.minWidth.coerceAtLeast(0),
                         minHeightDp = info.minHeight.coerceAtLeast(0),
