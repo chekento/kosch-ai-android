@@ -53,15 +53,27 @@ class WorkspaceHomeController(context: Context) {
     fun widgetBindingFor(workspaceItemId: String): Int? = widgetBindings[workspaceItemId]
 
     /**
-     * Removes stale device bindings only at an explicit lifecycle/host-validation gate. This intentionally
-     * does not run on every item removal so an in-session Home undo can still restore the original item id.
+     * Removes stale or crossed device bindings only at an explicit lifecycle/host-validation gate.
+     *
+     * Validation is pair- and provider-aware. A host id that still exists but now belongs to a different provider
+     * after restore/reuse is not accepted. This intentionally does not run on every item removal so an in-session
+     * Home undo can still restore the original item id before the next lifecycle reconciliation.
      */
-    fun pruneWidgetBindings(validAppWidgetIds: Set<Int>): Set<Int> {
-        val validWorkspaceWidgetIds = document.pages
+    fun pruneWidgetBindings(hostedProviderComponents: Map<Int, String?>): Set<Int> {
+        val expectedProviders = document.pages
             .flatMap(WorkspacePage::items)
-            .filter { it.content is WorkspaceItemContent.Widget }
-            .mapTo(mutableSetOf()) { it.id }
-        val released = widgetBindingStore.prune(validWorkspaceWidgetIds, validAppWidgetIds)
+            .mapNotNull { item ->
+                val widget = item.content as? WorkspaceItemContent.Widget ?: return@mapNotNull null
+                val expectedProvider = widget.providerComponent ?: return@mapNotNull null
+                item.id to expectedProvider
+            }
+            .toMap()
+        val validBindings = widgetBindings.filter { (itemId, appWidgetId) ->
+            val expectedProvider = expectedProviders[itemId] ?: return@filter false
+            val actualProvider = hostedProviderComponents[appWidgetId] ?: return@filter false
+            expectedProvider == actualProvider
+        }
+        val released = widgetBindingStore.prune(validBindings)
         widgetBindings = widgetBindingStore.load()
         return released
     }
