@@ -5,6 +5,12 @@ import cloud.kosch.aiandroid.model.DeviceWidgetBinding
 import cloud.kosch.aiandroid.model.MAX_WORKSPACE_ID_LENGTH
 import org.json.JSONObject
 
+/** Result of a device-local widget binding replacement. */
+data class WorkspaceWidgetBindingReplaceResult(
+    val committed: Boolean,
+    val releasedAppWidgetId: Int? = null,
+)
+
 /**
  * Device-only bridge between portable Workspace v7 widget items and Android AppWidgetHost ids.
  *
@@ -25,8 +31,8 @@ class WorkspaceWidgetBindingStore(context: Context) {
     /**
      * Adds an idempotent one-to-one binding.
      *
-     * Changing an existing item's host id must be an explicit unbind + bind operation so the caller can release
-     * the old AppWidgetHost id. Likewise, a host id already owned by another item is rejected rather than aliased.
+     * Changing an existing item's host id must use [replace] so the caller can release the old AppWidgetHost id.
+     * Likewise, a host id already owned by another item is rejected rather than aliased.
      */
     fun bind(binding: DeviceWidgetBinding): Boolean {
         val current = load().toMutableMap()
@@ -39,6 +45,34 @@ class WorkspaceWidgetBindingStore(context: Context) {
         if (current.size >= MAX_BINDINGS) return false
         current[binding.workspaceItemId] = binding.appWidgetId
         return persist(current)
+    }
+
+    /**
+     * Atomically replaces one item's device-local host binding.
+     *
+     * The previous host id is returned only after the new map was committed, so callers never release a still-live
+     * binding. A host id owned by another workspace item is rejected. Replacing with the same pair is idempotent.
+     */
+    fun replace(binding: DeviceWidgetBinding): WorkspaceWidgetBindingReplaceResult {
+        val current = load().toMutableMap()
+        if (current.any { (itemId, appWidgetId) ->
+                itemId != binding.workspaceItemId && appWidgetId == binding.appWidgetId
+            }
+        ) return WorkspaceWidgetBindingReplaceResult(committed = false)
+        if (binding.workspaceItemId !in current && current.size >= MAX_BINDINGS) {
+            return WorkspaceWidgetBindingReplaceResult(committed = false)
+        }
+
+        val previous = current[binding.workspaceItemId]
+        if (previous == binding.appWidgetId) {
+            return WorkspaceWidgetBindingReplaceResult(committed = true)
+        }
+        current[binding.workspaceItemId] = binding.appWidgetId
+        if (!persist(current)) return WorkspaceWidgetBindingReplaceResult(committed = false)
+        return WorkspaceWidgetBindingReplaceResult(
+            committed = true,
+            releasedAppWidgetId = previous?.takeIf { it != binding.appWidgetId },
+        )
     }
 
     /** Returns the released Android host id only when the updated map was committed. */
