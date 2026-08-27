@@ -57,13 +57,16 @@ import cloud.kosch.aiandroid.AssistantSessionController
 import cloud.kosch.aiandroid.LauncherSettingsController
 import cloud.kosch.aiandroid.WorkspaceHomeController
 import cloud.kosch.aiandroid.model.AssistantAnchor
+import cloud.kosch.aiandroid.model.HapticProfile
 import cloud.kosch.aiandroid.model.MotionProfile
+import cloud.kosch.aiandroid.model.PageTransition
 import cloud.kosch.aiandroid.model.SettingMaturity
 import cloud.kosch.aiandroid.model.SettingPortability
 import cloud.kosch.aiandroid.model.SettingScope
 import cloud.kosch.aiandroid.model.SettingsFeatureCatalog
 import cloud.kosch.aiandroid.model.SettingsFeatureDefinition
 import cloud.kosch.aiandroid.model.SettingsSection
+import cloud.kosch.aiandroid.model.WidgetStackSwitchMode
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 import cloud.kosch.aiandroid.ui.theme.Ink
 import cloud.kosch.aiandroid.ui.theme.Mint
@@ -294,8 +297,18 @@ private fun SettingsDetailPane(
 
             when (descriptor.section) {
                 SettingsSection.HOME -> HomeSettingsEditor(settings, home)
+                SettingsSection.PAGES -> PagesSettingsEditor(settings)
+                SettingsSection.APPS -> AppsSettingsEditor(settings)
+                SettingsSection.DOCK -> DockSettingsEditor(settings)
+                SettingsSection.FOLDERS -> FolderSettingsEditor(settings)
+                SettingsSection.WIDGETS -> WidgetSettingsEditor(settings)
                 SettingsSection.APPEARANCE -> AppearanceSettingsEditor(settings)
                 SettingsSection.ASSISTANT -> AssistantSettingsEditor(settings, assistant, descriptor.features)
+                SettingsSection.ACCESSIBILITY -> AccessibilitySettingsEditor(settings)
+                SettingsSection.PRIVACY -> PrivacySettingsEditor(settings)
+                SettingsSection.BACKUP -> BackupSettingsEditor(settings)
+                SettingsSection.SYSTEM -> SystemSettingsEditor(settings)
+                SettingsSection.ADVANCED -> AdvancedSettingsEditor(settings)
                 else -> SettingsCoverageList(descriptor.features)
             }
 
@@ -332,6 +345,138 @@ private fun ColumnScope.HomeSettingsEditor(settings: LauncherSettingsController,
             }
         }
         item { ApplyDiscardRow(dirty = draft != current, onApply = { settings.applyHome(draft, home) }, onDiscard = { draft = current }) }
+    }
+}
+
+@Composable
+private fun ColumnScope.PagesSettingsEditor(settings: LauncherSettingsController) {
+    val current = settings.document.pages
+    var draft by remember(current) { mutableStateOf(current) }
+    LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            EditableTag()
+            ToggleSetting("Seiten-Looping", draft.loopingEnabled) { draft = draft.copy(loopingEnabled = it) }
+            ToggleSetting("Letzte Seite merken", draft.rememberLastPage) { draft = draft.copy(rememberLastPage = it) }
+            ToggleSetting("Wallpaper pro Seite erlauben", draft.allowPerPageWallpaper) { draft = draft.copy(allowPerPageWallpaper = it) }
+            ToggleSetting("Raster pro Seite erlauben", draft.allowPerPageGridOverride) { draft = draft.copy(allowPerPageGridOverride = it) }
+            NumericSetting("Übergangsdauer (ms)", draft.transitionDurationMs, 80, 1_200) {
+                draft = draft.copy(transitionDurationMs = it)
+            }
+            Text("Übergang", color = Mint, style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                PageTransition.entries.forEach { transition ->
+                    FilterChip(
+                        selected = draft.transition == transition,
+                        onClick = { draft = draft.copy(transition = transition) },
+                        label = { Text(transition.name.lowercase().replaceFirstChar(Char::uppercase)) },
+                    )
+                }
+            }
+        }
+        item { ApplyDiscardRow(dirty = draft != current, onApply = { settings.applyPages(draft) }, onDiscard = { draft = current }) }
+    }
+}
+
+@Composable
+private fun ColumnScope.AppsSettingsEditor(settings: LauncherSettingsController) {
+    val current = settings.document.apps
+    var draft by remember(current) { mutableStateOf(current) }
+    LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            EditableTag()
+            ToggleSetting("Labels anzeigen", draft.showLabels) { draft = draft.copy(showLabels = it) }
+            ToggleSetting("Work-Profile-Badges", draft.showWorkProfileBadges) { draft = draft.copy(showWorkProfileBadges = it) }
+            ToggleSetting("System-Apps ausblenden", draft.hideSystemApps) { draft = draft.copy(hideSystemApps = it) }
+            ToggleSetting("Smart Ranking", draft.smartRankingEnabled) { draft = draft.copy(smartRankingEnabled = it) }
+            ToggleSetting("Alphabetischer Index", draft.alphabeticalIndexEnabled) { draft = draft.copy(alphabeticalIndexEnabled = it) }
+            NumericSetting("Drawer-Spalten Hochformat", draft.drawerColumnsPortrait, 3, 12) {
+                draft = draft.copy(drawerColumnsPortrait = it)
+            }
+            NumericSetting("Drawer-Spalten Querformat", draft.drawerColumnsLandscape, 4, 16) {
+                draft = draft.copy(drawerColumnsLandscape = it)
+            }
+        }
+        item { ApplyDiscardRow(dirty = draft != current, onApply = { settings.applyApps(draft) }, onDiscard = { draft = current }) }
+    }
+}
+
+@Composable
+private fun ColumnScope.DockSettingsEditor(settings: LauncherSettingsController) {
+    val current = settings.document.dock
+    var draft by remember(current) { mutableStateOf(current) }
+    LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            EditableTag()
+            ToggleSetting("Dock aktiv", draft.enabled) { draft = draft.copy(enabled = it) }
+            ToggleSetting("Adaptive Vorschläge", draft.adaptiveSuggestions) { draft = draft.copy(adaptiveSuggestions = it) }
+            ToggleSetting("Ask/AI-Schaltfläche", draft.showAskButton) { draft = draft.copy(showAskButton = it) }
+            NumericSetting("Maximale Einträge", draft.maxItems, 0, 12) { draft = draft.copy(maxItems = it) }
+            SliderSetting("Icon-Skalierung", draft.iconScale, 0.5f..1.75f) { draft = draft.copy(iconScale = it) }
+            SliderSetting("Hintergrund-Deckkraft", draft.backgroundOpacity, 0f..1f) { draft = draft.copy(backgroundOpacity = it) }
+        }
+        item { ApplyDiscardRow(dirty = draft != current, onApply = { settings.applyDock(draft) }, onDiscard = { draft = current }) }
+    }
+}
+
+@Composable
+private fun ColumnScope.FolderSettingsEditor(settings: LauncherSettingsController) {
+    val current = settings.document.folders
+    var draft by remember(current) { mutableStateOf(current) }
+    LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            EditableTag()
+            ToggleSetting("Als Sheet öffnen", draft.openAsSheet) { draft = draft.copy(openAsSheet = it) }
+            ToggleSetting("Labels anzeigen", draft.showLabels) { draft = draft.copy(showLabels = it) }
+            ToggleSetting("Smart Folders", draft.smartFoldersEnabled) { draft = draft.copy(smartFoldersEnabled = it) }
+            ToggleSetting("Nach App-Start schließen", draft.closeAfterLaunch) { draft = draft.copy(closeAfterLaunch = it) }
+            NumericSetting("Spalten", draft.columns, 2, 10) { draft = draft.copy(columns = it) }
+        }
+        item { ApplyDiscardRow(dirty = draft != current, onApply = { settings.applyFolders(draft) }, onDiscard = { draft = current }) }
+    }
+}
+
+@Composable
+private fun ColumnScope.WidgetSettingsEditor(settings: LauncherSettingsController) {
+    val current = settings.document.widgets
+    var draft by remember(current) { mutableStateOf(current) }
+    LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            EditableTag()
+            ToggleSetting("Freies Resize", draft.allowFreeResize) { draft = draft.copy(allowFreeResize = it) }
+            ToggleSetting("Fehlenden Provider als Platzhalter zeigen", draft.showMissingProviderPlaceholder) {
+                draft = draft.copy(showMissingProviderPlaceholder = it)
+            }
+            NumericSetting("Standardbreite in Zellen", draft.defaultColumnSpan, 1, 24) {
+                draft = draft.copy(defaultColumnSpan = it)
+            }
+            NumericSetting("Standardhöhe in Zellen", draft.defaultRowSpan, 1, 32) {
+                draft = draft.copy(defaultRowSpan = it)
+            }
+            NumericSetting("Stack Auto-Cycle (Sek.)", draft.stackAutoCycleSeconds, 0, 3_600) {
+                draft = draft.copy(stackAutoCycleSeconds = it)
+            }
+            Text("Stack-Wechsel", color = Mint, style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                WidgetStackSwitchMode.entries.forEach { mode ->
+                    FilterChip(
+                        selected = draft.stackSwitchMode == mode,
+                        onClick = { draft = draft.copy(stackSwitchMode = mode) },
+                        label = { Text(mode.name.lowercase().replace('_', ' ').replaceFirstChar(Char::uppercase)) },
+                    )
+                }
+            }
+            Text("Widget-Haptik", color = Mint, style = MaterialTheme.typography.labelLarge)
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
+                HapticProfile.entries.forEach { profile ->
+                    FilterChip(
+                        selected = draft.haptics == profile,
+                        onClick = { draft = draft.copy(haptics = profile) },
+                        label = { Text(profile.name.lowercase().replaceFirstChar(Char::uppercase)) },
+                    )
+                }
+            }
+        }
+        item { ApplyDiscardRow(dirty = draft != current, onApply = { settings.applyWidgets(draft) }, onDiscard = { draft = current }) }
     }
 }
 
@@ -423,6 +568,113 @@ private fun ColumnScope.AssistantSettingsEditor(
     }
 }
 
+@Composable
+private fun ColumnScope.AccessibilitySettingsEditor(settings: LauncherSettingsController) {
+    val current = settings.document.accessibility
+    var draft by remember(current) { mutableStateOf(current) }
+    LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            EditableTag()
+            ToggleSetting("Reduced Motion", draft.reducedMotion) { draft = draft.copy(reducedMotion = it) }
+            ToggleSetting("Hoher Kontrast", draft.highContrast) { draft = draft.copy(highContrast = it) }
+            ToggleSetting("Große Touch-Ziele", draft.largeTouchTargets) { draft = draft.copy(largeTouchTargets = it) }
+            ToggleSetting("Seitenwechsel ansagen", draft.announcePageChanges) { draft = draft.copy(announcePageChanges = it) }
+            ToggleSetting("Text zusätzlich zu Icons bevorzugen", draft.preferTextAlongsideIcons) {
+                draft = draft.copy(preferTextAlongsideIcons = it)
+            }
+        }
+        item { ApplyDiscardRow(dirty = draft != current, onApply = { settings.applyAccessibility(draft) }, onDiscard = { draft = current }) }
+    }
+}
+
+@Composable
+private fun ColumnScope.PrivacySettingsEditor(settings: LauncherSettingsController) {
+    val current = settings.document.privacy
+    var draft by remember(current) { mutableStateOf(current) }
+    LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            EditableTag()
+            ToggleSetting("Lokales Usage Learning", draft.localUsageLearningEnabled) { draft = draft.copy(localUsageLearningEnabled = it) }
+            ToggleSetting("Audit-Protokoll", draft.auditEnabled) { draft = draft.copy(auditEnabled = it) }
+            ToggleSetting("Netzwerkfeatures erlauben", draft.allowNetworkFeatures) { draft = draft.copy(allowNetworkFeatures = it) }
+            ToggleSetting("Kontext vor Provider-Handoff anzeigen", draft.requireContextPreviewBeforeProviderHandoff) {
+                draft = draft.copy(requireContextPreviewBeforeProviderHandoff = it)
+            }
+            NumericSetting("Audit-Aufbewahrung (Tage)", draft.auditRetentionDays, 1, 365) {
+                draft = draft.copy(auditRetentionDays = it)
+            }
+            LockedSetting("Notification-Zugriff", "wird nur über den Android-Systemdialog erteilt")
+        }
+        item { ApplyDiscardRow(dirty = draft != current, onApply = { settings.applyPrivacy(draft) }, onDiscard = { draft = current }) }
+    }
+}
+
+@Composable
+private fun ColumnScope.BackupSettingsEditor(settings: LauncherSettingsController) {
+    val current = settings.document.backup
+    var draft by remember(current) { mutableStateOf(current) }
+    LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            EditableTag()
+            ToggleSetting("Launcher-Settings einschließen", draft.includeLauncherSettings) { draft = draft.copy(includeLauncherSettings = it) }
+            ToggleSetting("Workspace-Layout einschließen", draft.includeWorkspaceLayout) { draft = draft.copy(includeWorkspaceLayout = it) }
+            ToggleSetting("Themes einschließen", draft.includeThemes) { draft = draft.copy(includeThemes = it) }
+            ToggleSetting("Assistant-Präferenzen einschließen", draft.includeAssistantPreferences) {
+                draft = draft.copy(includeAssistantPreferences = it)
+            }
+            ToggleSetting("Usage Learning einschließen", draft.includeUsageLearning) { draft = draft.copy(includeUsageLearning = it) }
+            LockedSetting("Secrets", "werden immer ausgeschlossen")
+            LockedSetting("Widget Host IDs / Grants / Geräte-Voice-IDs", "bleiben immer gerätegebunden")
+        }
+        item { ApplyDiscardRow(dirty = draft != current, onApply = { settings.applyBackup(draft) }, onDiscard = { draft = current }) }
+    }
+}
+
+@Composable
+private fun ColumnScope.SystemSettingsEditor(settings: LauncherSettingsController) {
+    val current = settings.document.system
+    var draft by remember(current) { mutableStateOf(current) }
+    LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            EditableTag()
+            ToggleSetting("Dynamic Color", draft.dynamicColorEnabled) { draft = draft.copy(dynamicColorEnabled = it) }
+            ToggleSetting("Work-Profile-Integration", draft.workProfileIntegrationEnabled) {
+                draft = draft.copy(workProfileIntegrationEnabled = it)
+            }
+            ToggleSetting("Notification Dots", draft.notificationDotsEnabled) { draft = draft.copy(notificationDotsEnabled = it) }
+            ToggleSetting("System-Home-Escape sichtbar", draft.systemHomeEscapeVisible) { draft = draft.copy(systemHomeEscapeVisible = it) }
+            ToggleSetting("System-Schriftgröße folgen", draft.followSystemFontScale) { draft = draft.copy(followSystemFontScale = it) }
+            Surface(color = Sky.copy(alpha = 0.08f), shape = RoundedCornerShape(14.dp)) {
+                Text(
+                    "Desktop-/External-Display-/Foldable-Planung wird separat aus der live verfügbaren Fensterfläche und Eingabeart abgeleitet; keine Geräte-Modelllisten.",
+                    modifier = Modifier.padding(12.dp),
+                    color = Sky,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+        }
+        item { ApplyDiscardRow(dirty = draft != current, onApply = { settings.applySystem(draft) }, onDiscard = { draft = current }) }
+    }
+}
+
+@Composable
+private fun ColumnScope.AdvancedSettingsEditor(settings: LauncherSettingsController) {
+    val current = settings.document.advanced
+    var draft by remember(current) { mutableStateOf(current) }
+    LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item {
+            EditableTag()
+            ToggleSetting("Diagnosefunktionen", draft.diagnosticsEnabled) { draft = draft.copy(diagnosticsEnabled = it) }
+            ToggleSetting("Performance-Overlay", draft.showPerformanceOverlay) { draft = draft.copy(showPerformanceOverlay = it) }
+            ToggleSetting("UI-Timing lokal protokollieren", draft.logUiTimingLocally) { draft = draft.copy(logUiTimingLocally = it) }
+            ToggleSetting("Experimentelle Features", draft.experimentalFeaturesEnabled) {
+                draft = draft.copy(experimentalFeaturesEnabled = it)
+            }
+        }
+        item { ApplyDiscardRow(dirty = draft != current, onApply = { settings.applyAdvanced(draft) }, onDiscard = { draft = current }) }
+    }
+}
+
 private fun presentationChanged(
     current: cloud.kosch.aiandroid.model.LauncherAssistantSettings,
     draft: cloud.kosch.aiandroid.model.LauncherAssistantSettings,
@@ -477,6 +729,28 @@ private fun FeatureCoverageRow(feature: SettingsFeatureDefinition) {
 private fun LiveTag(text: String) {
     Surface(color = Mint.copy(alpha = 0.12f), shape = RoundedCornerShape(12.dp)) {
         Text(text, modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp), color = Mint, style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+private fun EditableTag() {
+    Surface(color = Sky.copy(alpha = 0.10f), shape = RoundedCornerShape(12.dp)) {
+        Text(
+            "EDITIERBAR · persistent · Runtime-Reifegrad bleibt in der Feature-Matrix maßgeblich",
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+            color = Sky,
+            style = MaterialTheme.typography.labelMedium,
+        )
+    }
+}
+
+@Composable
+private fun LockedSetting(label: String, reason: String) {
+    Surface(color = RaisedSurface, shape = RoundedCornerShape(12.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp)) {
+            Text(label, fontWeight = FontWeight.SemiBold)
+            Text(reason, color = MutedMist, style = MaterialTheme.typography.bodySmall)
+        }
     }
 }
 
