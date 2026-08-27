@@ -249,12 +249,17 @@ private fun AssistantSheet(
             } else {
                 AssistantToggleRow(
                     title = "Assistant aktiv",
-                    body = "Aus bedeutet: kein Assistant-Voice und kein laufender Chat. Der Ask-Dock bleibt als Launcher-Steuerung verfügbar.",
+                    body = "Aus stoppt Voice, Screen Share und Kamera-Session und setzt Session sowie Agent gemeinsam auf AUS. Der Ask-Dock bleibt als Launcher-Steuerung verfügbar.",
                     checked = assistant.settings.enabled,
                     onCheckedChange = { enabled ->
-                        if (!enabled) stopSpeech()
-                        assistant.setEnabled(enabled)
-                        agent.setAssistantEnabled(enabled)
+                        AssistantEnableCoordinator.apply(
+                            enabled = enabled,
+                            stopSpeech = stopSpeech,
+                            stopScreenSession = stopScreenSession,
+                            stopCameraSession = stopCameraSession,
+                            setSessionEnabled = assistant::setEnabled,
+                            setAgentEnabled = agent::setAssistantEnabled,
+                        )
                     },
                 )
                 AssistantToggleRow(
@@ -402,7 +407,7 @@ private fun AssistantSheet(
                             assistant.clearSession()
                         },
                     ) {
-                        Icon(Icons.Rounded.DeleteOutline, contentDescription = null)
+                        Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = Warm)
                         Spacer(Modifier.width(4.dp))
                         Text("Chat löschen")
                     }
