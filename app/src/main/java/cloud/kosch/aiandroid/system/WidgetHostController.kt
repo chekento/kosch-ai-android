@@ -23,6 +23,14 @@ class WidgetHostController(context: Context) {
 
     fun deleteId(appWidgetId: Int) = host.deleteAppWidgetId(appWidgetId)
 
+    fun hostedIds(): Set<Int> = host.appWidgetIds.filter { it > 0 }.toSet()
+
+    fun providerComponent(appWidgetId: Int): String? = manager
+        .getAppWidgetInfo(appWidgetId)
+        ?.provider
+        ?.flattenToString()
+        ?.takeIf(String::isNotBlank)
+
     fun pickIntent(appWidgetId: Int): Intent = Intent(AppWidgetManager.ACTION_APPWIDGET_PICK).apply {
         putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
     }
