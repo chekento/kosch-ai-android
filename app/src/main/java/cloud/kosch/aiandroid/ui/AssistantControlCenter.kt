@@ -32,6 +32,7 @@ import cloud.kosch.aiandroid.AssistantSessionController
 import cloud.kosch.aiandroid.AssistantVoiceController
 import cloud.kosch.aiandroid.ai.AssistantCharacterCatalog
 import cloud.kosch.aiandroid.ai.AssistantWakeWordResolver
+import cloud.kosch.aiandroid.assistant.AssistantObservationRuntime
 import cloud.kosch.aiandroid.model.AssistantAgentState
 import cloud.kosch.aiandroid.model.AssistantObservationSource
 import cloud.kosch.aiandroid.model.AssistantPresenceMode
@@ -39,6 +40,7 @@ import cloud.kosch.aiandroid.model.AssistantSystemVoiceOption
 import cloud.kosch.aiandroid.model.AssistantVoiceGender
 import cloud.kosch.aiandroid.model.AssistantVisualState
 import cloud.kosch.aiandroid.model.AssistantWakeWordMode
+import cloud.kosch.aiandroid.ui.components.AssistantCameraSessionPreview
 import cloud.kosch.aiandroid.ui.theme.MutedMist
 import cloud.kosch.aiandroid.ui.theme.RaisedSurface
 import cloud.kosch.aiandroid.ui.theme.Warm
@@ -51,6 +53,13 @@ fun AssistantControlCenter(
     voice: AssistantVoiceController,
     requestVoicePreview: (voiceName: String) -> Boolean,
     stopSpeech: () -> Unit,
+    requestScreenSession: () -> Unit,
+    stopScreenSession: () -> Unit,
+    cameraSessionRequested: Boolean,
+    requestCameraSession: () -> Unit,
+    stopCameraSession: () -> Unit,
+    onCameraSessionStarted: () -> Unit,
+    onCameraSessionFailure: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val character = agent.character
@@ -69,6 +78,8 @@ fun AssistantControlCenter(
         ).take(MAX_VISIBLE_VOICES)
     }
     val effectiveWakeWord = AssistantWakeWordResolver.resolve(agent.preferences, character)
+    val screenActive = AssistantObservationRuntime.screenActive
+    val cameraActive = AssistantObservationRuntime.cameraActive
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
@@ -87,24 +98,28 @@ fun AssistantControlCenter(
                             active = assistant.awaitingVoice || assistant.visualState == AssistantVisualState.LISTENING,
                         )
                     }
-                    item {
-                        PrivacyStatusChip(
-                            label = "SCREEN",
-                            active = agent.activeObservation == AssistantObservationSource.SCREEN,
-                        )
-                    }
-                    item {
-                        PrivacyStatusChip(
-                            label = "CAM",
-                            active = agent.activeObservation == AssistantObservationSource.CAMERA,
-                        )
-                    }
+                    item { PrivacyStatusChip(label = "SCREEN", active = screenActive) }
+                    item { PrivacyStatusChip(label = "CAM", active = cameraActive) }
                     item {
                         PrivacyStatusChip(
                             label = "ACTING",
                             active = agent.state == AssistantAgentState.ACTING,
                         )
                     }
+                }
+                if (screenActive) {
+                    Text(
+                        "Screen Share: ${AssistantObservationRuntime.screenWidth}×${AssistantObservationRuntime.screenHeight} · ${AssistantObservationRuntime.screenFrameCount} flüchtige Frames beobachtet",
+                        color = MutedMist,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                if (cameraActive) {
+                    Text(
+                        "Camera Live: ${AssistantObservationRuntime.cameraFrameCount} flüchtige Frames beobachtet",
+                        color = MutedMist,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
             }
         }
@@ -279,24 +294,70 @@ fun AssistantControlCenter(
         item {
             ControlSection(
                 title = "Screen & Camera Awareness",
-                body = "Beide Fähigkeiten sind standardmäßig AUS. Einschalten ist ausschließlich hier als bewusste Nutzeraktion möglich.",
+                body = "Capability-Freigabe und laufende Session sind getrennt. Eine Live-Quelle gleichzeitig; Start und Stop bleiben sichtbar.",
             ) {
                 ControlToggleRow(
                     title = "Screen Awareness",
-                    body = "Erlaubt nur die Fähigkeit. Eine echte Session braucht zusätzlich sichtbaren Android-Screen-Share-Consent.",
+                    body = "Erlaubt die Fähigkeit. Jede echte Session braucht zusätzlich Androids sichtbaren Screen-Share-Consent.",
                     checked = agent.preferences.screenObservationEnabled,
-                    onCheckedChange = {
-                        agent.setObservationEnabledFromUser(AssistantObservationSource.SCREEN, it)
+                    onCheckedChange = { enabled ->
+                        if (!enabled && screenActive) stopScreenSession()
+                        agent.setObservationEnabledFromUser(AssistantObservationSource.SCREEN, enabled)
                     },
                 )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        enabled = assistant.settings.enabled && agent.preferences.screenObservationEnabled,
+                        onClick = if (screenActive) stopScreenSession else requestScreenSession,
+                    ) {
+                        Text(if (screenActive) "Screen Share stoppen" else "Screen Share starten")
+                    }
+                }
+                Text(
+                    if (screenActive) {
+                        "Android MediaProjection läuft als sichtbarer Foreground Service. Stoppen geht hier oder über die Systembenachrichtigung."
+                    } else {
+                        "Kein Bildschirm wird erfasst. Die Capability allein startet keine Aufnahme."
+                    },
+                    color = MutedMist,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+
                 ControlToggleRow(
                     title = "Camera Awareness",
-                    body = "Erlaubt nur die Fähigkeit. Eine echte Session braucht zusätzlich Kamera-Consent und sichtbare Aktivitätsanzeige.",
+                    body = "Erlaubt die Fähigkeit. Live-Kamera läuft nur mit Runtime-Permission und sichtbarer Vorschau in diesem Control Center.",
                     checked = agent.preferences.cameraObservationEnabled,
-                    onCheckedChange = {
-                        agent.setObservationEnabledFromUser(AssistantObservationSource.CAMERA, it)
+                    onCheckedChange = { enabled ->
+                        if (!enabled && cameraSessionRequested) stopCameraSession()
+                        agent.setObservationEnabledFromUser(AssistantObservationSource.CAMERA, enabled)
                     },
                 )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        enabled = assistant.settings.enabled && agent.preferences.cameraObservationEnabled,
+                        onClick = if (cameraSessionRequested) stopCameraSession else requestCameraSession,
+                    ) {
+                        Text(if (cameraSessionRequested) "Kamera stoppen" else "Kamera starten")
+                    }
+                }
+                if (cameraSessionRequested) {
+                    AssistantCameraSessionPreview(
+                        onStarted = onCameraSessionStarted,
+                        onStopped = stopCameraSession,
+                        onFailure = onCameraSessionFailure,
+                    )
+                    Text(
+                        "Die Vorschau ist der Privacy-Indikator: verlässt du diese Fläche, wird CameraX sofort ungebunden.",
+                        color = MutedMist,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                } else {
+                    Text(
+                        "Keine Kamera-Session aktiv. KoSch hält keine Kamera im Hintergrund offen.",
+                        color = MutedMist,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
         }
 
