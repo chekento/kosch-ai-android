@@ -47,6 +47,7 @@ object PortableLauncherBackupBundleCodec {
     private const val MAGIC = "KOSCH-LAUNCHER-BUNDLE"
     private const val MAX_BUNDLE_BYTES = 4 * 1024 * 1024
     private const val MAX_SECTION_BYTES = 3 * 1024 * 1024
+    private const val HEADER_PROBE_BYTES = 96
 
     fun encode(bundle: PortableLauncherBackupBundle): ByteArray {
         require(bundle.schemaVersion == PortableLauncherBackupBundle.SCHEMA_VERSION)
@@ -73,13 +74,14 @@ object PortableLauncherBackupBundleCodec {
     /** Returns null when the payload is a pre-bundle legacy Workspace backup. */
     fun decodeOrNull(payload: ByteArray): PortableLauncherBackupBundle? {
         require(payload.isNotEmpty()) { "Backup payload is empty" }
+        if (!hasBundleHeader(payload)) return null
         require(payload.size <= MAX_BUNDLE_BYTES) { "Launcher backup bundle is too large" }
-        val text = payload.toString(StandardCharsets.UTF_8)
+
+        val text = String(payload, StandardCharsets.UTF_8)
         val lines = text.lineSequence().filter(String::isNotBlank).toList()
         val header = lines.firstOrNull() ?: return null
-        if (!header.startsWith("$MAGIC|")) return null
         val headerParts = header.split('|')
-        require(headerParts.size == 3) { "Malformed launcher backup header" }
+        require(headerParts.size == 3 && headerParts[0] == MAGIC) { "Malformed launcher backup header" }
         val version = headerParts[1].toIntOrNull()
             ?: throw IllegalArgumentException("Invalid launcher backup schema")
         require(version == PortableLauncherBackupBundle.SCHEMA_VERSION) {
@@ -113,11 +115,13 @@ object PortableLauncherBackupBundleCodec {
         )
     }
 
-    fun isBundle(payload: ByteArray): Boolean = payload
-        .toString(StandardCharsets.UTF_8)
-        .lineSequence()
-        .firstOrNull()
-        ?.startsWith("$MAGIC|") == true
+    fun isBundle(payload: ByteArray): Boolean = payload.isNotEmpty() && hasBundleHeader(payload)
+
+    private fun hasBundleHeader(payload: ByteArray): Boolean {
+        val probeLength = minOf(payload.size, HEADER_PROBE_BYTES)
+        val probe = String(payload, 0, probeLength, StandardCharsets.UTF_8)
+        return probe.startsWith("$MAGIC|")
+    }
 
     private fun requireSectionBudget(value: String) {
         require(value.toByteArray(StandardCharsets.UTF_8).size <= MAX_SECTION_BYTES) {
