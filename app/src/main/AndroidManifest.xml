@@ -2,7 +2,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
 
     <queries>
         <intent>
@@ -49,6 +54,11 @@
             android:name=".SecurityNetworkActivity"
             android:exported="false"
             android:screenOrientation="unspecified" />
+
+        <service
+            android:name=".assistant.AssistantScreenShareService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
 
         <service
             android:name=".system.KoSchNotificationListenerService"

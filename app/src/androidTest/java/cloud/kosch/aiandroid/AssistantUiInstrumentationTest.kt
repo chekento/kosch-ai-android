@@ -1,6 +1,7 @@
 package cloud.kosch.aiandroid
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -19,11 +20,8 @@ class AssistantUiInstrumentationTest {
     fun askDockCompanion_opensAssistant_andSurvivesActivityRecreation() {
         composeTestRule.waitForIdle()
         dismissOnboardingIfVisible()
+        openAssistant()
 
-        composeTestRule
-            .onNodeWithContentDescription("KoSch Assistant einrichten", useUnmergedTree = true)
-            .performClick()
-        composeTestRule.waitForIdle()
         composeTestRule
             .onNodeWithText("KoSch Assistant", useUnmergedTree = true)
             .fetchSemanticsNode()
@@ -34,6 +32,44 @@ class AssistantUiInstrumentationTest {
         composeTestRule
             .onNodeWithText("KoSch Assistant", useUnmergedTree = true)
             .fetchSemanticsNode()
+    }
+
+    @Test
+    fun assistantControlCenter_exposesPrivacyAndCharacterControls() {
+        composeTestRule.waitForIdle()
+        dismissOnboardingIfVisible()
+        openAssistant()
+
+        composeTestRule
+            .onNodeWithText("Steuerung", useUnmergedTree = true)
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        composeTestRule
+            .onNodeWithText("Privacy Live", useUnmergedTree = true)
+            .fetchSemanticsNode()
+        composeTestRule
+            .onNodeWithText("Charakter & Name", useUnmergedTree = true)
+            .fetchSemanticsNode()
+        composeTestRule
+            .onNodeWithText("Name des Assistenten", useUnmergedTree = true)
+            .fetchSemanticsNode()
+    }
+
+    private fun openAssistant() {
+        val setupNodes = composeTestRule
+            .onAllNodesWithContentDescription("KoSch Assistant einrichten", useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        if (setupNodes.isNotEmpty()) {
+            composeTestRule
+                .onNodeWithContentDescription("KoSch Assistant einrichten", useUnmergedTree = true)
+                .performClick()
+        } else {
+            composeTestRule
+                .onNodeWithContentDescription("KoSch Assistant öffnen", useUnmergedTree = true)
+                .performClick()
+        }
+        composeTestRule.waitForIdle()
     }
 
     private fun dismissOnboardingIfVisible() {

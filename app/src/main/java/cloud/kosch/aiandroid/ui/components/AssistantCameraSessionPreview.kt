@@ -1,0 +1,188 @@
+package cloud.kosch.aiandroid.ui.components
+
+import android.content.Context
+import android.content.ContextWrapper
+import androidx.activity.ComponentActivity
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.content.ContextCompat
+import cloud.kosch.aiandroid.assistant.AssistantObservationRuntime
+import cloud.kosch.aiandroid.assistant.AssistantVisualContextRuntime
+import cloud.kosch.aiandroid.assistant.AssistantVisualFrameEncoder
+import cloud.kosch.aiandroid.model.AssistantObservationSource
+import java.util.concurrent.Executors
+
+/**
+ * Visible-only CameraX session for Assistant Camera Awareness.
+ *
+ * Normal live frames are closed immediately. Stage H encodes exactly one frame only when the
+ * process-only visual-context broker contains an explicit CAMERA request. Leaving this composable
+ * unbinds exactly the Assistant's camera use cases and tears down the analyzer executor. A late
+ * provider callback is guarded so it cannot resurrect capture after the visible preview is disposed.
+ */
+@Composable
+fun AssistantCameraSessionPreview(
+    onStarted: () -> Unit,
+    onStopped: () -> Unit,
+    onFailure: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val activity = remember(context) { context.findCameraActivity() }
+    val previewView = remember(context) {
+        PreviewView(context).apply {
+            scaleType = PreviewView.ScaleType.FILL_CENTER
+            implementationMode = PreviewView.ImplementationMode.COMPATIBLE
+        }
+    }
+    val cameraProviderFuture = remember(context.applicationContext) {
+        ProcessCameraProvider.getInstance(context.applicationContext)
+    }
+    val analysisExecutor = remember { Executors.newSingleThreadExecutor() }
+
+    DisposableEffect(activity, previewView, cameraProviderFuture) {
+        if (activity == null) {
+            AssistantObservationRuntime.cameraStopped()
+            AssistantVisualContextRuntime.cancel(
+                AssistantObservationSource.CAMERA,
+                "Kamera-Session war für den angeforderten Kontextframe nicht verfügbar",
+            )
+            onFailure("Keine sichtbare Activity für die Kamera-Session verfügbar")
+            onDispose { analysisExecutor.shutdownNow() }
+        } else {
+            var provider: ProcessCameraProvider? = null
+            var preview: Preview? = null
+            var analysis: ImageAnalysis? = null
+            var started = false
+            var disposed = false
+
+            val listener = Runnable {
+                if (disposed) return@Runnable
+                runCatching {
+                    val resolvedProvider = cameraProviderFuture.get()
+                    if (disposed) return@runCatching
+
+                    val resolvedPreview = Preview.Builder().build().also {
+                        it.setSurfaceProvider(previewView.surfaceProvider)
+                    }
+                    val resolvedAnalysis = ImageAnalysis.Builder()
+                        .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                        .build()
+                        .also { useCase ->
+                            useCase.setAnalyzer(analysisExecutor) { image ->
+                                try {
+                                    if (!disposed) {
+                                        AssistantObservationRuntime.cameraFrameObserved()
+                                        val requestId = AssistantVisualContextRuntime.claimCapture(
+                                            AssistantObservationSource.CAMERA,
+                                        )
+                                        if (requestId != null) {
+                                            val encoded = runCatching {
+                                                AssistantVisualFrameEncoder.encodeCameraImage(image)
+                                            }.getOrNull()
+                                            if (encoded == null) {
+                                                AssistantVisualContextRuntime.fail(
+                                                    requestId,
+                                                    "Der angeforderte Kamera-Kontextframe konnte nicht komprimiert werden",
+                                                )
+                                            } else {
+                                                AssistantVisualContextRuntime.publishJpeg(
+                                                    requestId = requestId,
+                                                    source = AssistantObservationSource.CAMERA,
+                                                    width = encoded.width,
+                                                    height = encoded.height,
+                                                    rotationDegrees = encoded.rotationDegrees,
+                                                    jpegBytes = encoded.bytes,
+                                                )
+                                            }
+                                        }
+                                    }
+                                } finally {
+                                    image.close()
+                                }
+                            }
+                        }
+
+                    if (disposed) {
+                        resolvedAnalysis.clearAnalyzer()
+                        return@runCatching
+                    }
+
+                    resolvedProvider.bindToLifecycle(
+                        activity,
+                        CameraSelector.DEFAULT_BACK_CAMERA,
+                        resolvedPreview,
+                        resolvedAnalysis,
+                    )
+                    if (disposed) {
+                        resolvedAnalysis.clearAnalyzer()
+                        resolvedProvider.unbind(resolvedPreview, resolvedAnalysis)
+                        return@runCatching
+                    }
+
+                    provider = resolvedProvider
+                    preview = resolvedPreview
+                    analysis = resolvedAnalysis
+                    started = true
+                    AssistantObservationRuntime.cameraStarted()
+                    onStarted()
+                }.onFailure { error ->
+                    if (!disposed) {
+                        AssistantObservationRuntime.cameraStopped()
+                        AssistantVisualContextRuntime.cancel(
+                            AssistantObservationSource.CAMERA,
+                            "Kamera-Session ist vor dem Kontextframe fehlgeschlagen",
+                        )
+                        onFailure(error.message ?: "CameraX-Session konnte nicht gestartet werden")
+                    }
+                }
+            }
+            cameraProviderFuture.addListener(listener, ContextCompat.getMainExecutor(context))
+
+            onDispose {
+                disposed = true
+                analysis?.clearAnalyzer()
+                val currentPreview = preview
+                val currentAnalysis = analysis
+                if (currentPreview != null && currentAnalysis != null) {
+                    provider?.unbind(currentPreview, currentAnalysis)
+                }
+                analysisExecutor.shutdownNow()
+                AssistantObservationRuntime.cameraStopped()
+                AssistantVisualContextRuntime.cancel(
+                    AssistantObservationSource.CAMERA,
+                    "Kamera wurde beendet, bevor der angeforderte Kontextframe bereit war",
+                )
+                if (started) onStopped()
+            }
+        }
+    }
+
+    AndroidView(
+        factory = { previewView },
+        modifier = modifier
+            .fillMaxWidth()
+            .aspectRatio(4f / 3f)
+            .clip(RoundedCornerShape(18.dp)),
+    )
+}
+
+private tailrec fun Context.findCameraActivity(): ComponentActivity? = when (this) {
+    is ComponentActivity -> this
+    is ContextWrapper -> baseContext.findCameraActivity()
+    else -> null
+}

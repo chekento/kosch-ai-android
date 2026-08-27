@@ -1,15 +1,21 @@
 package cloud.kosch.aiandroid
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import cloud.kosch.aiandroid.ai.AssistantLocalCore
+import cloud.kosch.aiandroid.ai.AssistantVisualContextRequestParser
 import cloud.kosch.aiandroid.ai.LauncherCommand
+import cloud.kosch.aiandroid.assistant.AssistantObservationRuntime
+import cloud.kosch.aiandroid.assistant.AssistantVisualContextRuntime
 import cloud.kosch.aiandroid.data.AssistantStore
 import cloud.kosch.aiandroid.model.AssistantMessage
 import cloud.kosch.aiandroid.model.AssistantMessageRole
+import cloud.kosch.aiandroid.model.AssistantObservationSource
 import cloud.kosch.aiandroid.model.AssistantSettings
 import cloud.kosch.aiandroid.model.AssistantVisualState
 import cloud.kosch.aiandroid.ui.components.AssistantAttentionSignal
@@ -23,9 +29,12 @@ import kotlin.math.sqrt
 class AssistantSessionController(context: Context) {
     private val store = AssistantStore(context.applicationContext)
     private val localCore = AssistantLocalCore()
+    private val mainHandler = Handler(Looper.getMainLooper())
     private var nextMessageId = 1L
     private var activeSpeechText = ""
     private var visualStateAfterSpeech = AssistantVisualState.IDLE
+    private var lastVisualReadyRequestId = -1L
+    private var lastVisualFailureGeneration = -1L
 
     var settings by mutableStateOf(store.load())
         private set
@@ -46,6 +55,12 @@ class AssistantSessionController(context: Context) {
     var attentionSignal by mutableStateOf(AssistantAttentionSignal.Idle)
         private set
 
+    init {
+        AssistantVisualContextRuntime.setEventListener { event ->
+            mainHandler.post { handleVisualContextEvent(event) }
+        }
+    }
+
     fun open() {
         sheetVisible = true
     }
@@ -61,7 +76,10 @@ class AssistantSessionController(context: Context) {
         updateSettings(settings.copy(enabled = enabled))
         awaitingVoice = false
         clearSpeechSignal()
-        if (!enabled) attentionSignal = AssistantAttentionSignal.Idle
+        if (!enabled) {
+            attentionSignal = AssistantAttentionSignal.Idle
+            AssistantVisualContextRuntime.discard()
+        }
         visualState = if (enabled) AssistantVisualState.IDLE else AssistantVisualState.DISABLED
         if (enabled && messages.isEmpty()) {
             append(
@@ -105,7 +123,14 @@ class AssistantSessionController(context: Context) {
         handoffPrompt = null
         clearSpeechSignal()
         attentionSignal = AssistantAttentionSignal.Idle
+        AssistantVisualContextRuntime.discard()
         visualState = if (settings.enabled) AssistantVisualState.IDLE else AssistantVisualState.DISABLED
+    }
+
+    fun close() {
+        AssistantVisualContextRuntime.setEventListener(null)
+        AssistantVisualContextRuntime.discard()
+        mainHandler.removeCallbacksAndMessages(null)
     }
 
     fun requestVoice(requestVoiceInput: () -> Unit) {
@@ -131,6 +156,7 @@ class AssistantSessionController(context: Context) {
         requestDocument: () -> Unit,
         requestContact: () -> Unit,
         requestSpeech: (String) -> Boolean,
+        requestVisualContext: (AssistantObservationSource?) -> Boolean = { false },
     ) {
         if (!awaitingVoice) return
         awaitingVoice = false
@@ -146,6 +172,7 @@ class AssistantSessionController(context: Context) {
             requestDocument = requestDocument,
             requestContact = requestContact,
             requestSpeech = requestSpeech,
+            requestVisualContext = requestVisualContext,
         )
     }
 
@@ -161,6 +188,7 @@ class AssistantSessionController(context: Context) {
         requestDocument: () -> Unit,
         requestContact: () -> Unit,
         requestSpeech: (String) -> Boolean,
+        requestVisualContext: (AssistantObservationSource?) -> Boolean = { false },
     ) {
         if (!settings.enabled) {
             sheetVisible = true
@@ -173,6 +201,27 @@ class AssistantSessionController(context: Context) {
         append(AssistantMessageRole.USER, input)
         handoffPrompt = null
         visualState = AssistantVisualState.THINKING
+
+        val visualRequest = AssistantVisualContextRequestParser.parseRequest(input)
+        if (visualRequest != null) {
+            val accepted = requestVisualContext(visualRequest.source) ||
+                requestActiveVisualContext(visualRequest.source)
+            val sourceText = when (visualRequest.source) {
+                AssistantObservationSource.SCREEN -> "Bildschirm"
+                AssistantObservationSource.CAMERA -> "Kamera"
+                null -> "aktiven visuellen"
+            }
+            val replyText = if (accepted) {
+                "Ich fordere genau einen aktuellen $sourceText-Kontextframe an. Die Capture-Session bleibt sichtbar; dieser Frame wird noch an kein KI-Modell übertragen."
+            } else {
+                "Dafür ist noch keine passende sichtbare Screen- oder Kamera-Session freigegeben. Aktiviere die gewünschte Awareness-Funktion und bestätige Androids Consent."
+            }
+            append(AssistantMessageRole.ASSISTANT, replyText)
+            visualState = if (accepted) AssistantVisualState.WORKING else AssistantVisualState.IDLE
+            if (settings.speechOutputEnabled && replyText.isNotBlank()) requestSpeech(replyText)
+            return
+        }
+
         val reply = localCore.reply(input)
         append(AssistantMessageRole.ASSISTANT, reply.text)
         handoffPrompt = reply.handoffPrompt
@@ -201,6 +250,35 @@ class AssistantSessionController(context: Context) {
             requestSpeech(reply.text)
             // The TTS listener switches to SPEAKING only when Android reports actual playback.
         }
+    }
+
+    fun visualContextReady(metadata: AssistantVisualContextRuntime.Metadata) {
+        if (!settings.enabled || metadata.requestId == lastVisualReadyRequestId) return
+        lastVisualReadyRequestId = metadata.requestId
+        val source = when (metadata.source) {
+            AssistantObservationSource.SCREEN -> "Bildschirm"
+            AssistantObservationSource.CAMERA -> "Kamera"
+        }
+        val kib = (metadata.byteCount + 1023) / 1024
+        append(
+            AssistantMessageRole.ASSISTANT,
+            "$source-Kontextframe bereit: ${metadata.width}×${metadata.height}, ca. $kib KiB. Er liegt nur kurz im Arbeitsspeicher und wurde noch an kein KI-Modell übertragen.",
+        )
+        mainHandler.postDelayed(
+            { AssistantVisualContextRuntime.discard(metadata.requestId) },
+            AssistantVisualContextRuntime.READY_TTL_MILLIS,
+        )
+        visualState = AssistantVisualState.IDLE
+    }
+
+    fun visualContextFailed(message: String, eventGeneration: Long = -1L) {
+        if (!settings.enabled || eventGeneration == lastVisualFailureGeneration) return
+        lastVisualFailureGeneration = eventGeneration
+        append(
+            AssistantMessageRole.ASSISTANT,
+            "Der visuelle Kontextframe ist fehlgeschlagen: ${message.take(240)}",
+        )
+        visualState = AssistantVisualState.ERROR
     }
 
     fun handoffToProvider(launcherController: LauncherController) {
@@ -268,6 +346,31 @@ class AssistantSessionController(context: Context) {
         if (!matchesActiveSpeech(utteranceId)) return
         clearSpeechSignal()
         if (settings.enabled) visualState = AssistantVisualState.ERROR
+    }
+
+    private fun handleVisualContextEvent(event: AssistantVisualContextRuntime.Event) {
+        when (event.status) {
+            AssistantVisualContextRuntime.Status.READY -> event.metadata?.let(::visualContextReady)
+            AssistantVisualContextRuntime.Status.FAILED -> event.failureMessage?.let { message ->
+                visualContextFailed(message, event.generation)
+            }
+            else -> Unit
+        }
+    }
+
+    private fun requestActiveVisualContext(requestedSource: AssistantObservationSource?): Boolean {
+        val source = requestedSource ?: when {
+            AssistantObservationRuntime.screenActive -> AssistantObservationSource.SCREEN
+            AssistantObservationRuntime.cameraActive -> AssistantObservationSource.CAMERA
+            else -> return false
+        }
+        val active = when (source) {
+            AssistantObservationSource.SCREEN -> AssistantObservationRuntime.screenActive
+            AssistantObservationSource.CAMERA -> AssistantObservationRuntime.cameraActive
+        }
+        if (!active) return false
+        AssistantVisualContextRuntime.request(source)
+        return true
     }
 
     private fun updateSettings(updated: AssistantSettings) {

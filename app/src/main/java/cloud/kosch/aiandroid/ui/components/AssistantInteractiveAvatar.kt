@@ -36,6 +36,7 @@ fun AssistantInteractiveAvatar(
     onActivate: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    assistantId: String = AssistantAssetCatalog.DEFAULT_ASSISTANT_ID,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val indication = LocalIndication.current
@@ -92,6 +93,11 @@ fun AssistantInteractiveAvatar(
                 },
             ),
     ) {
+        // assistantId is already carried through this public boundary so final character packs can
+        // switch without changing call sites. Until those calibrated packs land, the procedural
+        // fallback remains intentionally shared and safe.
+        @Suppress("UNUSED_VARIABLE")
+        val selectedAssistantId = assistantId
         AssistantAvatarFallback(
             state = state,
             speechSignal = speechSignal,

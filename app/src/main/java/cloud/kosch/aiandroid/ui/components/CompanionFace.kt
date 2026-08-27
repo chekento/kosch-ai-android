@@ -1,11 +1,14 @@
 package cloud.kosch.aiandroid.ui.components
 
+import android.Manifest
 import android.animation.ValueAnimator
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.AudioFormat
+import android.media.projection.MediaProjectionManager
 import android.os.Handler
 import android.os.Looper
 import android.provider.ContactsContract
@@ -17,14 +20,25 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModelProvider
 import cloud.kosch.aiandroid.LauncherViewModel
+import cloud.kosch.aiandroid.ai.AssistantBuiltInVoiceCatalog
+import cloud.kosch.aiandroid.ai.AssistantPolicyDecision
+import cloud.kosch.aiandroid.ai.AssistantVoiceDecision
+import cloud.kosch.aiandroid.ai.AssistantVoicePolicy
+import cloud.kosch.aiandroid.assistant.AssistantObservationRuntime
+import cloud.kosch.aiandroid.assistant.AssistantScreenShareService
+import cloud.kosch.aiandroid.model.AssistantObservationSource
+import cloud.kosch.aiandroid.model.AssistantSystemVoiceOption
+import cloud.kosch.aiandroid.model.AssistantVoiceGender
 import cloud.kosch.aiandroid.model.AssistantVisualState
 import cloud.kosch.aiandroid.system.DocumentGrantManager
 import cloud.kosch.aiandroid.ui.AssistantHost
@@ -36,7 +50,8 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * The original voice callback remains the fallback if this composable is ever rendered outside the
  * launcher Activity. Inside KoSch the Assistant reuses the Activity-owned LauncherViewModel, so no
- * second launcher runtime or background service is created.
+ * second launcher runtime or hidden background listener is created. Screen sharing is the sole
+ * deliberate foreground-service exception and exists only after Android MediaProjection consent.
  */
 @Composable
 fun CompanionFace(
@@ -49,17 +64,66 @@ fun CompanionFace(
         activity?.let { ViewModelProvider(it)[LauncherViewModel::class.java] }
     }
     val assistant = viewModel?.assistant
+    val assistantAgent = viewModel?.assistantAgent
+    val assistantVoice = viewModel?.assistantVoice
     val launcherController = viewModel?.controller
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     val documentGrantManager = remember(context) { DocumentGrantManager(context.applicationContext) }
+    val projectionManager = remember(context.applicationContext) {
+        context.applicationContext.getSystemService(MediaProjectionManager::class.java)
+    }
 
     var ttsEngine by remember { mutableStateOf<TextToSpeech?>(null) }
     var ttsReady by remember { mutableStateOf(false) }
-    val speechRuntimeEnabled = assistant?.settings?.enabled == true && assistant.settings.speechOutputEnabled
+    var cameraSessionRequested by remember { mutableStateOf(false) }
+    var sawRunningScreenSession by remember { mutableStateOf(AssistantObservationRuntime.screenActive) }
+
+    val ttsRuntimeEnabled = assistant != null && (
+        (assistant.settings.enabled && assistant.settings.speechOutputEnabled) || assistant.sheetVisible
+    )
     val effectiveReducedMotion = assistant?.settings?.reducedMotion == true || !ValueAnimator.areAnimatorsEnabled()
 
-    DisposableEffect(context, assistant, speechRuntimeEnabled) {
-        if (assistant == null || !speechRuntimeEnabled) {
+    LaunchedEffect(AssistantObservationRuntime.screenActive, assistant?.settings?.enabled) {
+        if (AssistantObservationRuntime.screenActive) {
+            if (assistant?.settings?.enabled != true) {
+                runCatching { AssistantScreenShareService.stop(context.applicationContext) }
+                if (assistantAgent?.activeObservation == AssistantObservationSource.SCREEN) {
+                    assistantAgent.stopObservation()
+                }
+            } else {
+                sawRunningScreenSession = true
+            }
+        } else if (sawRunningScreenSession) {
+            sawRunningScreenSession = false
+            if (assistantAgent?.activeObservation == AssistantObservationSource.SCREEN) {
+                assistantAgent.stopObservation()
+            }
+        }
+    }
+
+    LaunchedEffect(AssistantObservationRuntime.screenFailureGeneration) {
+        if (AssistantObservationRuntime.screenFailureGeneration > 0L) {
+            if (assistantAgent?.activeObservation == AssistantObservationSource.SCREEN) {
+                assistantAgent.stopObservation()
+            }
+            AssistantObservationRuntime.screenFailureMessage?.let { message ->
+                launcherController?.postNotice(message)
+            }
+            AssistantObservationRuntime.clearScreenFailure()
+        }
+    }
+
+    LaunchedEffect(assistant?.settings?.enabled) {
+        if (assistant?.settings?.enabled != true) {
+            cameraSessionRequested = false
+            if (AssistantObservationRuntime.screenActive) {
+                runCatching { AssistantScreenShareService.stop(context.applicationContext) }
+            }
+        }
+    }
+
+    DisposableEffect(context, assistant, assistantVoice, ttsRuntimeEnabled) {
+        if (assistant == null || !ttsRuntimeEnabled) {
             ttsEngine = null
             ttsReady = false
             onDispose { }
@@ -75,7 +139,25 @@ fun CompanionFace(
                     } else {
                         false
                     }
-                    mainHandler.post { ttsReady = ready }
+                    val voices = if (ready) {
+                        runCatching {
+                            current.voices.orEmpty().map { voice ->
+                                AssistantSystemVoiceOption(
+                                    name = voice.name,
+                                    languageTag = voice.locale.toLanguageTag(),
+                                    quality = voice.quality,
+                                    latency = voice.latency,
+                                    networkRequired = voice.isNetworkConnectionRequired,
+                                )
+                            }
+                        }.getOrDefault(emptyList())
+                    } else {
+                        emptyList()
+                    }
+                    mainHandler.post {
+                        assistantVoice?.updateAvailableVoices(voices)
+                        ttsReady = ready
+                    }
                 }
             }
             engineReference = engine
@@ -172,10 +254,161 @@ fun CompanionFace(
             .onFailure { launcherController?.postNotice("Die Android-Kontaktauswahl ist nicht verfügbar") }
     }
 
+    val screenShareLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val resultData = result.data
+        val agent = assistantAgent
+        if (result.resultCode != Activity.RESULT_OK || resultData == null) {
+            launcherController?.postNotice("Bildschirmfreigabe wurde nicht gestartet")
+        } else if (assistant?.settings?.enabled != true || agent == null) {
+            launcherController?.postNotice("Der Assistant ist für Screen Share nicht aktiv")
+        } else {
+            cameraSessionRequested = false
+            if (agent.activeObservation == AssistantObservationSource.CAMERA) {
+                agent.stopObservation()
+            }
+            val decision = agent.beginObservation(
+                assistantEnabled = true,
+                source = AssistantObservationSource.SCREEN,
+                platformConsentGranted = true,
+                sessionVisible = true,
+            )
+            if (decision != AssistantPolicyDecision.ALLOW) {
+                launcherController?.postNotice("Screen Awareness ist nicht freigegeben")
+            } else {
+                runCatching {
+                    AssistantScreenShareService.start(
+                        context = context.applicationContext,
+                        resultCode = result.resultCode,
+                        resultData = resultData,
+                    )
+                }.onFailure {
+                    if (agent.activeObservation == AssistantObservationSource.SCREEN) agent.stopObservation()
+                    launcherController?.postNotice("Screen Share konnte nicht gestartet werden")
+                }
+            }
+        }
+    }
+
+    val stopScreenSession: () -> Unit = {
+        runCatching { AssistantScreenShareService.stop(context.applicationContext) }
+            .onFailure { launcherController?.postNotice("Screen Share konnte nicht beendet werden") }
+        if (assistantAgent?.activeObservation == AssistantObservationSource.SCREEN) {
+            assistantAgent.stopObservation()
+        }
+    }
+
+    val requestScreenSession: () -> Unit = {
+        when {
+            assistant?.settings?.enabled != true -> launcherController?.postNotice("Aktiviere den Assistant zuerst")
+            assistantAgent?.preferences?.screenObservationEnabled != true ->
+                launcherController?.postNotice("Aktiviere zuerst Screen Awareness")
+            AssistantObservationRuntime.screenActive -> Unit
+            else -> runCatching {
+                screenShareLauncher.launch(projectionManager.createScreenCaptureIntent())
+            }.onFailure {
+                launcherController?.postNotice("Android Screen-Share-Consent ist nicht verfügbar")
+            }
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) {
+            launcherController?.postNotice("Kamera-Berechtigung wurde nicht erteilt")
+        } else if (assistant?.settings?.enabled != true || assistantAgent?.preferences?.cameraObservationEnabled != true) {
+            launcherController?.postNotice("Camera Awareness ist nicht freigegeben")
+        } else {
+            if (AssistantObservationRuntime.screenActive) {
+                stopScreenSession()
+            }
+            cameraSessionRequested = true
+        }
+    }
+
+    val requestCameraSession: () -> Unit = {
+        when {
+            assistant?.settings?.enabled != true -> launcherController?.postNotice("Aktiviere den Assistant zuerst")
+            assistantAgent?.preferences?.cameraObservationEnabled != true ->
+                launcherController?.postNotice("Aktiviere zuerst Camera Awareness")
+            cameraSessionRequested -> Unit
+            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED -> {
+                if (AssistantObservationRuntime.screenActive) stopScreenSession()
+                cameraSessionRequested = true
+            }
+            else -> runCatching { cameraPermissionLauncher.launch(Manifest.permission.CAMERA) }
+                .onFailure { launcherController?.postNotice("Android Kamera-Berechtigung ist nicht verfügbar") }
+        }
+    }
+
+    val stopCameraSession: () -> Unit = {
+        cameraSessionRequested = false
+        if (assistantAgent?.activeObservation == AssistantObservationSource.CAMERA) {
+            assistantAgent.stopObservation()
+        }
+    }
+
+    val onCameraSessionStarted: () -> Unit = {
+        val agent = assistantAgent
+        if (assistant?.settings?.enabled != true || agent == null) {
+            cameraSessionRequested = false
+        } else {
+            val decision = agent.beginObservation(
+                assistantEnabled = true,
+                source = AssistantObservationSource.CAMERA,
+                platformConsentGranted = true,
+                sessionVisible = true,
+            )
+            if (decision != AssistantPolicyDecision.ALLOW) {
+                cameraSessionRequested = false
+                launcherController?.postNotice("Camera Awareness ist nicht freigegeben")
+            }
+        }
+    }
+
+    val onCameraSessionFailure: (String) -> Unit = { message ->
+        cameraSessionRequested = false
+        if (assistantAgent?.activeObservation == AssistantObservationSource.CAMERA) {
+            assistantAgent.stopObservation()
+        }
+        launcherController?.postNotice(message)
+    }
+
+    fun selectCharacterVoice(engine: TextToSpeech): Boolean {
+        val character = assistantAgent?.character ?: return true
+        val profile = AssistantBuiltInVoiceCatalog.resolve(character.voiceProfileId)
+        if (profile == null || AssistantVoicePolicy.decision(character, profile) != AssistantVoiceDecision.ALLOW) {
+            launcherController?.postNotice("Stimmenprofil des Charakters ist ungültig")
+            return false
+        }
+
+        val gender = character.voiceGender
+        val assignedName = assistantVoice?.assignedVoiceName(gender)
+        if (gender != AssistantVoiceGender.NEUTRAL && assignedName == null) {
+            launcherController?.postNotice(
+                "Ordne ${character.displayName} zuerst eine ${if (gender == AssistantVoiceGender.FEMALE) "weibliche" else "männliche"} Stimme zu",
+            )
+            return false
+        }
+
+        if (assignedName == null) return true
+        val systemVoice = runCatching { engine.voices.orEmpty().firstOrNull { it.name == assignedName } }.getOrNull()
+        if (systemVoice == null) {
+            if (gender == AssistantVoiceGender.NEUTRAL) return true
+            launcherController?.postNotice("Die zugeordnete Stimme ist auf diesem Gerät nicht verfügbar")
+            return false
+        }
+        if (engine.setVoice(systemVoice) == TextToSpeech.ERROR) {
+            launcherController?.postNotice("Die zugeordnete Stimme konnte nicht aktiviert werden")
+            return false
+        }
+        return true
+    }
+
     val requestSpeech: (String) -> Boolean = { text ->
         val engine = ttsEngine
         if (!ttsReady || engine == null) {
             launcherController?.postNotice("Android Text-to-Speech ist auf diesem Gerät nicht bereit")
+            false
+        } else if (!selectCharacterVoice(engine)) {
             false
         } else {
             val utteranceId = "kosch-assistant-${System.nanoTime()}"
@@ -192,6 +425,30 @@ fun CompanionFace(
             result != TextToSpeech.ERROR
         }
     }
+
+    val requestVoicePreview: (String) -> Boolean = { voiceName ->
+        val engine = ttsEngine
+        val systemVoice = engine?.let { current ->
+            runCatching { current.voices.orEmpty().firstOrNull { it.name == voiceName } }.getOrNull()
+        }
+        if (!ttsReady || engine == null || systemVoice == null) {
+            launcherController?.postNotice("Diese TTS-Stimme ist gerade nicht verfügbar")
+            false
+        } else if (engine.setVoice(systemVoice) == TextToSpeech.ERROR) {
+            launcherController?.postNotice("Diese TTS-Stimme konnte nicht aktiviert werden")
+            false
+        } else {
+            val sample = "Hallo. Ich bin dein KoSch Assistant. So klingt diese Stimme."
+            val utteranceId = "kosch-assistant-preview-${System.nanoTime()}"
+            assistant?.speechQueued(utteranceId, sample)
+            val result = runCatching {
+                engine.speak(sample, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+            }.getOrDefault(TextToSpeech.ERROR)
+            if (result == TextToSpeech.ERROR) assistant?.speechFailed(utteranceId)
+            result != TextToSpeech.ERROR
+        }
+    }
+
     val stopSpeech: () -> Unit = {
         ttsEngine?.stop()
         assistant?.speechInterrupted()
@@ -244,18 +501,29 @@ fun CompanionFace(
         onPointerAttention = { x, y, pressed -> assistant?.pointerAttention(x, y, pressed) },
         onActivate = { assistant?.attentionActivated() },
         onClick = { assistant?.open() ?: onClick() },
+        assistantId = assistantAgent?.character?.assetPackId ?: AssistantAssetCatalog.DEFAULT_ASSISTANT_ID,
         modifier = modifier,
     )
 
-    if (assistant != null && launcherController != null) {
+    if (assistant != null && assistantAgent != null && assistantVoice != null && launcherController != null) {
         AssistantHost(
             assistant = assistant,
+            agent = assistantAgent,
+            voice = assistantVoice,
             launcherController = launcherController,
             requestVoiceInput = requestAssistantVoice,
             requestDocument = requestDocument,
             requestContact = requestContact,
             requestSpeech = requestSpeech,
+            requestVoicePreview = requestVoicePreview,
             stopSpeech = stopSpeech,
+            requestScreenSession = requestScreenSession,
+            stopScreenSession = stopScreenSession,
+            cameraSessionRequested = cameraSessionRequested,
+            requestCameraSession = requestCameraSession,
+            stopCameraSession = stopCameraSession,
+            onCameraSessionStarted = onCameraSessionStarted,
+            onCameraSessionFailure = onCameraSessionFailure,
             showFloatingTrigger = false,
         )
     }
