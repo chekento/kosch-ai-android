@@ -29,6 +29,65 @@ class WorkspaceWidgetEditorTest {
     }
 
     @Test
+    fun remapProvider_preservesStableIdBoundsAndPage() {
+        val source = WorkspaceDocument(
+            activePageId = "page:user:1",
+            pages = listOf(
+                WorkspacePage(
+                    id = "page:user:1",
+                    title = "Home",
+                    order = 0,
+                    items = listOf(
+                        WorkspaceItem(
+                            id = "item:user:widget-1",
+                            bounds = WorkspaceCellBounds(3, 4, 5, 2),
+                            content = WorkspaceItemContent.Widget(null),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+        val remapped = WorkspaceWidgetEditor.remapProvider(
+            document = source,
+            itemId = "item:user:widget-1",
+            providerComponent = "  com.example/.WeatherWidget  ",
+        )
+
+        val before = source.pages.single().items.single()
+        val after = remapped.pages.single().items.single()
+        assertEquals(before.id, after.id)
+        assertEquals(before.bounds, after.bounds)
+        assertEquals(source.activePageId, remapped.activePageId)
+        assertEquals("com.example/.WeatherWidget", (after.content as WorkspaceItemContent.Widget).providerComponent)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun remapProvider_rejectsNonWidgetItems() {
+        WorkspaceWidgetEditor.remapProvider(
+            document = WorkspaceDocument(
+                activePageId = "page:user:1",
+                pages = listOf(
+                    WorkspacePage(
+                        id = "page:user:1",
+                        title = "Home",
+                        order = 0,
+                        items = listOf(
+                            WorkspaceItem(
+                                id = "item:user:app-1",
+                                bounds = WorkspaceCellBounds(0, 0, 2, 2),
+                                content = WorkspaceItemContent.App("app:one"),
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            itemId = "item:user:app-1",
+            providerComponent = "com.example/.ClockWidget",
+        )
+    }
+
+    @Test
     fun duplicatePage_copiesPortableProviderButRequiresFreshBindingId() {
         val withWidget = WorkspaceWidgetEditor.addWidget(
             document = WorkspaceDocument(
