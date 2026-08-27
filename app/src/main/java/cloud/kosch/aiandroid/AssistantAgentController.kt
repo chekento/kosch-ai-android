@@ -52,6 +52,10 @@ class AssistantAgentController(context: Context) {
         )
     }
 
+    fun setAssistantName(name: String) {
+        updatePreferences(preferences.copy(assistantName = name.trim().take(32)))
+    }
+
     fun setPresenceMode(mode: AssistantPresenceMode) {
         val supported = character.supportedPresenceModes
         updatePreferences(preferences.copy(presenceMode = mode.takeIf(supported::contains) ?: AssistantPresenceMode.AMBIENT))
