@@ -106,7 +106,9 @@ fun CompanionFace(
             if (assistantAgent?.activeObservation == AssistantObservationSource.SCREEN) {
                 assistantAgent.stopObservation()
             }
-            AssistantObservationRuntime.screenFailureMessage?.let(launcherController::postNotice)
+            AssistantObservationRuntime.screenFailureMessage?.let { message ->
+                launcherController?.postNotice(message)
+            }
             AssistantObservationRuntime.clearScreenFailure()
         }
     }
