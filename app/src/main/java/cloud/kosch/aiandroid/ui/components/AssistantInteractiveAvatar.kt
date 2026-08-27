@@ -36,6 +36,7 @@ fun AssistantInteractiveAvatar(
     onActivate: () -> Unit,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    assistantId: String = AssistantAssetCatalog.DEFAULT_ASSISTANT_ID,
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val indication = LocalIndication.current
@@ -97,6 +98,7 @@ fun AssistantInteractiveAvatar(
             speechSignal = speechSignal,
             reducedMotion = reducedMotion,
             attentionSignal = attentionSignal,
+            assistantId = assistantId,
             modifier = Modifier.fillMaxSize(),
         )
     }
