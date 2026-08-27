@@ -52,8 +52,7 @@ object AssistantAgentPolicy {
             AssistantActionRisk.LOCAL_READ_ONLY -> false
             AssistantActionRisk.LOCAL_REVERSIBLE -> false
             AssistantActionRisk.EXTERNAL_SIDE_EFFECT,
-            AssistantActionRisk.SENSITIVE_SIDE_EFFECT,
-            -> preferences.confirmationRequiredForExternalActions
+            AssistantActionRisk.SENSITIVE_SIDE_EFFECT -> preferences.confirmationRequiredForExternalActions
         }
         if (confirmationRequired && !explicitUserConfirmation) {
             return AssistantPolicyDecision.REQUIRE_ACTION_CONFIRMATION
