@@ -127,6 +127,12 @@ object AssistantVisualContextRuntime {
         failLocked(message)
     }
 
+    @Synchronized
+    fun cancel(source: AssistantObservationSource, message: String) {
+        if (status != Status.REQUESTED || requestedSource != source) return
+        failLocked(message)
+    }
+
     /**
      * Transfers ownership of the bytes to the caller and clears the process broker immediately.
      * The caller must keep the payload transient and explicitly discard it after inference/handoff.
