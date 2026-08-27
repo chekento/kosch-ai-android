@@ -1,8 +1,12 @@
 package cloud.kosch.aiandroid
 
 import android.app.Application
+import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
 import cloud.kosch.aiandroid.data.WorkspaceWidgetHostRecovery
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 /**
  * Owns launcher, unified Home, Settings Center, AI/browser Hub, portable custom actions and Assistant runtimes across
@@ -29,6 +33,23 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
     val customActions = CustomLauncherActionController(application)
     val aiHub = AiHubController(application)
+
+    init {
+        // Migrate every legacy provider entry path to the task-aware AI Hub without duplicating command parsing.
+        // A non-generative launcher command still stays fully local inside LauncherController; only the old provider
+        // surface is replaced. Existing tiles, command bar and legacy screens therefore gain the new Hub at once.
+        viewModelScope.launch {
+            snapshotFlow { controller.providerChooserVisible to controller.providerPrompt }
+                .collect { (visible, prompt) ->
+                    if (visible) {
+                        controller.closeProviderChooser()
+                        settings.close()
+                        aiHub.open(prompt)
+                    }
+                }
+        }
+    }
+
     val assistant = AssistantSessionController(application)
     val assistantAgent = AssistantAgentController(application).also {
         it.setAssistantEnabled(assistant.settings.enabled)
