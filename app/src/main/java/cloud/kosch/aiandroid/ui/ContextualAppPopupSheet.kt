@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.ArrowDownward
 import androidx.compose.material.icons.rounded.ArrowUpward
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Info
@@ -57,6 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.LauncherController
+import cloud.kosch.aiandroid.smartDockExplanationFor
 import cloud.kosch.aiandroid.ai.ContextPopupInput
 import cloud.kosch.aiandroid.ai.ContextPopupItem
 import cloud.kosch.aiandroid.ai.ContextPopupItemKind
@@ -91,6 +93,17 @@ fun ContextualAppPopupSheet(controller: LauncherController) {
 
     val profileAmbiguousForBadges = controller.apps.count { it.packageName == app.packageName } > 1
     val badgeCount = if (profileAmbiguousForBadges) 0 else controller.notificationCounts[app.packageName] ?: 0
+    val dockExplanation = remember(
+        app.key,
+        controller.apps,
+        controller.hiddenAppKeys,
+        controller.pinnedAppKeys,
+        controller.recentPackages,
+        controller.appUsageSignals,
+        controller.activeScene,
+    ) {
+        controller.smartDockExplanationFor(app.key)
+    }
     val popupItems = remember(
         app.key,
         app.label,
@@ -148,6 +161,34 @@ fun ContextualAppPopupSheet(controller: LauncherController) {
                         color = Mint,
                         style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
                     )
+                }
+            }
+
+            dockExplanation?.let { explanation ->
+                Surface(
+                    color = Mint.copy(alpha = 0.10f),
+                    shape = RoundedCornerShape(17.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = Mint)
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Warum im Smart Dock?", fontWeight = FontWeight.SemiBold)
+                            Text(
+                                explanation.primaryReason.title,
+                                color = Sky,
+                                style = androidx.compose.material3.MaterialTheme.typography.labelMedium,
+                            )
+                            Text(
+                                explanation.reasons.joinToString(" · ") { it.title },
+                                color = MutedMist,
+                                style = androidx.compose.material3.MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                    }
                 }
             }
 
