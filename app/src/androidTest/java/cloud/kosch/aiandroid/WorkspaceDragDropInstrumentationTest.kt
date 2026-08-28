@@ -52,8 +52,11 @@ class WorkspaceDragDropInstrumentationTest {
 
             composeTestRule.onNodeWithText("Home Studio", useUnmergedTree = true).performClick()
             composeTestRule.waitForIdle()
-            composeTestRule.onNodeWithText("Ziehen · skalieren · Seiten verwalten · automatisch anordnen", useUnmergedTree = true)
-                .fetchSemanticsNode()
+            composeTestRule.onNodeWithText(
+                "Ziehen · skalieren · Seiten verwalten",
+                substring = true,
+                useUnmergedTree = true,
+            ).fetchSemanticsNode()
 
             composeTestRule
                 .onNodeWithContentDescription(
