@@ -44,6 +44,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -107,13 +108,18 @@ fun DragDropWorkspaceHomeScreen(
     var arrangeVisible by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
-        UnifiedWorkspaceHomeScreen(
-            controller = controller,
-            home = home,
-            requestVoiceInput = requestVoiceInput,
-            requestDocument = requestDocument,
-            requestContact = requestContact,
-        )
+        CompositionLocalProvider(
+            LocalLauncherSettings provides settings.document,
+            LocalScopedSettings provides scopedSettings.document,
+        ) {
+            UnifiedWorkspaceHomeScreen(
+                controller = controller,
+                home = home,
+                requestVoiceInput = requestVoiceInput,
+                requestDocument = requestDocument,
+                requestContact = requestContact,
+            )
+        }
         if (home.isUserPage()) {
             AssistChip(
                 onClick = { arrangeVisible = true },
