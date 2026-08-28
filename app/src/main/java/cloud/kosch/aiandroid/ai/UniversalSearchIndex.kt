@@ -5,6 +5,7 @@ import cloud.kosch.aiandroid.model.LaunchableApp
 import cloud.kosch.aiandroid.model.LauncherFolder
 import cloud.kosch.aiandroid.model.SettingsFeatureDefinition
 import cloud.kosch.aiandroid.model.WorkspacePage
+import java.util.Locale
 
 enum class UniversalSearchKind {
     APP,
@@ -164,19 +165,17 @@ object UniversalSearchIndex {
         .take(MAX_TOTAL_ENTRIES)
 
     fun rank(query: String, entries: List<UniversalSearchEntry>): List<RankedUniversalSearchEntry> {
-        val documents = entries.associateBy(
-            keySelector = UniversalSearchEntry::id,
-            valueTransform = { entry ->
-                SearchDocument(
-                    id = entry.id,
-                    title = entry.title,
-                    keywords = entry.keywords + entry.subtitle,
-                )
-            },
-        )
+        val entryById = entries.associateBy(UniversalSearchEntry::id)
+        val documents = entryById.mapValues { (_, entry) ->
+            SearchDocument(
+                id = entry.id,
+                title = entry.title,
+                keywords = entry.keywords + entry.subtitle,
+            )
+        }
         val ranked = SearchRanker.rankDetailed(query, documents.values.toList())
         return ranked.mapNotNull { result ->
-            val entry = entries.firstOrNull { it.id == result.document.id } ?: return@mapNotNull null
+            val entry = entryById[result.document.id] ?: return@mapNotNull null
             RankedUniversalSearchEntry(
                 entry = entry,
                 score = result.score + entry.localPriorityBoost.coerceIn(0, MAX_LOCAL_BOOST),
@@ -185,7 +184,7 @@ object UniversalSearchIndex {
         }.sortedWith(
             compareByDescending<RankedUniversalSearchEntry> { it.score }
                 .thenBy { kindOrder(it.entry.kind) }
-                .thenBy { it.entry.title.lowercase() },
+                .thenBy { it.entry.title.lowercase(Locale.ROOT) },
         )
     }
 
