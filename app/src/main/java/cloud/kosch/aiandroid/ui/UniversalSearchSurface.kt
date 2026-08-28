@@ -5,13 +5,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.systemBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -45,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import cloud.kosch.aiandroid.UniversalSearchController
+import cloud.kosch.aiandroid.ai.SearchMatchReason
 import cloud.kosch.aiandroid.ai.UniversalQueryResult
 import cloud.kosch.aiandroid.ai.UniversalSearchKind
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
@@ -282,7 +281,7 @@ private fun UniversalEntityResult(
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(kindTitle(entry.kind), color = kindTint(entry.kind), style = MaterialTheme.typography.labelSmall)
-                Text(result.ranked.reason.title, color = MutedMist, style = MaterialTheme.typography.labelSmall)
+                Text(matchTitle(result.ranked.reason), color = MutedMist, style = MaterialTheme.typography.labelSmall)
             }
         }
     }
@@ -301,6 +300,19 @@ private fun kindTitle(kind: UniversalSearchKind): String = when (kind) {
     UniversalSearchKind.SETTING -> "SETTING"
     UniversalSearchKind.CUSTOM_ACTION -> "AKTION"
     UniversalSearchKind.AI_ROUTE -> "KI"
+}
+
+private fun matchTitle(reason: SearchMatchReason): String = when (reason) {
+    SearchMatchReason.EXACT -> "Exakt"
+    SearchMatchReason.TRANSLITERATED -> "Schrift"
+    SearchMatchReason.COMPACT_EXACT -> "Exakt kompakt"
+    SearchMatchReason.TOKEN_PREFIX -> "Wortfolge"
+    SearchMatchReason.PREFIX -> "Präfix"
+    SearchMatchReason.WORD_PREFIX -> "Wortanfang"
+    SearchMatchReason.CONTAINS -> "Enthält"
+    SearchMatchReason.ACRONYM -> "Kürzel"
+    SearchMatchReason.TYPO -> "Tippfehler"
+    SearchMatchReason.SUBSEQUENCE -> "Ähnlich"
 }
 
 private fun kindTint(kind: UniversalSearchKind): Color = when (kind) {
