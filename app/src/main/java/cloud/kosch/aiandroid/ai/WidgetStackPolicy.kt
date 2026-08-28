@@ -31,7 +31,7 @@ object WidgetStackPolicy {
         }
         return stack.copy(
             id = id,
-            title = stack.title.trim().take(MAX_TITLE_CHARS).ifBlank { "Widget Stack" },
+            title = normalizedTitle(stack.title),
             appWidgetIds = ids,
             activeIndex = stack.activeIndex.coerceIn(0, ids.lastIndex),
             autoCycleSeconds = cycle,
@@ -72,11 +72,32 @@ object WidgetStackPolicy {
         if (index < 0) null else normalized.copy(activeIndex = index)
     }
 
+    fun rename(stack: WidgetStack, title: String): WidgetStack? = normalize(stack)?.let { normalized ->
+        normalized.copy(title = normalizedTitle(title))
+    }
+
     fun addWidget(stack: WidgetStack, appWidgetId: Int): WidgetStack? {
         if (appWidgetId <= 0) return normalize(stack)
         val normalized = normalize(stack) ?: return null
         val updated = (normalized.appWidgetIds + appWidgetId).distinct().take(MAX_WIDGETS_PER_STACK)
         return normalize(normalized.copy(appWidgetIds = updated))
+    }
+
+    /** Moves one member without changing which widget is active. */
+    fun moveWidget(stack: WidgetStack, appWidgetId: Int, delta: Int): WidgetStack? {
+        val normalized = normalize(stack) ?: return null
+        if (delta == 0) return normalized
+        val from = normalized.appWidgetIds.indexOf(appWidgetId)
+        if (from < 0) return null
+        val to = (from + delta).coerceIn(0, normalized.appWidgetIds.lastIndex)
+        if (to == from) return normalized
+        val activeId = normalized.activeWidgetId
+        val reordered = normalized.appWidgetIds.toMutableList().apply {
+            val moved = removeAt(from)
+            add(to, moved)
+        }
+        val activeIndex = activeId?.let(reordered::indexOf)?.takeIf { it >= 0 } ?: 0
+        return normalize(normalized.copy(appWidgetIds = reordered, activeIndex = activeIndex))
     }
 
     fun removeWidget(stack: WidgetStack, appWidgetId: Int): WidgetStack? {
@@ -91,4 +112,7 @@ object WidgetStackPolicy {
             ?: normalized.activeIndex.coerceIn(0, remaining.lastIndex)
         return normalize(normalized.copy(appWidgetIds = remaining, activeIndex = nextIndex))
     }
+
+    private fun normalizedTitle(title: String): String =
+        title.trim().take(MAX_TITLE_CHARS).ifBlank { "Widget Stack" }
 }
