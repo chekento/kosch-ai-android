@@ -23,6 +23,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.ai.SmartCollection
 import cloud.kosch.aiandroid.model.AdaptiveHomePresentation
@@ -68,15 +70,20 @@ fun AdaptiveEdgePowerRail(
                 onClick = onAsk,
                 modifier = Modifier
                     .clip(CircleShape)
-                    .background(Mint.copy(alpha = 0.14f)),
+                    .background(Mint.copy(alpha = 0.14f))
+                    .then(
+                        if (inputCapabilities.hasHardwareKeyboard) {
+                            Modifier.semantics {
+                                stateDescription = "Tastaturkurzbefehl: Strg oder Cmd + K"
+                            }
+                        } else {
+                            Modifier
+                        },
+                    ),
             ) {
                 Icon(
                     Icons.Rounded.AutoAwesome,
-                    contentDescription = if (inputCapabilities.hasHardwareKeyboard) {
-                        "Power Rail · Ask · Tastatur: Strg oder Cmd + K"
-                    } else {
-                        "Power Rail · Ask"
-                    },
+                    contentDescription = "Power Rail · Ask",
                     tint = Mint,
                 )
             }
