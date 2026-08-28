@@ -79,7 +79,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         // no portable workspace/settings document ever receives this membership.
         viewModelScope.launch {
             snapshotFlow { controller.widgetIds }
-                .collect(widgetStacks::repair)
+                .collect { widgetIds -> widgetStacks.repair(widgetIds) }
         }
     }
 
