@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+         INTERNET enables only the explicit KAL Provider Connections layer. Cloud Access remains logically OFF by
+         default and direct provider requests still require an explicitly connected provider plus foreground user
+         action. No analytics/advertising/background network SDK is introduced by this permission.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
