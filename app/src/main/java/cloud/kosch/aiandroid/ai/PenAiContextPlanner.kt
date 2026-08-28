@@ -3,6 +3,7 @@ package cloud.kosch.aiandroid.ai
 import cloud.kosch.aiandroid.model.InkPoint
 import cloud.kosch.aiandroid.model.InkStroke
 import cloud.kosch.aiandroid.model.InkTool
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
@@ -89,29 +90,23 @@ object PenAiContextPlanner {
      * The polygon exists only as an input to this local calculation. The returned object contains no lasso vertices,
      * no selected point coordinates and no SVG. A caller may turn the textual aggregate into an explicit
      * AiContextHandoff draft, which still requires the normal user confirmation before any AI route sees it.
+     *
+     * Selection includes strokes with a sampled point inside the polygon and strokes whose line segments cross the
+     * polygon boundary. This avoids missing fast/long pen segments whose endpoints happen to lie outside the lasso.
      */
     fun summarizeLassoSelection(
         strokes: List<InkStroke>,
         lassoPoints: List<InkPoint>,
     ): PenAiLassoSummary {
-        val validPolygon = lassoPoints
-            .filter { it.x.isFinite() && it.y.isFinite() }
-            .map { Point2(it.x.coerceIn(0f, 1f), it.y.coerceIn(0f, 1f)) }
-        if (validPolygon.size < MIN_LASSO_POINTS) {
-            return PenAiLassoSummary(
-                selected = summarize(emptyList()),
-                selectedStrokeCount = 0,
-                totalStrokeCount = strokes.size,
-                selectionSharePercent = 0,
-            )
+        val finitePolygonPoints = lassoPoints.filter { it.x.isFinite() && it.y.isFinite() }
+        if (finitePolygonPoints.size !in MIN_LASSO_POINTS..MAX_LASSO_POINTS) {
+            return emptyLassoSummary(strokes.size)
+        }
+        val polygon = finitePolygonPoints.map {
+            Point2(it.x.coerceIn(0f, 1f), it.y.coerceIn(0f, 1f))
         }
 
-        val selectedStrokes = strokes.filter { stroke ->
-            stroke.points.any { point ->
-                point.x.isFinite() && point.y.isFinite() &&
-                    pointInPolygon(Point2(point.x, point.y), validPolygon)
-            }
-        }
+        val selectedStrokes = strokes.filter { strokeTouchesPolygon(it, polygon) }
         val share = if (strokes.isEmpty()) 0 else {
             ((selectedStrokes.size.toFloat() / strokes.size.toFloat()) * 100f).roundToInt().coerceIn(0, 100)
         }
@@ -121,6 +116,27 @@ object PenAiContextPlanner {
             totalStrokeCount = strokes.size,
             selectionSharePercent = share,
         )
+    }
+
+    private fun emptyLassoSummary(totalStrokeCount: Int) = PenAiLassoSummary(
+        selected = summarize(emptyList()),
+        selectedStrokeCount = 0,
+        totalStrokeCount = totalStrokeCount,
+        selectionSharePercent = 0,
+    )
+
+    private fun strokeTouchesPolygon(stroke: InkStroke, polygon: List<Point2>): Boolean {
+        val points = stroke.points
+            .asSequence()
+            .filter { it.x.isFinite() && it.y.isFinite() }
+            .map { Point2(it.x.coerceIn(0f, 1f), it.y.coerceIn(0f, 1f)) }
+            .toList()
+        if (points.isEmpty()) return false
+        if (points.any { pointInPolygon(it, polygon) }) return true
+        if (points.size < 2) return false
+        return points.zipWithNext().any { (start, end) ->
+            segmentIntersectsPolygon(start, end, polygon)
+        }
     }
 
     private fun pointInPolygon(point: Point2, polygon: List<Point2>): Boolean {
@@ -140,7 +156,45 @@ object PenAiContextPlanner {
         return inside
     }
 
+    private fun segmentIntersectsPolygon(start: Point2, end: Point2, polygon: List<Point2>): Boolean {
+        var previous = polygon.last()
+        polygon.forEach { current ->
+            if (segmentsIntersect(start, end, previous, current)) return true
+            previous = current
+        }
+        return false
+    }
+
+    private fun segmentsIntersect(a: Point2, b: Point2, c: Point2, d: Point2): Boolean {
+        val o1 = cross(a, b, c)
+        val o2 = cross(a, b, d)
+        val o3 = cross(c, d, a)
+        val o4 = cross(c, d, b)
+        val properIntersection = oppositeSigns(o1, o2) && oppositeSigns(o3, o4)
+        if (properIntersection) return true
+        if (abs(o1) <= GEOMETRY_EPSILON && pointOnSegment(c, a, b)) return true
+        if (abs(o2) <= GEOMETRY_EPSILON && pointOnSegment(d, a, b)) return true
+        if (abs(o3) <= GEOMETRY_EPSILON && pointOnSegment(a, c, d)) return true
+        if (abs(o4) <= GEOMETRY_EPSILON && pointOnSegment(b, c, d)) return true
+        return false
+    }
+
+    private fun cross(a: Point2, b: Point2, c: Point2): Float =
+        (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+
+    private fun oppositeSigns(a: Float, b: Float): Boolean =
+        (a > GEOMETRY_EPSILON && b < -GEOMETRY_EPSILON) ||
+            (a < -GEOMETRY_EPSILON && b > GEOMETRY_EPSILON)
+
+    private fun pointOnSegment(point: Point2, start: Point2, end: Point2): Boolean =
+        point.x >= minOf(start.x, end.x) - GEOMETRY_EPSILON &&
+            point.x <= maxOf(start.x, end.x) + GEOMETRY_EPSILON &&
+            point.y >= minOf(start.y, end.y) - GEOMETRY_EPSILON &&
+            point.y <= maxOf(start.y, end.y) + GEOMETRY_EPSILON
+
     private data class Point2(val x: Float, val y: Float)
 
     private const val MIN_LASSO_POINTS = 3
+    private const val MAX_LASSO_POINTS = 2_048
+    private const val GEOMETRY_EPSILON = 0.000_01f
 }
