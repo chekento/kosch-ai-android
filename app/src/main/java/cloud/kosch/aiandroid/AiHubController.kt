@@ -40,6 +40,9 @@ import cloud.kosch.aiandroid.system.SystemActionGateway
  * Routing order is deliberate: semantic task -> privacy-minimal local context -> valid device-local preference ->
  * confidence explanation -> published Android shortcut / normal safe Android route. Context never grants a capability
  * or observation right, and confidence never changes the underlying ranking.
+ *
+ * Prompt handoff is deliberately two-step and process-local. The first user gesture only stages the exact destination
+ * and prompt and shows a disclosure. A second unchanged gesture is required before Android receives the Share intent.
  */
 class AiHubController(context: Context) {
     private val appContext = context.applicationContext
@@ -50,6 +53,7 @@ class AiHubController(context: Context) {
     private val publishedSurfaceDiscovery = AiPublishedSurfaceDiscovery(appContext)
     private val publishedSurfaceCache = mutableMapOf<String, AiPublishedSurfaceSnapshot>()
     private var defaultRoutingContextProvider: () -> AiHubRoutingContext = { AiHubRoutingContext() }
+    private var pendingExternalHandoff: PendingExternalHandoff? = null
 
     var visible by mutableStateOf(false)
         private set
@@ -105,6 +109,7 @@ class AiHubController(context: Context) {
         preferredTargetIds[inferredTask()] == entry.stableId
 
     fun togglePreferredForCurrentTask(entry: AiHubEntry): Boolean {
+        clearPendingExternalHandoff()
         val intent = inferredTask()
         if (!AiHubPreferencePolicy.canPrefer(intent, entry)) return false
         val alreadyPreferred = preferredTargetIds[intent] == entry.stableId
@@ -155,6 +160,7 @@ class AiHubController(context: Context) {
         val entry = recommendation.entry
         val shortcut = bestPublishedShortcut(entry)
         if (shortcut != null) {
+            clearPendingExternalHandoff()
             val shortcutResult = launchPublishedShortcut(shortcut)
             if (shortcutResult.isSuccess) {
                 notice = "${shortcut.label} für ${recommendation.intent.title} geöffnet"
@@ -176,6 +182,7 @@ class AiHubController(context: Context) {
         context: AiHubRoutingContext? = null,
     ) {
         publishedSurfaceCache.clear()
+        clearPendingExternalHandoff()
         routingContext = context ?: defaultRoutingContextProvider()
         prompt = initialPrompt.take(MAX_PROMPT_CHARS)
         notice = null
@@ -183,16 +190,22 @@ class AiHubController(context: Context) {
     }
 
     fun close() {
+        clearPendingExternalHandoff()
         visible = false
         notice = null
     }
 
     fun updatePrompt(value: String) {
-        prompt = value.take(MAX_PROMPT_CHARS)
+        val updated = value.take(MAX_PROMPT_CHARS)
+        if (updated != prompt) clearPendingExternalHandoff()
+        prompt = updated
     }
 
     fun execute(entry: AiHubEntry) {
         val plan = AiHubLaunchPlanner.plan(entry, prompt)
+        if (plan is AiHubLaunchPlan.SharePrompt && !confirmOrStageExternalHandoff(entry, plan)) return
+
+        if (plan !is AiHubLaunchPlan.SharePrompt) clearPendingExternalHandoff()
         val result = when (plan) {
             is AiHubLaunchPlan.LaunchInstalled -> runCatching {
                 launcherApps.startMainActivity(plan.app.componentName, plan.app.user, null, null)
@@ -219,6 +232,7 @@ class AiHubController(context: Context) {
     }
 
     fun execute(surface: AiPublishedShortcutSurface) {
+        clearPendingExternalHandoff()
         launchPublishedShortcut(surface)
             .onSuccess {
                 notice = "${surface.label} über den von der App veröffentlichten Android-Shortcut geöffnet"
@@ -226,6 +240,31 @@ class AiHubController(context: Context) {
             .onFailure {
                 notice = "Der veröffentlichte Shortcut ${surface.label} ist aktuell nicht startbar"
             }
+    }
+
+    private fun confirmOrStageExternalHandoff(
+        entry: AiHubEntry,
+        plan: AiHubLaunchPlan.SharePrompt,
+    ): Boolean {
+        val candidate = PendingExternalHandoff(
+            stableId = entry.stableId,
+            packageName = plan.app.packageName,
+            prompt = plan.prompt,
+        )
+        if (pendingExternalHandoff == candidate) {
+            pendingExternalHandoff = null
+            return true
+        }
+
+        pendingExternalHandoff = candidate
+        notice = "Externe Übergabe vorbereitet: ${entry.title} erhält den eingegebenen Text. " +
+            "Für die weitere Verarbeitung gelten die Bedingungen der Ziel-App. " +
+            "Zum Bestätigen erneut „Text übergeben“ tippen; Ändern des Textes oder Ziels bricht ab."
+        return false
+    }
+
+    private fun clearPendingExternalHandoff() {
+        pendingExternalHandoff = null
     }
 
     private fun launchPublishedShortcut(surface: AiPublishedShortcutSurface): Result<Unit> = runCatching {
@@ -243,6 +282,7 @@ class AiHubController(context: Context) {
     }
 
     fun dismiss(entry: AiHubEntry): Boolean {
+        clearPendingExternalHandoff()
         if (!entry.dismissible) return false
         val saved = dismissedStore.dismiss(entry.stableId)
         if (saved) {
@@ -253,12 +293,14 @@ class AiHubController(context: Context) {
     }
 
     fun restore(stableId: String): Boolean {
+        clearPendingExternalHandoff()
         val saved = dismissedStore.restore(stableId)
         if (saved) hiddenIds = dismissedStore.hiddenIds()
         return saved
     }
 
     fun restoreAll(): Boolean {
+        clearPendingExternalHandoff()
         val saved = dismissedStore.restoreAll()
         if (saved) {
             hiddenIds = emptySet()
@@ -280,6 +322,12 @@ class AiHubController(context: Context) {
             .apply(intent, preferredTargetIds[intent], contextual)
             .take(limit)
     }
+
+    private data class PendingExternalHandoff(
+        val stableId: String,
+        val packageName: String,
+        val prompt: String,
+    )
 
     private companion object {
         const val MAX_PROMPT_CHARS = 32_000
