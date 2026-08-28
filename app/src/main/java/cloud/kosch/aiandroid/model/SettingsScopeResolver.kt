@@ -24,7 +24,7 @@ data class ResolvedSettingValue<T>(
 )
 
 object SettingsScopeResolver {
-    fun feature(featureId: String): SettingsFeatureDefinition = SettingsFeatureCatalog.all
+    fun feature(featureId: String): SettingsFeatureDefinition = SettingsFeatureRegistry.all
         .firstOrNull { it.id == featureId }
         ?: throw IllegalArgumentException("Unknown settings feature: $featureId")
 
