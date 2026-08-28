@@ -1,5 +1,6 @@
 package cloud.kosch.aiandroid.ai
 
+import cloud.kosch.aiandroid.model.AssistantActionRisk
 import cloud.kosch.aiandroid.model.AssistantVisualState
 import java.text.Normalizer
 import java.util.Locale
@@ -9,10 +10,12 @@ data class AssistantLocalReply(
     val command: LauncherCommand? = null,
     val handoffPrompt: String? = null,
     val visualState: AssistantVisualState = AssistantVisualState.IDLE,
+    val actionRisk: AssistantActionRisk? = null,
 )
 
 /**
  * Deterministic assistant layer that stays useful without pretending to be a bundled generative LLM.
+ * Every executable command is accompanied by the central risk class so the UI/runtime can display and gate it.
  */
 class AssistantLocalCore(
     private val commandPlanner: LocalCommandPlanner = LocalCommandPlanner(),
@@ -47,18 +50,20 @@ class AssistantLocalCore(
                 text = "Das ist eine freie KI-Anfrage. Im aktuellen Offline-Build ist kein generatives Modell eingebettet. Ich kann den Text unverändert an einen von dir gewählten KI-Anbieter übergeben.",
                 handoffPrompt = command.prompt,
                 visualState = AssistantVisualState.OFFLINE,
+                actionRisk = AssistantCommandRiskClassifier.risk(command),
             )
             else -> AssistantLocalReply(
                 text = commandAcknowledgement(command),
                 command = command,
                 visualState = AssistantVisualState.WORKING,
+                actionRisk = AssistantCommandRiskClassifier.risk(command),
             )
         }
     }
 
     private fun commandAcknowledgement(command: LauncherCommand): String = when (command) {
         LauncherCommand.OpenDrawer -> "Ich öffne deine Apps."
-        LauncherCommand.StartVoice -> "Ich höre zu."
+        LauncherCommand.StartVoice -> "Ich bereite den Sprachmodus vor. Die Audio-Sitzung bleibt ein eigener sensibler Bestätigungsschritt."
         LauncherCommand.OpenFiles -> "Ich öffne die sichere Dateiauswahl."
         LauncherCommand.OpenFileWorkspace -> "Ich öffne deinen freigegebenen Datei-Arbeitsraum."
         LauncherCommand.OpenControls -> "Ich öffne das Kontrollzentrum."
@@ -73,7 +78,7 @@ class AssistantLocalCore(
         is LauncherCommand.OpenMessage -> "Ich öffne den Nachrichten-Composer."
         LauncherCommand.OpenCalendar -> "Ich öffne den Kalender."
         LauncherCommand.OpenAlarms -> "Ich öffne die Wecker-App."
-        LauncherCommand.OpenCamera -> "Ich öffne die Kamera."
+        LauncherCommand.OpenCamera -> "Ich öffne die Kamera-App. Das aktiviert keine Assistant-Camera-Awareness."
         LauncherCommand.CreateSystemNote -> "Ich öffne eine Systemnotiz."
         is LauncherCommand.OpenSystemPanel -> "Ich öffne ${command.panel.title}."
         is LauncherCommand.SwitchScene -> "Ich wechsle zu ${command.scene.title}."
