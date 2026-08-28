@@ -12,6 +12,8 @@ class AiExecutionRouterTest {
                 AiExecutionContext(
                     deterministicLocalSupport = true,
                     onDeviceGenAiAvailable = true,
+                    connectedProviderAvailable = true,
+                    userAllowsConnectedProvider = true,
                     appHandoffAvailable = true,
                     userAllowsExternalHandoff = true,
                 ),
@@ -20,13 +22,49 @@ class AiExecutionRouterTest {
     }
 
     @Test
-    fun onDeviceGenAiWinsBeforeExternalAppHandoff() {
+    fun onDeviceGenAiWinsBeforeConnectedOrExternalRoutes() {
         assertEquals(
             AiExecutionLane.ANDROID_ON_DEVICE_GENAI,
             AiExecutionRouter.route(
                 AiExecutionContext(
                     deterministicLocalSupport = false,
                     onDeviceGenAiAvailable = true,
+                    connectedProviderAvailable = true,
+                    userAllowsConnectedProvider = true,
+                    appHandoffAvailable = true,
+                    userAllowsExternalHandoff = true,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun connectedProviderWinsBeforeInstalledAppOnlyAfterExplicitCloudGate() {
+        assertEquals(
+            AiExecutionLane.CONNECTED_PROVIDER,
+            AiExecutionRouter.route(
+                AiExecutionContext(
+                    deterministicLocalSupport = false,
+                    onDeviceGenAiAvailable = false,
+                    connectedProviderAvailable = true,
+                    userAllowsConnectedProvider = true,
+                    appHandoffAvailable = true,
+                    userAllowsExternalHandoff = true,
+                ),
+            ),
+        )
+    }
+
+    @Test
+    fun connectedCredentialDoesNotBypassCloudPermission() {
+        assertEquals(
+            AiExecutionLane.INSTALLED_APP_HANDOFF,
+            AiExecutionRouter.route(
+                AiExecutionContext(
+                    deterministicLocalSupport = false,
+                    onDeviceGenAiAvailable = false,
+                    connectedProviderAvailable = true,
+                    userAllowsConnectedProvider = false,
                     appHandoffAvailable = true,
                     userAllowsExternalHandoff = true,
                 ),
