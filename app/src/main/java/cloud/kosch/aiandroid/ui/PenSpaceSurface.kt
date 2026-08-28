@@ -85,8 +85,14 @@ fun ColumnScope.PenSpaceSurface(
     var selectedTool by remember { mutableStateOf(InkTool.PEN) }
     var inkView by remember { mutableStateOf<PressureInkView?>(null) }
     var strokeCount by remember { mutableIntStateOf(controller.loadInkStrokes().size) }
+    var lassoMode by remember { mutableStateOf(false) }
     val aiHandoff = remember { AiContextHandoffController() }
     val stylus = controller.stylusState
+
+    fun cancelLasso() {
+        lassoMode = false
+        inkView?.setLassoMode(false)
+    }
 
     Surface(
         modifier = Modifier
@@ -128,13 +134,15 @@ fun ColumnScope.PenSpaceSurface(
                     shape = CircleShape,
                 ) {
                     Text(
-                        text = if (stylus.active) {
+                        text = if (lassoMode) {
+                            "Lasso aktiv"
+                        } else if (stylus.active) {
                             "${stylus.lastTool.title} · ${(stylus.pressure * 100).toInt()} %"
                         } else {
                             "$strokeCount Striche"
                         },
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
-                        color = if (stylus.active) Mint else MutedMist,
+                        color = if (lassoMode || stylus.active) Mint else MutedMist,
                         style = MaterialTheme.typography.labelSmall,
                     )
                 }
@@ -147,31 +155,60 @@ fun ColumnScope.PenSpaceSurface(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 PenToolChip(InkTool.PEN, selectedTool, Icons.Rounded.BorderColor) {
+                    cancelLasso()
                     selectedTool = it
                     inkView?.setTool(it)
                 }
                 PenToolChip(InkTool.HIGHLIGHTER, selectedTool, Icons.Rounded.Draw) {
+                    cancelLasso()
                     selectedTool = it
                     inkView?.setTool(it)
                 }
                 PenToolChip(InkTool.ERASER, selectedTool, Icons.Rounded.DeleteOutline) {
+                    cancelLasso()
                     selectedTool = it
                     inkView?.setTool(it)
                 }
                 AssistChip(
-                    onClick = { inkView?.undo() },
+                    onClick = {
+                        cancelLasso()
+                        inkView?.undo()
+                    },
                     label = { Text("Undo") },
                     leadingIcon = {
                         Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = null, modifier = Modifier.size(18.dp))
                     },
                 )
                 AssistChip(
-                    onClick = { inkView?.clearInk() },
+                    onClick = {
+                        cancelLasso()
+                        inkView?.clearInk()
+                    },
                     label = { Text("Leeren") },
                     leadingIcon = { Icon(Icons.Rounded.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 )
                 AssistChip(
                     onClick = {
+                        val strokes = controller.loadInkStrokes()
+                        if (lassoMode) {
+                            cancelLasso()
+                            controller.postNotice("Lasso-Auswahl abgebrochen")
+                        } else if (strokes.isEmpty()) {
+                            controller.postNotice("Für Lasso → Ask braucht die Skizze mindestens einen Strich")
+                        } else {
+                            lassoMode = true
+                            inkView?.setLassoMode(true)
+                            controller.postNotice("Lasso aktiv · gewünschten Bereich mit dem Stift umranden")
+                        }
+                    },
+                    label = { Text(if (lassoMode) "Lasso abbrechen" else "Lasso → Ask") },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp))
+                    },
+                )
+                AssistChip(
+                    onClick = {
+                        cancelLasso()
                         val strokes = controller.loadInkStrokes()
                         if (strokes.isEmpty()) {
                             controller.postNotice("Noch keine Skizze vorhanden · Ask bleibt als normaler Texteinstieg verfügbar")
@@ -191,12 +228,18 @@ fun ColumnScope.PenSpaceSurface(
                     leadingIcon = { Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 )
                 AssistChip(
-                    onClick = onSystemNote,
+                    onClick = {
+                        cancelLasso()
+                        onSystemNote()
+                    },
                     label = { Text("Systemnotiz") },
                     leadingIcon = { Icon(Icons.Rounded.EditNote, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 )
                 AssistChip(
-                    onClick = onExport,
+                    onClick = {
+                        cancelLasso()
+                        onExport()
+                    },
                     label = { Text("SVG Export") },
                     leadingIcon = { Icon(Icons.Rounded.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 )
@@ -220,6 +263,29 @@ fun ColumnScope.PenSpaceSurface(
                                 strokeCount = strokes.size
                                 controller.saveInkStrokes(strokes)
                             }
+                            setOnLassoCompleted { lassoPoints ->
+                                lassoMode = false
+                                if (lassoPoints.size < 3) {
+                                    controller.postNotice("Lasso abgebrochen oder zu klein")
+                                } else {
+                                    val summary = PenAiContextPlanner.summarizeLassoSelection(
+                                        strokes = controller.loadInkStrokes(),
+                                        lassoPoints = lassoPoints,
+                                    )
+                                    if (summary.selectedStrokeCount <= 0) {
+                                        controller.postNotice("Im Lasso wurden keine Striche erkannt")
+                                    } else {
+                                        aiHandoff.prepare(
+                                            AiContextHandoffPolicy.fromPenSketch(
+                                                title = "Pen-Lasso-Auswahl",
+                                                summary = summary.text,
+                                                textualDescription = "Nur lokale Aggregatanalyse der Lasso-Auswahl; Lasso-Punkte, Rohkoordinaten und SVG bleiben auf dem Gerät.",
+                                            ),
+                                        )
+                                    }
+                                }
+                            }
+                            setLassoMode(lassoMode)
                             strokeCount = strokeCount()
                             inkView = this
                         }
@@ -227,6 +293,7 @@ fun ColumnScope.PenSpaceSurface(
                     update = { view ->
                         view.setTool(selectedTool)
                         view.setStylusRequired(true)
+                        view.setLassoMode(lassoMode)
                     },
                     modifier = Modifier.fillMaxSize(),
                 )
@@ -238,8 +305,12 @@ fun ColumnScope.PenSpaceSurface(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
-                    "Lokal autosaved · normierte Vektorstriche",
-                    color = MutedMist,
+                    if (lassoMode) {
+                        "Lasso lokal aktiv · Polygon wird nach Pen-up verworfen"
+                    } else {
+                        "Lokal autosaved · normierte Vektorstriche"
+                    },
+                    color = if (lassoMode) Sky else MutedMist,
                     style = MaterialTheme.typography.labelSmall,
                 )
                 if (stylus.barrelButtonPressed) {
@@ -302,10 +373,20 @@ class PressureInkView @JvmOverloads constructor(
         style = Paint.Style.STROKE
         strokeWidth = resources.displayMetrics.density * 1.5f
     }
+    private val lassoPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = AndroidColor.argb(225, 105, 230, 215)
+        style = Paint.Style.STROKE
+        strokeCap = Paint.Cap.ROUND
+        strokeJoin = Paint.Join.ROUND
+        strokeWidth = resources.displayMetrics.density * 2.2f
+    }
     private var activePoints: MutableList<InkPoint>? = null
+    private var activeLassoPoints: MutableList<InkPoint>? = null
     private var selectedTool = InkTool.PEN
     private var stylusRequired = true
+    private var lassoMode = false
     private var onInkChanged: (List<InkStroke>) -> Unit = {}
+    private var onLassoCompleted: (List<InkPoint>) -> Unit = {}
     private var hoverPoint: PointF? = null
     private var eraserChanged = false
 
@@ -330,8 +411,21 @@ class PressureInkView @JvmOverloads constructor(
         stylusRequired = value
     }
 
+    fun setLassoMode(enabled: Boolean) {
+        if (lassoMode == enabled) return
+        lassoMode = enabled
+        activePoints = null
+        if (!enabled) activeLassoPoints = null
+        invalidate()
+        sendAccessibilityEvent(AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED)
+    }
+
     fun setOnInkChanged(callback: (List<InkStroke>) -> Unit) {
         onInkChanged = callback
+    }
+
+    fun setOnLassoCompleted(callback: (List<InkPoint>) -> Unit) {
+        onLassoCompleted = callback
     }
 
     fun strokeCount(): Int = strokes.size
@@ -360,6 +454,9 @@ class PressureInkView @JvmOverloads constructor(
         activePoints?.takeIf { it.isNotEmpty() }?.let { points ->
             drawStroke(canvas, InkStroke(selectedTool, points))
         }
+        activeLassoPoints?.takeIf { it.isNotEmpty() }?.let { points ->
+            drawLasso(canvas, points)
+        }
         hoverPoint?.let { point ->
             val radius = resources.displayMetrics.density * when (selectedTool) {
                 InkTool.PEN -> 7f
@@ -377,6 +474,7 @@ class PressureInkView @JvmOverloads constructor(
             hardwareTool == MotionEvent.TOOL_TYPE_ERASER ||
             event.isFromSource(InputDevice.SOURCE_STYLUS)
         if (stylusRequired && !fromStylus) return false
+        if (lassoMode) return handleLassoTouch(event, index)
 
         val erasing = selectedTool == InkTool.ERASER || hardwareTool == MotionEvent.TOOL_TYPE_ERASER
         when (event.actionMasked) {
@@ -464,8 +562,12 @@ class PressureInkView @JvmOverloads constructor(
     override fun onInitializeAccessibilityNodeInfo(info: AccessibilityNodeInfo) {
         super.onInitializeAccessibilityNodeInfo(info)
         info.className = View::class.java.name
-        info.contentDescription = "Pen-Space-Zeichenfläche, ${strokes.size} Striche, Werkzeug ${selectedTool.title}"
-        if (undoStack.isNotEmpty()) {
+        info.contentDescription = if (lassoMode) {
+            "Pen-Space-Zeichenfläche, Lasso-Auswahl aktiv, ${strokes.size} Striche"
+        } else {
+            "Pen-Space-Zeichenfläche, ${strokes.size} Striche, Werkzeug ${selectedTool.title}"
+        }
+        if (undoStack.isNotEmpty() && !lassoMode) {
             info.addAction(
                 AccessibilityNodeInfo.AccessibilityAction(
                     R.id.accessibility_action_undo_ink,
@@ -473,7 +575,7 @@ class PressureInkView @JvmOverloads constructor(
                 ),
             )
         }
-        if (strokes.isNotEmpty()) {
+        if (strokes.isNotEmpty() && !lassoMode) {
             info.addAction(
                 AccessibilityNodeInfo.AccessibilityAction(
                     R.id.accessibility_action_clear_ink,
@@ -487,6 +589,67 @@ class PressureInkView @JvmOverloads constructor(
         R.id.accessibility_action_undo_ink -> true.also { undo() }
         R.id.accessibility_action_clear_ink -> true.also { clearInk() }
         else -> super.performAccessibilityAction(action, arguments)
+    }
+
+    private fun handleLassoTouch(event: MotionEvent, index: Int): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                parent?.requestDisallowInterceptTouchEvent(true)
+                requestFocus()
+                activeLassoPoints = mutableListOf(event.point(index))
+                invalidate()
+                return true
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                val target = activeLassoPoints ?: return false
+                for (historyIndex in 0 until event.historySize) {
+                    appendLassoPoint(target, event.historicalPoint(index, historyIndex))
+                }
+                appendLassoPoint(target, event.point(index))
+                invalidate()
+                return true
+            }
+
+            MotionEvent.ACTION_UP -> {
+                val target = activeLassoPoints.orEmpty().toMutableList()
+                appendLassoPoint(target, event.point(index))
+                val completed = target.toList()
+                activeLassoPoints = null
+                lassoMode = false
+                parent?.requestDisallowInterceptTouchEvent(false)
+                performClick()
+                invalidate()
+                onLassoCompleted(if (completed.size >= MIN_LASSO_POINTS) completed else emptyList())
+                return true
+            }
+
+            MotionEvent.ACTION_CANCEL -> {
+                activeLassoPoints = null
+                lassoMode = false
+                parent?.requestDisallowInterceptTouchEvent(false)
+                invalidate()
+                onLassoCompleted(emptyList())
+                return true
+            }
+        }
+        return false
+    }
+
+    private fun appendLassoPoint(target: MutableList<InkPoint>, point: InkPoint) {
+        if (target.size < MAX_LASSO_POINTS) target += point
+    }
+
+    private fun drawLasso(canvas: Canvas, points: List<InkPoint>) {
+        val first = points.firstOrNull() ?: return
+        val path = Path().apply {
+            moveTo(first.x * width, first.y * height)
+            points.drop(1).forEach { point ->
+                lineTo(point.x * width, point.y * height)
+            }
+            if (points.size >= MIN_LASSO_POINTS) close()
+        }
+        canvas.drawPath(path, lassoPaint)
     }
 
     private fun drawGrid(canvas: Canvas) {
@@ -584,5 +747,7 @@ class PressureInkView @JvmOverloads constructor(
 
     private companion object {
         const val MAX_UNDO_STEPS = 24
+        const val MIN_LASSO_POINTS = 3
+        const val MAX_LASSO_POINTS = 2_048
     }
 }
