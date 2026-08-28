@@ -37,6 +37,7 @@ import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Home
@@ -94,6 +95,10 @@ import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.LauncherController
 import cloud.kosch.aiandroid.WorkspaceHomeController
 import cloud.kosch.aiandroid.ai.SmartCollection
+import cloud.kosch.aiandroid.model.AdaptiveHomePresentation
+import cloud.kosch.aiandroid.model.AdaptiveHomePresentationPolicy
+import cloud.kosch.aiandroid.model.AdaptiveLauncherEnvironment
+import cloud.kosch.aiandroid.model.AdaptiveLauncherPlanner
 import cloud.kosch.aiandroid.model.AppProfile
 import cloud.kosch.aiandroid.model.DefaultWorkspace
 import cloud.kosch.aiandroid.model.LaunchableApp
@@ -111,6 +116,7 @@ import cloud.kosch.aiandroid.ui.theme.Sky
 import cloud.kosch.aiandroid.ui.theme.Violet
 import cloud.kosch.aiandroid.ui.theme.Warm
 import java.util.Locale
+import kotlin.math.roundToInt
 
 /**
  * First user-facing surface backed directly by WorkspaceDocument v7.
@@ -168,18 +174,35 @@ fun UnifiedWorkspaceHomeScreen(
         containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHost) },
     ) { contentPadding ->
-        Box(
+        BoxWithConstraints(
             Modifier
                 .fillMaxSize()
                 .background(Ink)
                 .padding(contentPadding),
         ) {
+            val hasStylus = controller.stylusState.present
+            val adaptivePlan = remember(maxWidth, maxHeight, hasStylus) {
+                AdaptiveLauncherPlanner.plan(
+                    AdaptiveLauncherEnvironment(
+                        widthDp = maxWidth.value.roundToInt().coerceAtLeast(1),
+                        heightDp = maxHeight.value.roundToInt().coerceAtLeast(1),
+                        hasStylus = hasStylus,
+                    ),
+                )
+            }
+            val presentation = remember(adaptivePlan, hasStylus) {
+                AdaptiveHomePresentationPolicy.from(adaptivePlan, hasStylus)
+            }
+
             NeuralGlassBackground(Modifier.fillMaxSize())
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                    .padding(
+                        horizontal = presentation.horizontalPaddingDp.dp,
+                        vertical = presentation.verticalPaddingDp.dp,
+                    ),
+                verticalArrangement = Arrangement.spacedBy(presentation.verticalGapDp.dp),
             ) {
                 UnifiedHomeHeader(
                     controller = controller,
@@ -206,6 +229,7 @@ fun UnifiedWorkspaceHomeScreen(
                 )
                 UnifiedHomeDock(
                     controller = controller,
+                    presentation = presentation,
                     onOpenApps = { controller.openDrawer() },
                     onAsk = {
                         askFocusRequester.requestFocus()
@@ -552,6 +576,7 @@ private fun FolderHomeItem(
 @Composable
 private fun UnifiedHomeDock(
     controller: LauncherController,
+    presentation: AdaptiveHomePresentation,
     onOpenApps: () -> Unit,
     onAsk: () -> Unit,
 ) {
@@ -565,9 +590,29 @@ private fun UnifiedHomeDock(
                 Icon(Icons.Rounded.Apps, contentDescription = "Alle Apps")
             }
             val pinned = controller.pinnedAppKeys.mapNotNull { key -> controller.apps.firstOrNull { it.key == key } }
-            pinned.take(5).forEach { app ->
+            pinned.take(presentation.dockPinnedAppLimit).forEach { app ->
                 IconButton(onClick = { controller.launch(app) }) {
                     Image(bitmap = app.icon, contentDescription = app.label, modifier = Modifier.size(34.dp))
+                }
+            }
+            if (presentation.showPenShortcut) {
+                IconButton(
+                    onClick = controller::openPenSpace,
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .background(
+                            if (presentation.emphasizePenShortcut) Mint.copy(alpha = 0.16f) else Color.Transparent,
+                        ),
+                ) {
+                    Icon(
+                        Icons.Rounded.Draw,
+                        contentDescription = if (presentation.emphasizePenShortcut) {
+                            "Pen Space · für Stift priorisiert"
+                        } else {
+                            "Pen Space"
+                        },
+                        tint = if (presentation.emphasizePenShortcut) Mint else Sky,
+                    )
                 }
             }
             Spacer(Modifier.weight(1f))
