@@ -570,13 +570,11 @@ class MainActivity : ComponentActivity() {
             )
             GestureAction.CUSTOM_SHORTCUT -> {
                 val target = LauncherGestureBindingResolver.customTargetFor(gestureSettings, trigger)
-                controller.postNotice(
-                    if (target == null) {
-                        "Für diese Geste ist kein gültiges eigenes Ziel hinterlegt"
-                    } else {
-                        "Eigene Gesten-Ziele werden erst nach sicherer Action-Auflösung ausgeführt"
-                    },
-                )
+                if (target == null) {
+                    controller.postNotice("Für diese Geste ist kein gültiges eigenes Ziel hinterlegt")
+                } else {
+                    universalSearchDispatcher.executeCustomActionId(target)
+                }
             }
         }
     }
