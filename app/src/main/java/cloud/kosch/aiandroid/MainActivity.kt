@@ -22,6 +22,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -47,6 +50,8 @@ import cloud.kosch.aiandroid.ui.AiHubEntryButton
 import cloud.kosch.aiandroid.ui.AiHubSurface
 import cloud.kosch.aiandroid.ui.DragDropWorkspaceHomeScreen
 import cloud.kosch.aiandroid.ui.LauncherRoot
+import cloud.kosch.aiandroid.ui.PersonalizationEntryButton
+import cloud.kosch.aiandroid.ui.PersonalizationQuickSurface
 import cloud.kosch.aiandroid.ui.SettingsCenterSurface
 import cloud.kosch.aiandroid.ui.SettingsEntryButton
 import cloud.kosch.aiandroid.ui.components.CompanionFace
@@ -64,6 +69,7 @@ class MainActivity : ComponentActivity() {
     private var pendingBackupExportToken: String? = null
     private var pendingAuditExportToken: String? = null
     private var pendingInkExportToken: String? = null
+    private var personalizationVisible by mutableStateOf(false)
 
     private val homeRoleRequest = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -229,6 +235,7 @@ class MainActivity : ComponentActivity() {
             val assistantPresentation = settings.document.assistant
             val gestureSurfaceEnabled = !controller.onboardingVisible &&
                 !settings.visible &&
+                !personalizationVisible &&
                 !aiHub.visible &&
                 !controller.drawerVisible &&
                 !controller.providerChooserVisible &&
@@ -299,9 +306,10 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    if (unifiedHomeVisible && !aiHub.visible) {
+                    if (unifiedHomeVisible && !aiHub.visible && !settings.visible && !personalizationVisible) {
                         SettingsEntryButton(
                             onClick = {
+                                personalizationVisible = false
                                 aiHub.close()
                                 settings.open()
                             },
@@ -309,14 +317,25 @@ class MainActivity : ComponentActivity() {
                                 .align(Alignment.TopEnd)
                                 .padding(end = 18.dp, top = 76.dp),
                         )
+                        PersonalizationEntryButton(
+                            onClick = {
+                                settings.close()
+                                aiHub.close()
+                                personalizationVisible = true
+                            },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(end = 18.dp, top = 122.dp),
+                        )
                         AiHubEntryButton(
                             onClick = {
+                                personalizationVisible = false
                                 settings.close()
                                 aiHub.open()
                             },
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
-                                .padding(end = 18.dp, top = 122.dp),
+                                .padding(end = 18.dp, top = 168.dp),
                         )
                     }
 
@@ -345,6 +364,12 @@ class MainActivity : ComponentActivity() {
                             home = launcherViewModel.homeWorkspace,
                             assistant = launcherViewModel.assistant,
                             onDismiss = settings::close,
+                        )
+                    }
+                    if (personalizationVisible) {
+                        PersonalizationQuickSurface(
+                            settings = settings,
+                            onDismiss = { personalizationVisible = false },
                         )
                     }
                     if (aiHub.visible) {
@@ -410,6 +435,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_ESCAPE && personalizationVisible) {
+            personalizationVisible = false
+            return true
+        }
         if (keyCode == KeyEvent.KEYCODE_ESCAPE && launcherViewModel.aiHub.visible) {
             launcherViewModel.aiHub.close()
             return true
