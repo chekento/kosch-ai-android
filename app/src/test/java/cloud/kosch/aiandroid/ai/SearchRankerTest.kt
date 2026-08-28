@@ -11,6 +11,8 @@ class SearchRankerTest {
         SearchDocument("calculator", "Taschenrechner", listOf("Rechnen")),
         SearchDocument("mail", "E-Mail", listOf("Postfach")),
         SearchDocument("google-calendar", "Google Calendar", listOf("Meetings", "Agenda")),
+        SearchDocument("telegram-cyrillic", "Телеграм", listOf("Сообщения")),
+        SearchDocument("settings-greek", "Ρυθμίσεις", listOf("Σύστημα")),
     )
 
     @Test
@@ -57,6 +59,43 @@ class SearchRankerTest {
         val result = SearchRanker.rankDetailed("kalendr", documents)
         assertEquals("calendar", result.first().document.id)
         assertEquals(SearchMatchReason.TYPO, result.first().reason)
+    }
+
+    @Test
+    fun `cyrillic title is discoverable from latin query locally`() {
+        val result = SearchRanker.rankDetailed("telegram", documents)
+        assertEquals("telegram-cyrillic", result.first().document.id)
+        assertEquals(SearchMatchReason.TRANSLITERATED, result.first().reason)
+    }
+
+    @Test
+    fun `latin title can be discovered from cyrillic query locally`() {
+        val result = SearchRanker.rankDetailed(
+            "камера",
+            listOf(SearchDocument("camera-latin", "Kamera")),
+        )
+        assertEquals("camera-latin", result.first().document.id)
+        assertEquals(SearchMatchReason.TRANSLITERATED, result.first().reason)
+    }
+
+    @Test
+    fun `greek title is discoverable from romanized query`() {
+        val result = SearchRanker.rankDetailed("rythmiseis", documents)
+        assertEquals("settings-greek", result.first().document.id)
+        assertEquals(SearchMatchReason.TRANSLITERATED, result.first().reason)
+    }
+
+    @Test
+    fun `original script exact match still outranks transliterated fallback`() {
+        val result = SearchRanker.rankDetailed(
+            "Телеграм",
+            listOf(
+                SearchDocument("native", "Телеграм"),
+                SearchDocument("latin", "Telegram"),
+            ),
+        )
+        assertEquals("native", result.first().document.id)
+        assertEquals(SearchMatchReason.EXACT, result.first().reason)
     }
 
     @Test
