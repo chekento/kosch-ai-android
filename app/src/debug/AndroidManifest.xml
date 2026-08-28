@@ -2,6 +2,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
         <!--
+             lintDebug evaluates the debug variant as its own manifest surface. Repeat the mediaProjection service
+             declaration here so the foreground-service type remains explicit after source-set merging. This does
+             not widen permissions or change the release manifest; the same service/type already exists in main.
+        -->
+        <service
+            android:name=".assistant.AssistantScreenShareService"
+            android:exported="false"
+            android:foregroundServiceType="mediaProjection" />
+
+        <!--
              Development-only N1 consent-boundary prototype. It is intentionally absent from release builds until
              a genuine eligible security/network capability exists and the Google Play VpnService declaration gate
              is satisfied. KoSchConsentVpnService itself remains inert and never establishes a tunnel.
