@@ -29,8 +29,8 @@ data class AdaptiveLauncherEnvironment(
     val heightDp: Int,
     val isExternalDisplay: Boolean = false,
     val isDesktopWindowing: Boolean = false,
-    val hasPrecisePointer: Boolean = false,
-    val hasHardwareKeyboard: Boolean = false,
+    val hasPrecisePointer: Boolean = AdaptiveInputRuntimeState.capabilities.hasPrecisePointer,
+    val hasHardwareKeyboard: Boolean = AdaptiveInputRuntimeState.capabilities.hasHardwareKeyboard,
     val hasSeparatingFold: Boolean = false,
     val hasStylus: Boolean = false,
     val isPresentationDisplay: Boolean = false,
@@ -62,7 +62,9 @@ data class AdaptiveLauncherPlan(
 
 /**
  * Pure decision core for phones, foldables, split-screen, desktop windows and connected displays.
- * The caller supplies live window/capability signals; device model allowlists are deliberately not part of the API.
+ * The caller supplies a captured window/capability environment; device model allowlists are deliberately not part of
+ * the API. AdaptiveLauncherEnvironment may source omitted input booleans from the process-local runtime snapshot, but
+ * this planner itself has no Android or mutable-state dependency.
  *
  * The returned profile is a presentation/recommendation plan only. It never mutates a workspace, changes a profile,
  * starts an app or grants a permission. The user-facing layer decides whether to preview or apply a suggestion.
