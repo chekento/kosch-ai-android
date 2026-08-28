@@ -26,6 +26,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.Redo
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apps
@@ -161,13 +162,22 @@ private fun WorkspaceArrangeDialog(
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Home Studio", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Ziehen · skalieren · Seiten verwalten · automatisch anordnen",
+                            "Ziehen · skalieren · Seiten verwalten · 30× Undo/Redo",
                             color = MutedMist,
                             style = MaterialTheme.typography.labelMedium,
                         )
                     }
                     IconButton(enabled = home.canUndo, onClick = home::undo) {
-                        Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "Letzten Homescreen-Schritt rückgängig")
+                        Icon(
+                            Icons.AutoMirrored.Rounded.Undo,
+                            contentDescription = "Homescreen rückgängig · ${home.undoDepth} Schritte verfügbar",
+                        )
+                    }
+                    IconButton(enabled = home.canRedo, onClick = home::redo) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.Redo,
+                            contentDescription = "Homescreen wiederholen · ${home.redoDepth} Schritte verfügbar",
+                        )
                     }
                     IconButton(onClick = onDismiss) {
                         Icon(Icons.Rounded.Close, contentDescription = "Home Studio schließen")
@@ -237,8 +247,15 @@ private fun HomeStudioPageActions(home: WorkspaceHomeController) {
         if (home.canUndo) {
             AssistChip(
                 onClick = home::undo,
-                label = { Text("Rückgängig") },
+                label = { Text("Rückgängig · ${home.undoDepth}") },
                 leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = null) },
+            )
+        }
+        if (home.canRedo) {
+            AssistChip(
+                onClick = home::redo,
+                label = { Text("Wiederholen · ${home.redoDepth}") },
+                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Redo, contentDescription = null) },
             )
         }
     }
