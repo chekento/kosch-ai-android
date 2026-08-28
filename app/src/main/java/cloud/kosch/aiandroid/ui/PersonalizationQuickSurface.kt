@@ -43,7 +43,6 @@ import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.LauncherSettingsController
 import cloud.kosch.aiandroid.data.IconPackResolver
 import cloud.kosch.aiandroid.data.InstalledIconPack
-import cloud.kosch.aiandroid.model.AppearanceSettings
 import cloud.kosch.aiandroid.model.GestureAction
 import cloud.kosch.aiandroid.model.GestureBinding
 import cloud.kosch.aiandroid.model.GestureSettings
@@ -275,8 +274,8 @@ private fun GestureTrigger.gestureTitle(): String = when (this) {
     GestureTrigger.PINCH_OUT -> "Auseinanderziehen"
     GestureTrigger.EDGE_LEFT -> "Vom linken Rand wischen"
     GestureTrigger.EDGE_RIGHT -> "Vom rechten Rand wischen"
-    GestureTrigger.STYLUS_PRIMARY -> "Stift-Haupttaste"
-    GestureTrigger.STYLUS_SECONDARY -> "Stift-Zweittaste"
+    GestureTrigger.STYLUS_BUTTON_PRIMARY -> "Stift-Haupttaste"
+    GestureTrigger.STYLUS_BUTTON_SECONDARY -> "Stift-Zweittaste"
 }
 
 private fun GestureAction.actionTitle(): String = when (this) {
@@ -298,8 +297,8 @@ private fun GestureAction.actionTitle(): String = when (this) {
 private fun HapticProfile.hapticTitle(): String = when (this) {
     HapticProfile.OFF -> "Aus"
     HapticProfile.LIGHT -> "Leicht"
-    HapticProfile.BALANCED -> "Normal"
-    HapticProfile.EXPRESSIVE -> "Kräftig"
+    HapticProfile.STANDARD -> "Normal"
+    HapticProfile.STRONG -> "Kräftig"
 }
 
 private val QUICK_GESTURES = listOf(
