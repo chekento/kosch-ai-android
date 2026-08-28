@@ -36,6 +36,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     val homeWorkspace = WorkspaceHomeController(application)
+    val widgetStacks = WidgetStackController(application).also { it.repair(controller.widgetIds) }
     val settings = LauncherSettingsController(application)
     val scopedSettings = ScopedSettingsController(application).also {
         // Startup/process-death reconciliation removes only overrides whose portable page/item owner no longer exists.
@@ -73,6 +74,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                         )
                     }
                 }
+        }
+        // Stack membership contains device-bound AppWidgetHost ids only. Every binding change repairs orphaned ids;
+        // no portable workspace/settings document ever receives this membership.
+        viewModelScope.launch {
+            snapshotFlow { controller.widgetIds }
+                .collect(widgetStacks::repair)
         }
     }
 
