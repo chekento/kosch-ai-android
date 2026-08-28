@@ -2,6 +2,7 @@ package cloud.kosch.aiandroid.data
 
 import android.content.ComponentName
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.LauncherApps
 import android.content.pm.ShortcutInfo
 import android.content.res.Resources
@@ -31,6 +32,8 @@ class AppCatalog(
     private val settingsStore = LauncherSettingsStore(appContext)
     private val iconPackResolver = IconPackResolver(appContext)
     private var listening = false
+    private var selectedIconPackPackage = settingsStore.load().appearance.iconPackPackage
+    private var settingsListener: SharedPreferences.OnSharedPreferenceChangeListener? = null
 
     private val callback = object : LauncherApps.Callback() {
         override fun onPackageRemoved(packageName: String, user: UserHandle) = catalogChanged(packageName)
@@ -52,51 +55,60 @@ class AppCatalog(
     fun startListening() {
         if (listening) return
         launcherApps.registerCallback(callback, callbackHandler)
+        settingsListener = settingsStore.registerDocumentListener {
+            val nextIconPack = settingsStore.load().appearance.iconPackPackage
+            if (nextIconPack != selectedIconPackPackage) {
+                val previousIconPack = selectedIconPackPackage
+                selectedIconPackPackage = nextIconPack
+                previousIconPack?.let(iconPackResolver::invalidate)
+                nextIconPack?.let(iconPackResolver::invalidate)
+                onCatalogChanged()
+            }
+        }
         listening = true
     }
 
     fun stopListening() {
         if (!listening) return
         launcherApps.unregisterCallback(callback)
+        settingsListener?.let(settingsStore::unregisterDocumentListener)
+        settingsListener = null
         listening = false
     }
 
-    fun loadApps(): List<LaunchableApp> {
-        val selectedIconPack = settingsStore.load().appearance.iconPackPackage
-        return launcherApps.profiles
-            .flatMap { profile ->
-                val serial = userManager.getSerialNumberForUser(profile)
-                val profileType = profileType(profile)
-                runCatching { launcherApps.getActivityList(null, profile) }
-                    .getOrDefault(emptyList())
-                    .mapNotNull { activity ->
-                        runCatching {
-                            val component = activity.componentName
-                            val systemIcon = activity.getBadgedIcon(0)
-                            val displayIcon = if (profileType == AppProfile.PERSONAL) {
-                                iconPackResolver.resolve(selectedIconPack, component, systemIcon)
-                            } else {
-                                // Keep Android's profile badge authoritative. Replacing it with an unbadged pack icon
-                                // would make personal/work identity visually ambiguous.
-                                systemIcon
-                            }
-                            LaunchableApp(
-                                key = "$serial:${component.flattenToShortString()}",
-                                label = activity.label?.toString()?.ifBlank { component.packageName }
-                                    ?: component.packageName,
-                                packageName = component.packageName,
-                                componentName = component,
-                                user = activity.user,
-                                userSerialNumber = serial,
-                                profile = profileType,
-                                icon = displayIcon.safeBitmap().asImageBitmap(),
-                                legacyKeys = setOf("${activity.user.hashCode()}:${component.flattenToShortString()}"),
-                            )
-                        }.getOrNull()
-                    }
-            }
-            .sortedBy { it.label.lowercase(Locale.getDefault()) }
-    }
+    fun loadApps(): List<LaunchableApp> = launcherApps.profiles
+        .flatMap { profile ->
+            val serial = userManager.getSerialNumberForUser(profile)
+            val profileType = profileType(profile)
+            runCatching { launcherApps.getActivityList(null, profile) }
+                .getOrDefault(emptyList())
+                .mapNotNull { activity ->
+                    runCatching {
+                        val component = activity.componentName
+                        val systemIcon = activity.getBadgedIcon(0)
+                        val displayIcon = if (profileType == AppProfile.PERSONAL) {
+                            iconPackResolver.resolve(selectedIconPackPackage, component, systemIcon)
+                        } else {
+                            // Keep Android's profile badge authoritative. Replacing it with an unbadged pack icon
+                            // would make personal/work identity visually ambiguous.
+                            systemIcon
+                        }
+                        LaunchableApp(
+                            key = "$serial:${component.flattenToShortString()}",
+                            label = activity.label?.toString()?.ifBlank { component.packageName }
+                                ?: component.packageName,
+                            packageName = component.packageName,
+                            componentName = component,
+                            user = activity.user,
+                            userSerialNumber = serial,
+                            profile = profileType,
+                            icon = displayIcon.safeBitmap().asImageBitmap(),
+                            legacyKeys = setOf("${activity.user.hashCode()}:${component.flattenToShortString()}"),
+                        )
+                    }.getOrNull()
+                }
+        }
+        .sortedBy { it.label.lowercase(Locale.getDefault()) }
 
     fun loadIconPacks(): List<InstalledIconPack> = iconPackResolver.discover()
 
