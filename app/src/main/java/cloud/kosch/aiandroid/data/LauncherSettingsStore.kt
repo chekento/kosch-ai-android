@@ -1,6 +1,7 @@
 package cloud.kosch.aiandroid.data
 
 import android.content.Context
+import android.content.SharedPreferences
 import cloud.kosch.aiandroid.model.LauncherSettingsDocument
 
 /**
@@ -44,6 +45,22 @@ class LauncherSettingsStore(context: Context) {
     fun exportPortable(): String = LauncherSettingsCodec.encode(PortableLauncherSettingsPolicy.project(load()))
 
     fun reset(): Boolean = preferences.edit().remove(KEY_DOCUMENT).commit()
+
+    /**
+     * Registers a listener only for replacement/removal of the launcher settings document. Callers still decide which
+     * field actually changed so an icon runtime, for example, does not need to reload for unrelated privacy settings.
+     */
+    fun registerDocumentListener(onChanged: () -> Unit): SharedPreferences.OnSharedPreferenceChangeListener {
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == KEY_DOCUMENT) onChanged()
+        }
+        preferences.registerOnSharedPreferenceChangeListener(listener)
+        return listener
+    }
+
+    fun unregisterDocumentListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        preferences.unregisterOnSharedPreferenceChangeListener(listener)
+    }
 
     private companion object {
         const val PREFS_NAME = "launcher-settings-v1"
