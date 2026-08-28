@@ -44,4 +44,58 @@ class PenAiContextPlannerTest {
         assertEquals(0, summary.pointCount)
         assertTrue(summary.text.contains("0 Striche"))
     }
+
+    @Test
+    fun lassoSelection_returnsOnlyAggregateSelectedContent() {
+        val inside = InkStroke(
+            tool = InkTool.PEN,
+            points = listOf(
+                InkPoint(0.25f, 0.25f, 0.6f, 0f),
+                InkPoint(0.30f, 0.30f, 0.7f, 0f),
+            ),
+        )
+        val outside = InkStroke(
+            tool = InkTool.HIGHLIGHTER,
+            points = listOf(
+                InkPoint(0.80f, 0.80f, 0.5f, 0f),
+                InkPoint(0.90f, 0.90f, 0.5f, 0f),
+            ),
+        )
+        val lasso = listOf(
+            InkPoint(0.10f, 0.10f, 0f, 0f),
+            InkPoint(0.50f, 0.10f, 0f, 0f),
+            InkPoint(0.50f, 0.50f, 0f, 0f),
+            InkPoint(0.10f, 0.50f, 0f, 0f),
+        )
+
+        val result = PenAiContextPlanner.summarizeLassoSelection(listOf(inside, outside), lasso)
+        assertEquals(1, result.selectedStrokeCount)
+        assertEquals(2, result.totalStrokeCount)
+        assertEquals(50, result.selectionSharePercent)
+        assertEquals(1, result.selected.strokeCount)
+        assertTrue(InkTool.PEN in result.selected.tools)
+        assertFalse(InkTool.HIGHLIGHTER in result.selected.tools)
+        assertTrue(result.text.contains("1 von 2"))
+        assertFalse(result.text.contains("0.25"))
+        assertFalse(result.text.contains("0.50"))
+    }
+
+    @Test
+    fun invalidLasso_failsClosedWithEmptySelection() {
+        val strokes = listOf(
+            InkStroke(
+                tool = InkTool.PEN,
+                points = listOf(InkPoint(0.25f, 0.25f, 0.5f, 0f)),
+            ),
+        )
+        val result = PenAiContextPlanner.summarizeLassoSelection(
+            strokes,
+            listOf(
+                InkPoint(0.1f, 0.1f, 0f, 0f),
+                InkPoint(0.2f, 0.2f, 0f, 0f),
+            ),
+        )
+        assertEquals(0, result.selectedStrokeCount)
+        assertEquals(0, result.selectionSharePercent)
+    }
 }
