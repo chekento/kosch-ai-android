@@ -19,11 +19,12 @@ enum class AiExecutionLane(val title: String) {
 data class AiExecutionContext(
     val deterministicLocalSupport: Boolean,
     val onDeviceGenAiAvailable: Boolean,
-    val connectedProviderAvailable: Boolean = false,
-    val userAllowsConnectedProvider: Boolean = false,
     val appHandoffAvailable: Boolean,
     val userAllowsExternalHandoff: Boolean,
     val userExplicitlyRequestedWeb: Boolean = false,
+    // Appended for source compatibility with older positional construction sites.
+    val connectedProviderAvailable: Boolean = false,
+    val userAllowsConnectedProvider: Boolean = false,
 )
 
 object AiExecutionRouter {
