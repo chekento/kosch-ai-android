@@ -37,6 +37,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -54,10 +55,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.AiHubController
+import cloud.kosch.aiandroid.ai.AiHubDecisionConfidence
 import cloud.kosch.aiandroid.ai.AiHubEntry
 import cloud.kosch.aiandroid.ai.AiHubEntryKind
 import cloud.kosch.aiandroid.ai.AiHubInstallState
+import cloud.kosch.aiandroid.ai.AiHubQuickAction
+import cloud.kosch.aiandroid.ai.AiHubQuickActionPolicy
 import cloud.kosch.aiandroid.ai.AiHubRecommendation
+import cloud.kosch.aiandroid.ai.AiHubRouteDecision
 import cloud.kosch.aiandroid.model.LaunchableApp
 import cloud.kosch.aiandroid.system.AiPublishedShortcutSurface
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
@@ -100,6 +105,7 @@ fun AiHubSurface(
     var filter by remember { mutableStateOf(AiHubFilter.SMART) }
     val allEntries = hub.entries(apps)
     val recommendations = hub.recommendations(apps)
+    val routeDecision = hub.routeDecision(apps)
     val currentTask = hub.inferredTask()
     val recommendationReasons = recommendations.associate { it.entry.stableId to it.reason }
     val bestRecommendation = recommendations.firstOrNull()
@@ -154,9 +160,9 @@ fun AiHubSurface(
                 shape = RoundedCornerShape(16.dp),
             ) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("API-KEY-FREI ZUERST", color = Mint, style = MaterialTheme.typography.labelMedium)
+                    Text("SMART AI · LOCAL-FIRST", color = Mint, style = MaterialTheme.typography.labelMedium)
                     Text(
-                        "KoSch nutzt lokale Regeln und veröffentlichte Android-Funktionen zuerst. Browser-KI wird nur als direkter Einstieg angeboten, wenn die App selbst einen passenden Shortcut veröffentlicht.",
+                        "KoSch bewertet Aufgabe, echte Gerätefähigkeiten, Privacy-Kontext und deine lokale Präferenz. Kein Provider erhält Inhalt allein durch eine Empfehlung.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -171,6 +177,13 @@ fun AiHubSurface(
                 placeholder = { Text("z. B. Recherchiere aktuelle Quellen · Fasse diese Seite zusammen · lokal/offline") },
                 minLines = 2,
                 maxLines = 4,
+            )
+
+            PowerPromptStrip(
+                onAction = { action ->
+                    hub.updatePrompt(AiHubQuickActionPolicy.apply(action, hub.prompt))
+                    filter = AiHubFilter.SMART
+                },
             )
 
             Row(
@@ -196,41 +209,22 @@ fun AiHubSurface(
             }
 
             if (filter == AiHubFilter.SMART) {
-                Surface(
-                    color = Sky.copy(alpha = 0.08f),
-                    shape = RoundedCornerShape(14.dp),
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(9.dp),
-                    ) {
-                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = Sky)
-                        Column {
-                            Text(
-                                "KoSch empfiehlt · ${currentTask.title}",
-                                color = Sky,
-                                style = MaterialTheme.typography.labelLarge,
-                                fontWeight = FontWeight.SemiBold,
-                            )
-                            Text(
-                                "Verfügbarkeit, bestätigte Fähigkeiten und deine geräte-lokale Aufgabenpräferenz werden bewertet.",
-                                color = MutedMist,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                        }
-                    }
-                }
+                SmartDecisionHeader(
+                    taskTitle = currentTask.title,
+                    decision = routeDecision,
+                )
 
-                bestRecommendation?.let { best ->
+                if (bestRecommendation != null && routeDecision != null) {
                     AiHubBestRouteCard(
-                        recommendation = best,
+                        recommendation = bestRecommendation,
+                        decision = routeDecision,
                         shortcut = bestShortcut,
                         hasPrompt = hub.prompt.isNotBlank(),
-                        canPrefer = hub.canPreferForCurrentTask(best.entry),
-                        preferred = hub.isPreferredForCurrentTask(best.entry),
-                        onTogglePreferred = { hub.togglePreferredForCurrentTask(best.entry) },
+                        canPrefer = hub.canPreferForCurrentTask(bestRecommendation.entry),
+                        preferred = hub.isPreferredForCurrentTask(bestRecommendation.entry),
+                        onTogglePreferred = { hub.togglePreferredForCurrentTask(bestRecommendation.entry) },
                         onExecute = { hub.executeBestRoute(apps) },
+                        onExecuteAlternative = { alternative -> hub.executeRecommendation(alternative) },
                     )
                 }
             }
@@ -250,7 +244,9 @@ fun AiHubSurface(
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("Keine sichtbaren Einträge", color = MutedMist)
                         if (hub.hiddenIds.isNotEmpty()) {
-                            TextButton(onClick = { hub.restoreAll() }) { Text("Ausgeblendete Vorschläge zurückholen") }
+                            TextButton(onClick = { hub.restoreAll() }) {
+                                Text("Ausgeblendete Vorschläge zurückholen")
+                            }
                         }
                     }
                 }
@@ -289,31 +285,142 @@ fun AiHubSurface(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PowerPromptStrip(
+    onAction: (AiHubQuickAction) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            "POWER ACTIONS",
+            color = MutedMist,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            verticalArrangement = Arrangement.spacedBy(7.dp),
+        ) {
+            AiHubQuickAction.entries.forEach { action ->
+                AssistChip(
+                    onClick = { onAction(action) },
+                    label = { Text(action.title) },
+                    leadingIcon = {
+                        Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(15.dp))
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SmartDecisionHeader(
+    taskTitle: String,
+    decision: AiHubRouteDecision?,
+) {
+    Surface(
+        color = Sky.copy(alpha = 0.08f),
+        shape = RoundedCornerShape(14.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
+        ) {
+            Icon(Icons.Rounded.AutoAwesome, contentDescription = null, tint = Sky)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "KoSch empfiehlt · $taskTitle",
+                    color = Sky,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold,
+                )
+                Text(
+                    decision?.explanation
+                        ?: "Verfügbarkeit, bestätigte Fähigkeiten und deine geräte-lokale Aufgabenpräferenz werden bewertet.",
+                    color = MutedMist,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            decision?.let {
+                ConfidenceBadge(
+                    confidence = it.confidence,
+                    scoreMargin = it.scoreMargin,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ConfidenceBadge(
+    confidence: AiHubDecisionConfidence,
+    scoreMargin: Int?,
+) {
+    val tint = confidenceColor(confidence)
+    Surface(
+        color = tint.copy(alpha = 0.14f),
+        shape = RoundedCornerShape(50),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Text(
+                confidence.title,
+                color = tint,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+            if (scoreMargin != null) {
+                Text(
+                    "+$scoreMargin Punkte",
+                    color = MutedMist,
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun AiHubBestRouteCard(
     recommendation: AiHubRecommendation,
+    decision: AiHubRouteDecision,
     shortcut: AiPublishedShortcutSurface?,
     hasPrompt: Boolean,
     canPrefer: Boolean,
     preferred: Boolean,
     onTogglePreferred: () -> Unit,
     onExecute: () -> Unit,
+    onExecuteAlternative: (AiHubRecommendation) -> Unit,
 ) {
     val entry = recommendation.entry
+    val alternative = decision.alternatives.firstOrNull()
     Surface(
         color = Violet.copy(alpha = 0.13f),
         shape = RoundedCornerShape(20.dp),
     ) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp),
         ) {
-            Text(
-                "BESTE ROUTE · ${recommendation.intent.title.uppercase()}",
-                color = Mint,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text(
+                    "BESTE ROUTE · ${recommendation.intent.title.uppercase()}",
+                    color = Mint,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                ConfidenceBadge(decision.confidence, decision.scoreMargin)
+            }
             Text(
                 entry.title,
                 style = MaterialTheme.typography.titleLarge,
@@ -349,6 +456,23 @@ private fun AiHubBestRouteCard(
                         selected = preferred,
                         onClick = onTogglePreferred,
                         label = { Text(if (preferred) "Bevorzugt" else "Merken") },
+                    )
+                }
+            }
+            alternative?.let { second ->
+                OutlinedButton(
+                    onClick = { onExecuteAlternative(second) },
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = second.entry.installState != AiHubInstallState.UNAVAILABLE,
+                ) {
+                    Text(
+                        if (decision.confidence == AiHubDecisionConfidence.LOW) {
+                            "Gleichwertige Alternative · ${second.entry.title}"
+                        } else {
+                            "Schnelle Alternative · ${second.entry.title}"
+                        },
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
@@ -526,6 +650,12 @@ private fun AiHubCard(
             }
         }
     }
+}
+
+private fun confidenceColor(confidence: AiHubDecisionConfidence): Color = when (confidence) {
+    AiHubDecisionConfidence.HIGH -> Mint
+    AiHubDecisionConfidence.MEDIUM -> Sky
+    AiHubDecisionConfidence.LOW -> Violet
 }
 
 private fun installLabel(state: AiHubInstallState): String = when (state) {
