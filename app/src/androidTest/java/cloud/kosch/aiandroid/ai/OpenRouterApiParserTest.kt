@@ -113,14 +113,14 @@ class OpenRouterApiParserTest {
     @Test(expected = IllegalArgumentException::class)
     fun chatParserFailsClosedWithoutText() {
         OpenRouterChatResponseParser.parse(
-            """{"choices":[{"message":{"content":[]}}]}""",
+            "{\"choices\":[{\"message\":{\"content\":[]}}]}",
         )
     }
 
     @Test
     fun errorParserBoundsProviderMessage() {
         val result = OpenRouterErrorParser.safeMessage(
-            """{"error":{"message":"Invalid model"}}"",
+            "{\"error\":{\"message\":\"Invalid model\"}}",
             400,
         )
 
