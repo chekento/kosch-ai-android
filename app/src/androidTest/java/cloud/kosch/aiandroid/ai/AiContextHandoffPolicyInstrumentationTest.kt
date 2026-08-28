@@ -36,7 +36,7 @@ class AiContextHandoffPolicyInstrumentationTest {
         )
         assertTrue(draft.localExcerpt!!.length <= AiContextHandoffDraft.MAX_EXCERPT_CHARS)
         assertTrue(draft.localSummary.length <= AiContextHandoffDraft.MAX_SUMMARY_CHARS)
-        assertFalse(draft.localExcerpt!!.contains("content://test"))
+        assertFalse(draft.localExcerpt.contains("content://test"))
     }
 
     @Test
@@ -48,12 +48,30 @@ class AiContextHandoffPolicyInstrumentationTest {
     }
 
     @Test
-    fun confirmedPrompt_containsBoundedContentButNeverOriginalUri() {
+    fun confirmedPrompt_defaultsToMinimalContextAndRequiresExcerptOptIn() {
         val draft = AiContextHandoffPolicy.fromFile(insight())
-        val confirmed = AiContextHandoffPolicy.confirm(draft, "Erkläre das", userConfirmed = true)
-        assertTrue(confirmed.prompt.contains("Plan Q4.txt"))
-        assertTrue(confirmed.prompt.contains("Kurzer Dateiinhalt"))
-        assertFalse(confirmed.prompt.contains("content://test/secret-document"))
-        assertTrue(confirmed.prompt.length <= 12_000)
+
+        val minimal = AiContextHandoffPolicy.confirm(
+            draft = draft,
+            userPrompt = "Erkläre das",
+            userConfirmed = true,
+        )
+        assertTrue(minimal.prompt.contains("Plan Q4.txt"))
+        assertTrue(minimal.prompt.contains("Lokale Zusammenfassung"))
+        assertFalse(minimal.prompt.contains("Kurzer Dateiinhalt"))
+        assertFalse(minimal.prompt.contains("content://test/secret-document"))
+        assertTrue(minimal.prompt.length <= 12_000)
+
+        val withExcerpt = AiContextHandoffPolicy.confirm(
+            draft = draft,
+            userPrompt = "Erkläre das",
+            userConfirmed = true,
+            selection = AiContextHandoffSelection.SUMMARY_AND_EXCERPT,
+        )
+        assertTrue(withExcerpt.prompt.contains("Plan Q4.txt"))
+        assertTrue(withExcerpt.prompt.contains("Lokale Zusammenfassung"))
+        assertTrue(withExcerpt.prompt.contains("Kurzer Dateiinhalt"))
+        assertFalse(withExcerpt.prompt.contains("content://test/secret-document"))
+        assertTrue(withExcerpt.prompt.length <= 12_000)
     }
 }
