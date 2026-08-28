@@ -13,6 +13,7 @@ class ReleaseComplianceCatalogTest {
                 ComplianceDataClass.SCREEN_CONTENT,
                 ComplianceDataClass.NOTIFICATION_METADATA,
                 ComplianceDataClass.USER_TEXT,
+                ComplianceDataClass.AUTH_CREDENTIAL,
             )
         }
 
@@ -29,12 +30,30 @@ class ReleaseComplianceCatalogTest {
 
         assertFalse(vpn.productionEnabled)
         assertFalse(vpn.defaultEnabled)
-        assertFalse(vpn.koSchNetworkTransfer)
+        assertFalse(vpn.kalNetworkTransfer)
     }
 
     @Test
-    fun currentReleaseDeclaresNoKoSchContentUpload() {
-        assertTrue(ReleaseComplianceCatalog.currentReleaseHasNoKoSchContentUpload())
+    fun productionNetworkTransfersAreExplicitOptIn() {
+        val transfers = ReleaseComplianceCatalog.productionCapabilities.filter { it.kalNetworkTransfer }
+
+        assertTrue(transfers.isNotEmpty())
+        assertTrue(ReleaseComplianceCatalog.productionNetworkTransfersAreExplicitOptIn())
+        transfers.forEach { capability ->
+            assertFalse(capability.defaultEnabled)
+            assertTrue(capability.requiresExplicitUserAction)
+        }
+    }
+
+    @Test
+    fun directProviderRequestsAreDisclosedAsNetworkTransfer() {
+        val direct = requireNotNull(ReleaseComplianceCatalog.byId("direct_ai_provider_request"))
+        val authentication = requireNotNull(ReleaseComplianceCatalog.byId("provider_authentication"))
+
+        assertTrue(direct.productionEnabled)
+        assertTrue(direct.kalNetworkTransfer)
+        assertTrue(authentication.productionEnabled)
+        assertTrue(authentication.kalNetworkTransfer)
     }
 
     @Test
