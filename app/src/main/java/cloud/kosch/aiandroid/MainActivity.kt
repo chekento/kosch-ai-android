@@ -283,6 +283,8 @@ class MainActivity : ComponentActivity() {
                         DragDropWorkspaceHomeScreen(
                             controller = controller,
                             home = launcherViewModel.homeWorkspace,
+                            settings = settings,
+                            scopedSettings = launcherViewModel.scopedSettings,
                             requestVoiceInput = ::requestVoiceInput,
                             requestDocument = ::requestDocument,
                             requestContact = ::requestContact,
