@@ -19,7 +19,7 @@ class AdaptiveLauncherEnvironmentTest {
     }
 
     @Test
-    fun precisePointerOnWideDesktop_usesProductivityDensityAndHover() {
+    fun precisePointerOnWideDesktop_usesProductivityDensityAndPowerUi() {
         val plan = AdaptiveLauncherPlanner.plan(
             AdaptiveLauncherEnvironment(
                 widthDp = 1_400,
@@ -31,20 +31,29 @@ class AdaptiveLauncherEnvironmentTest {
         )
         assertEquals(AdaptiveSurfaceMode.DESKTOP_WINDOW, plan.surfaceMode)
         assertEquals(AdaptiveUiDensity.PRODUCTIVITY, plan.density)
+        assertEquals(AdaptiveInteractionProfile.DESKTOP_PRO, plan.interactionProfile)
+        assertEquals(AdaptiveWorkspaceProfileHint.WORK, plan.workspaceProfileHint)
         assertTrue(plan.enableHoverAffordances)
         assertTrue(plan.usePersistentCommandRail)
         assertTrue(plan.useTwoPaneSettings)
         assertTrue(plan.preferWindowedAssistantDock)
+        assertTrue(plan.useEdgePowerRail)
+        assertTrue(plan.preferDenseAppGrid)
+        assertTrue(plan.showKeyboardShortcutHints)
+        assertEquals(10, plan.maxVisibleQuickActions)
     }
 
     @Test
-    fun mediumWidthButCompactHeight_avoidsTwoPaneLayout() {
+    fun mediumWidthButCompactHeight_avoidsTwoPaneAndPowerRail() {
         val plan = AdaptiveLauncherPlanner.plan(
             AdaptiveLauncherEnvironment(widthDp = 820, heightDp = 420),
         )
         assertEquals(AdaptiveWidthClass.MEDIUM, plan.widthClass)
         assertEquals(AdaptiveHeightClass.COMPACT, plan.heightClass)
+        assertEquals(AdaptiveInteractionProfile.LARGE_TOUCH, plan.interactionProfile)
         assertFalse(plan.useTwoPaneSettings)
+        assertFalse(plan.useEdgePowerRail)
+        assertEquals(6, plan.maxVisibleQuickActions)
     }
 
     @Test
@@ -65,7 +74,9 @@ class AdaptiveLauncherEnvironmentTest {
             AdaptiveLauncherEnvironment(widthDp = 412, heightDp = 915),
         )
         assertEquals(AdaptiveSurfaceMode.PHONE, phone.surfaceMode)
+        assertEquals(AdaptiveInteractionProfile.THUMB_FIRST, phone.interactionProfile)
         assertEquals(ExternalDisplayWorkspaceMode.MIRROR_CURRENT, phone.externalWorkspaceMode)
+        assertEquals(4, phone.maxVisibleQuickActions)
     }
 
     @Test
@@ -78,5 +89,35 @@ class AdaptiveLauncherEnvironmentTest {
             ),
         )
         assertFalse(plan.useTwoPaneSettings)
+        assertEquals(AdaptiveInteractionProfile.FOLD_DUAL_SURFACE, plan.interactionProfile)
+    }
+
+    @Test
+    fun stylusOnLargeTouch_prioritizesCreativePenSpaceWithoutAutomaticMutation() {
+        val plan = AdaptiveLauncherPlanner.plan(
+            AdaptiveLauncherEnvironment(
+                widthDp = 1_000,
+                heightDp = 900,
+                hasStylus = true,
+            ),
+        )
+        assertEquals(AdaptiveInteractionProfile.PEN_CANVAS, plan.interactionProfile)
+        assertEquals(AdaptiveWorkspaceProfileHint.CREATIVE, plan.workspaceProfileHint)
+        assertTrue(plan.prioritizePenSpaceEntry)
+        assertFalse(plan.preferDenseAppGrid)
+    }
+
+    @Test
+    fun presentationDisplay_recommendsPresentationProfile() {
+        val plan = AdaptiveLauncherPlanner.plan(
+            AdaptiveLauncherEnvironment(
+                widthDp = 1_920,
+                heightDp = 1_080,
+                isExternalDisplay = true,
+                isPresentationDisplay = true,
+            ),
+        )
+        assertEquals(AdaptiveInteractionProfile.PRESENTATION, plan.interactionProfile)
+        assertEquals(AdaptiveWorkspaceProfileHint.PRESENTATION, plan.workspaceProfileHint)
     }
 }
