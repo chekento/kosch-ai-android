@@ -1,10 +1,8 @@
 package cloud.kosch.aiandroid
 
-import androidx.compose.ui.test.assertDoesNotExist
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.ViewModelProvider
@@ -14,6 +12,7 @@ import cloud.kosch.aiandroid.model.HomePage
 import cloud.kosch.aiandroid.model.PortableSettingValue
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -44,9 +43,7 @@ class WorkspaceObjectStyleInstrumentationTest {
             }
             composeTestRule.waitForIdle()
 
-            composeTestRule
-                .onNodeWithContentDescription("Nicht verfügbare App", useUnmergedTree = true)
-                .assertExists()
+            assertContentDescriptionPresent("Nicht verfügbare App")
 
             composeTestRule.runOnUiThread {
                 val saved = initialViewModel.scopedSettings.setObjectOverride(
@@ -58,12 +55,8 @@ class WorkspaceObjectStyleInstrumentationTest {
             }
             composeTestRule.waitForIdle()
 
-            composeTestRule
-                .onNodeWithContentDescription("Nicht verfügbare App", useUnmergedTree = true)
-                .assertDoesNotExist()
-            composeTestRule
-                .onNodeWithText("Alle Elemente dieser Seite sind ausgeblendet", useUnmergedTree = true)
-                .assertExists()
+            assertContentDescriptionAbsent("Nicht verfügbare App")
+            assertTextPresent("Alle Elemente dieser Seite sind ausgeblendet")
 
             composeTestRule.activityRule.scenario.recreate()
             composeTestRule.waitForIdle()
@@ -73,9 +66,7 @@ class WorkspaceObjectStyleInstrumentationTest {
                 PortableSettingValue.Bool(false),
                 recreated.scopedSettings.document.objectOverride(itemId, VISIBLE_FEATURE),
             )
-            composeTestRule
-                .onNodeWithText("Alle Elemente dieser Seite sind ausgeblendet", useUnmergedTree = true)
-                .assertExists()
+            assertTextPresent("Alle Elemente dieser Seite sind ausgeblendet")
 
             composeTestRule.runOnUiThread {
                 val inherited = recreated.scopedSettings.setObjectOverride(
@@ -88,9 +79,7 @@ class WorkspaceObjectStyleInstrumentationTest {
             composeTestRule.waitForIdle()
 
             assertNull(recreated.scopedSettings.document.objectOverride(itemId, VISIBLE_FEATURE))
-            composeTestRule
-                .onNodeWithContentDescription("Nicht verfügbare App", useUnmergedTree = true)
-                .assertExists()
+            assertContentDescriptionPresent("Nicht verfügbare App")
         } finally {
             composeTestRule.runOnUiThread {
                 val current = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
@@ -101,6 +90,36 @@ class WorkspaceObjectStyleInstrumentationTest {
             }
             composeTestRule.waitForIdle()
         }
+    }
+
+    private fun assertContentDescriptionPresent(value: String) {
+        assertTrue(
+            "Expected content description '$value' to exist",
+            composeTestRule
+                .onAllNodesWithContentDescription(value, useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty(),
+        )
+    }
+
+    private fun assertContentDescriptionAbsent(value: String) {
+        assertTrue(
+            "Expected content description '$value' to be absent",
+            composeTestRule
+                .onAllNodesWithContentDescription(value, useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty(),
+        )
+    }
+
+    private fun assertTextPresent(value: String) {
+        assertTrue(
+            "Expected text '$value' to exist",
+            composeTestRule
+                .onAllNodesWithText(value, useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isNotEmpty(),
+        )
     }
 
     private fun dismissOnboardingIfVisible() {
