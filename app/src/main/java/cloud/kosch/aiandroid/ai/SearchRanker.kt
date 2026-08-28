@@ -31,8 +31,8 @@ data class RankedSearchDocument(
 /**
  * Fully local search scorer shared by launcher search surfaces.
  *
- * Ranking is deterministic and explainable: exact matches in the user's/script's original form win, then a bounded
- * local romanization path, compact/multi-token prefixes, regular prefixes, contained terms, acronyms, tightly bounded
+ * Ranking is deterministic and explainable: exact matches in the user's original script win, then a bounded local
+ * romanization path, compact/multi-token prefixes, regular prefixes, contained terms, acronyms, tightly bounded
  * one-edit typo recovery and finally subsequences. Short unrelated queries are never typo-guessed.
  */
 object SearchRanker {
@@ -41,7 +41,7 @@ object SearchRanker {
 
     fun rankDetailed(query: String, documents: List<SearchDocument>): List<RankedSearchDocument> {
         val needle = query.searchVariants()
-        if (needle.spaced.isEmpty()) {
+        if (needle.spaced.isEmpty() && needle.romanizedSpaced.isEmpty()) {
             return documents
                 .sortedBy { it.title.lowercase(Locale.ROOT) }
                 .map { RankedSearchDocument(it, score = 0, reason = SearchMatchReason.SUBSEQUENCE) }
@@ -165,7 +165,7 @@ object SearchRanker {
 
     private fun String.searchVariants(): SearchVariants {
         val source = lowercase(Locale.ROOT)
-        val spaced = source.asciiSearchForm()
+        val spaced = source.unicodeSearchForm()
         val romanizedSource = source.romanizeForSearch()
         val romanizedSpaced = romanizedSource.asciiSearchForm()
         val tokens = spaced.split(' ').filter(String::isNotBlank)
@@ -180,6 +180,23 @@ object SearchRanker {
         )
     }
 
+    /** Canonical matching keeps all Unicode letters/numbers, so exact native-script names remain exact. */
+    private fun String.unicodeSearchForm(): String = Normalizer
+        .normalize(this, Normalizer.Form.NFD)
+        .replace("\\p{M}+".toRegex(), "")
+        .replace("ß", "ss")
+        .replace("æ", "ae")
+        .replace("œ", "oe")
+        .replace("ø", "o")
+        .replace("ł", "l")
+        .replace("đ", "d")
+        .replace("ð", "d")
+        .replace("þ", "th")
+        .replace("[^\\p{L}\\p{N}]+".toRegex(), " ")
+        .replace("\\s+".toRegex(), " ")
+        .trim()
+
+    /** Romanized forms intentionally collapse to Latin/numeric search keys for cross-script discovery. */
     private fun String.asciiSearchForm(): String = Normalizer
         .normalize(this, Normalizer.Form.NFD)
         .replace("\\p{M}+".toRegex(), "")
@@ -197,8 +214,8 @@ object SearchRanker {
 
     /**
      * Small embedded romanization table for launcher discovery. It deliberately covers common Cyrillic and Greek
-     * alphabets without pulling a network/service dependency into local search. Original-script matching is still
-     * scored first and therefore never loses to the romanized fallback.
+     * alphabets without pulling a network/service dependency into local search. Original-script matching is scored
+     * first and therefore never loses to the romanized fallback.
      */
     private fun String.romanizeForSearch(): String = buildString(length) {
         this@romanizeForSearch.forEach { character ->
