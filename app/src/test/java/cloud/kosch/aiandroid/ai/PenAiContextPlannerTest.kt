@@ -61,12 +61,7 @@ class PenAiContextPlannerTest {
                 InkPoint(0.90f, 0.90f, 0.5f, 0f),
             ),
         )
-        val lasso = listOf(
-            InkPoint(0.10f, 0.10f, 0f, 0f),
-            InkPoint(0.50f, 0.10f, 0f, 0f),
-            InkPoint(0.50f, 0.50f, 0f, 0f),
-            InkPoint(0.10f, 0.50f, 0f, 0f),
-        )
+        val lasso = rectangleLasso()
 
         val result = PenAiContextPlanner.summarizeLassoSelection(listOf(inside, outside), lasso)
         assertEquals(1, result.selectedStrokeCount)
@@ -78,6 +73,33 @@ class PenAiContextPlannerTest {
         assertTrue(result.text.contains("1 von 2"))
         assertFalse(result.text.contains("0.25"))
         assertFalse(result.text.contains("0.50"))
+    }
+
+    @Test
+    fun lassoSelection_detectsCrossingSegmentWithoutInteriorSamplePoint() {
+        val crossing = InkStroke(
+            tool = InkTool.PEN,
+            points = listOf(
+                InkPoint(0.0f, 0.30f, 0.5f, 0f),
+                InkPoint(0.80f, 0.30f, 0.5f, 0f),
+            ),
+        )
+        val outside = InkStroke(
+            tool = InkTool.HIGHLIGHTER,
+            points = listOf(
+                InkPoint(0.70f, 0.80f, 0.5f, 0f),
+                InkPoint(0.90f, 0.80f, 0.5f, 0f),
+            ),
+        )
+
+        val result = PenAiContextPlanner.summarizeLassoSelection(
+            listOf(crossing, outside),
+            rectangleLasso(),
+        )
+
+        assertEquals(1, result.selectedStrokeCount)
+        assertTrue(InkTool.PEN in result.selected.tools)
+        assertFalse(InkTool.HIGHLIGHTER in result.selected.tools)
     }
 
     @Test
@@ -98,4 +120,28 @@ class PenAiContextPlannerTest {
         assertEquals(0, result.selectedStrokeCount)
         assertEquals(0, result.selectionSharePercent)
     }
+
+    @Test
+    fun oversizedLasso_failsClosedInsteadOfDoingUnboundedGeometryWork() {
+        val stroke = InkStroke(
+            tool = InkTool.PEN,
+            points = listOf(InkPoint(0.25f, 0.25f, 0.5f, 0f)),
+        )
+        val oversized = List(2_049) { index ->
+            val x = if (index % 2 == 0) 0.1f else 0.5f
+            InkPoint(x, 0.2f, 0f, 0f)
+        }
+
+        val result = PenAiContextPlanner.summarizeLassoSelection(listOf(stroke), oversized)
+
+        assertEquals(0, result.selectedStrokeCount)
+        assertEquals(0, result.selectionSharePercent)
+    }
+
+    private fun rectangleLasso() = listOf(
+        InkPoint(0.10f, 0.10f, 0f, 0f),
+        InkPoint(0.50f, 0.10f, 0f, 0f),
+        InkPoint(0.50f, 0.50f, 0f, 0f),
+        InkPoint(0.10f, 0.50f, 0f, 0f),
+    )
 }
