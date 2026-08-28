@@ -10,6 +10,7 @@ import cloud.kosch.aiandroid.ai.AiHubContextSignal
 import cloud.kosch.aiandroid.ai.AiHubOrigin
 import cloud.kosch.aiandroid.ai.AiHubRoutingContext
 import cloud.kosch.aiandroid.ai.PenAiContextPlanner
+import cloud.kosch.aiandroid.ai.UniversalSearchSourcesFactory
 import cloud.kosch.aiandroid.data.WorkspaceWidgetHostRecovery
 import cloud.kosch.aiandroid.model.HomePage
 import cloud.kosch.aiandroid.model.SceneId
@@ -17,8 +18,8 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 /**
- * Owns launcher, unified Home, Settings Center, AI/browser Hub, portable custom actions and Assistant runtimes across
- * Activity recreation.
+ * Owns launcher, unified Home, Settings Center, AI/browser Hub, Universal Search, portable custom actions and
+ * Assistant runtimes across Activity recreation.
  *
  * Device-local widget host ownership is reconciled before Home loads. Portable launcher settings and scoped
  * page/object overrides stay independent from Assistant session/agent/device-voice stores: the Settings Center may
@@ -44,6 +45,15 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val aiHub = AiHubController(application).also { hub ->
         // Even old/direct aiHub.open() call sites receive the same abstract context; explicit origins may override it.
         hub.setDefaultRoutingContextProvider { currentAiHubContext(AiHubOrigin.HOME) }
+    }
+    val universalSearch = UniversalSearchController {
+        UniversalSearchSourcesFactory.build(
+            apps = controller.apps,
+            loadedShortcuts = controller.appShortcuts,
+            folders = controller.folders,
+            pages = homeWorkspace.document.pages,
+            customActions = customActions.actions,
+        )
     }
 
     init {
@@ -74,11 +84,19 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         initialPrompt: String = "",
         requestedOrigin: AiHubOrigin = AiHubOrigin.HOME,
     ) {
+        universalSearch.close()
         settings.close()
         aiHub.open(
             initialPrompt = initialPrompt,
             context = currentAiHubContext(requestedOrigin),
         )
+    }
+
+    fun openUniversalSearch(initialQuery: String = "") {
+        aiHub.close()
+        settings.close()
+        controller.closeTopSurface()
+        universalSearch.open(initialQuery)
     }
 
     /** Prepares a memory-only preview. It does not open the AI Hub and transfers no file content. */
@@ -184,6 +202,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     override fun onCleared() {
+        universalSearch.close()
         aiContextHandoff.cancel()
         assistant.close()
         controller.close()
