@@ -59,26 +59,50 @@ jobs:
       - name: Verify, lint and assemble
         run: ./gradlew --no-daemon testDebugUnitTest lintDebug assembleDebug assembleRelease assembleDebugAndroidTest --stacktrace
 
-      - name: Verify packaged permission budget
+      - name: Verify packaged permission and release compliance budget
         run: |
-          packaged_permissions=$($ANDROID_HOME/build-tools/36.0.0/aapt dump permissions app/build/outputs/apk/debug/app-debug.apk)
-          echo "$packaged_permissions"
-          if echo "$packaged_permissions" | grep -q 'android.permission.INTERNET'; then
-            echo "INTERNET permission must not enter the offline launcher APK"
-            exit 1
-          fi
-          if echo "$packaged_permissions" | grep -q 'android.permission.RECORD_AUDIO'; then
-            echo "RECORD_AUDIO must not enter before the explicit local wake-word stage"
-            exit 1
-          fi
-          for permission in \
-            android.permission.ACCESS_NETWORK_STATE \
-            android.permission.CAMERA \
-            android.permission.FOREGROUND_SERVICE \
-            android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION
+          debug_apk=app/build/outputs/apk/debug/app-debug.apk
+          release_apk=app/build/outputs/apk/release/app-release.apk
+
+          debug_permissions=$($ANDROID_HOME/build-tools/36.0.0/aapt dump permissions "$debug_apk")
+          release_permissions=$($ANDROID_HOME/build-tools/36.0.0/aapt dump permissions "$release_apk")
+          echo "$debug_permissions"
+          echo "$release_permissions"
+
+          for packaged_permissions in "$debug_permissions" "$release_permissions"
           do
-            echo "$packaged_permissions" | grep -q "$permission"
+            if echo "$packaged_permissions" | grep -q 'android.permission.INTERNET'; then
+              echo "INTERNET permission must not enter the offline launcher APK"
+              exit 1
+            fi
+            if echo "$packaged_permissions" | grep -q 'android.permission.RECORD_AUDIO'; then
+              echo "RECORD_AUDIO must not enter before the explicit local wake-word stage"
+              exit 1
+            fi
+            for permission in \
+              android.permission.ACCESS_NETWORK_STATE \
+              android.permission.CAMERA \
+              android.permission.FOREGROUND_SERVICE \
+              android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION
+            do
+              echo "$packaged_permissions" | grep -q "$permission"
+            done
           done
+
+          debug_manifest=$($ANDROID_HOME/build-tools/36.0.0/aapt dump xmltree "$debug_apk" AndroidManifest.xml)
+          release_manifest=$($ANDROID_HOME/build-tools/36.0.0/aapt dump xmltree "$release_apk" AndroidManifest.xml)
+
+          echo "$debug_manifest" | grep -q 'KoSchConsentVpnService'
+          echo "$debug_manifest" | grep -q 'SecurityNetworkActivity'
+
+          if echo "$release_manifest" | grep -q 'KoSchConsentVpnService'; then
+            echo "Release APK must not contain the inert N1 VpnService prototype"
+            exit 1
+          fi
+          if echo "$release_manifest" | grep -q 'SecurityNetworkActivity'; then
+            echo "Release APK must not expose the debug-only N1 Security surface"
+            exit 1
+          fi
 
       - name: Prepare installable APK and checksum
         run: |
