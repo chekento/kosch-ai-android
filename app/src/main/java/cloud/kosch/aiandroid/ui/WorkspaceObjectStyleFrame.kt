@@ -15,9 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.zIndex
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import cloud.kosch.aiandroid.model.WorkspaceObjectStyle
 import cloud.kosch.aiandroid.ui.theme.Mint
 import cloud.kosch.aiandroid.ui.theme.RaisedSurface
