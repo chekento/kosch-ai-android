@@ -34,6 +34,19 @@ class ScopedSettingsController(context: Context) {
     fun setObjectOverride(itemId: String, featureId: String, value: PortableSettingValue?): Boolean =
         persist(runCatching { document.withObjectOverride(itemId, featureId, value) }, "Objekt-Override gespeichert")
 
+    /** Applies a group of object-level changes in one store commit, useful for presets and full style reset. */
+    fun setObjectOverrides(
+        itemId: String,
+        values: Map<String, PortableSettingValue?>,
+    ): Boolean = persist(
+        runCatching {
+            values.entries.fold(document) { current, (featureId, value) ->
+                current.withObjectOverride(itemId, featureId, value)
+            }
+        },
+        "Objekt-Stil gespeichert",
+    )
+
     fun resolve(
         featureId: String,
         global: PortableSettingValue,
