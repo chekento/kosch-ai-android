@@ -22,6 +22,9 @@ data class AiHubEntry(
     val webUrl: String? = null,
     val aiCapabilities: Set<String> = emptySet(),
     val aiStatusLabel: String? = null,
+    /** Direct-account auth modes known by KAL; these do not imply that network execution is currently available. */
+    val connectionAuthModes: Set<KalProviderAuthMode> = emptySet(),
+    val recommendedConnectionAuthMode: KalProviderAuthMode? = null,
     val dismissible: Boolean = true,
 )
 
@@ -35,6 +38,7 @@ object AiHubCatalog {
             val stableId = "ai:${provider.id}"
             if (stableId in hiddenSuggestionIds) return@forEach
             val installed = AiProviderRegistry.installedApp(provider, apps)
+            val connectionProfile = KalProviderConnectionRegistry.profileForAiProvider(provider.id)
             val state = when {
                 installed != null -> AiHubInstallState.INSTALLED
                 provider.playStorePackageName != null -> AiHubInstallState.STORE_AVAILABLE
@@ -57,6 +61,12 @@ object AiHubCatalog {
                     webUrl = provider.webUrl,
                     aiCapabilities = provider.capabilities.mapTo(linkedSetOf()) { it.title },
                     aiStatusLabel = provider.kind.title,
+                    connectionAuthModes = connectionProfile
+                        ?.authOptions
+                        ?.filter { it.maturity != KalConnectionMaturity.FALLBACK_ONLY }
+                        ?.mapTo(linkedSetOf()) { it.mode }
+                        .orEmpty(),
+                    recommendedConnectionAuthMode = connectionProfile?.recommendedAuthMode,
                 ),
             )
         }
