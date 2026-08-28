@@ -14,6 +14,7 @@ import cloud.kosch.aiandroid.ai.UniversalSearchSourcesFactory
 import cloud.kosch.aiandroid.data.WorkspaceWidgetHostRecovery
 import cloud.kosch.aiandroid.model.HomePage
 import cloud.kosch.aiandroid.model.SceneId
+import cloud.kosch.aiandroid.system.UniversalSearchShortcutRepository
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
@@ -46,10 +47,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         // Even old/direct aiHub.open() call sites receive the same abstract context; explicit origins may override it.
         hub.setDefaultRoutingContextProvider { currentAiHubContext(AiHubOrigin.HOME) }
     }
+    private val universalSearchShortcuts = UniversalSearchShortcutRepository(application)
     val universalSearch = UniversalSearchController {
         UniversalSearchSourcesFactory.build(
             apps = controller.apps,
-            loadedShortcuts = controller.appShortcuts,
+            shortcutSources = universalSearchShortcuts.shortcuts,
             folders = controller.folders,
             pages = homeWorkspace.document.pages,
             customActions = customActions.actions,
@@ -97,6 +99,12 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         settings.close()
         controller.closeTopSurface()
         universalSearch.open(initialQuery)
+        // Open immediately with the last local snapshot, then refresh Android-published shortcuts off the UI thread.
+        // Execution re-resolves the target again, so a stale session entry can never become an authorization decision.
+        viewModelScope.launch {
+            universalSearchShortcuts.refresh(controller.apps)
+            universalSearch.refresh()
+        }
     }
 
     /** Prepares a memory-only preview. It does not open the AI Hub and transfers no file content. */
@@ -203,6 +211,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     override fun onCleared() {
         universalSearch.close()
+        universalSearchShortcuts.clear()
         aiContextHandoff.cancel()
         assistant.close()
         controller.close()
