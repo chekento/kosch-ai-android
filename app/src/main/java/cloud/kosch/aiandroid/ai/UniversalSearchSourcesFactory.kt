@@ -14,6 +14,7 @@ import cloud.kosch.aiandroid.model.WorkspacePage
  * screen/camera data or secrets are added. Shortcut entries preserve the owning app/profile through appKey lookup.
  */
 object UniversalSearchSourcesFactory {
+    /** Compatibility path for an already loaded App Actions shortcut list. */
     fun build(
         apps: List<LaunchableApp>,
         loadedShortcuts: List<LaunchableShortcut>,
@@ -33,6 +34,32 @@ object UniversalSearchSourcesFactory {
                 appLabel = app.label,
             )
         }
+        return build(
+            apps = apps,
+            shortcutSources = shortcuts,
+            folders = folders,
+            pages = pages,
+            customActions = customActions,
+            appPriorityBoosts = appPriorityBoosts,
+        )
+    }
+
+    /** Preferred path for the async, device-local launcher-wide published-shortcut cache. */
+    fun build(
+        apps: List<LaunchableApp>,
+        shortcutSources: List<UniversalShortcutSource>,
+        folders: List<LauncherFolder>,
+        pages: List<WorkspacePage>,
+        customActions: List<CustomLauncherAction>,
+        appPriorityBoosts: Map<String, Int> = emptyMap(),
+    ): UniversalSearchSources {
+        val currentAppKeys = apps.asSequence().map(LaunchableApp::key).toHashSet()
+        val shortcuts = shortcutSources
+            .asSequence()
+            .filter { it.appKey in currentAppKeys }
+            .distinctBy { it.appKey to it.shortcutId }
+            .take(MAX_SHORTCUTS)
+            .toList()
         return UniversalSearchSources(
             apps = apps,
             shortcuts = shortcuts,
@@ -89,4 +116,6 @@ object UniversalSearchSourcesFactory {
             keywords = listOf("sources", "quellen", "notebook", "belege"),
         ),
     )
+
+    private const val MAX_SHORTCUTS = 2_048
 }
