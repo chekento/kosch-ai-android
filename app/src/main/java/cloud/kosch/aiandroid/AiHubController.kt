@@ -5,6 +5,9 @@ import android.content.pm.LauncherApps
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import cloud.kosch.aiandroid.ai.AiExternalHandoffCandidate
+import cloud.kosch.aiandroid.ai.AiExternalHandoffDecision
+import cloud.kosch.aiandroid.ai.AiExternalHandoffGate
 import cloud.kosch.aiandroid.ai.AiHubCatalog
 import cloud.kosch.aiandroid.ai.AiHubContextPolicy
 import cloud.kosch.aiandroid.ai.AiHubDecisionConfidence
@@ -52,8 +55,8 @@ class AiHubController(context: Context) {
     private val launcherApps = appContext.getSystemService(LauncherApps::class.java)
     private val publishedSurfaceDiscovery = AiPublishedSurfaceDiscovery(appContext)
     private val publishedSurfaceCache = mutableMapOf<String, AiPublishedSurfaceSnapshot>()
+    private val externalHandoffGate = AiExternalHandoffGate()
     private var defaultRoutingContextProvider: () -> AiHubRoutingContext = { AiHubRoutingContext() }
-    private var pendingExternalHandoff: PendingExternalHandoff? = null
 
     var visible by mutableStateOf(false)
         private set
@@ -246,17 +249,15 @@ class AiHubController(context: Context) {
         entry: AiHubEntry,
         plan: AiHubLaunchPlan.SharePrompt,
     ): Boolean {
-        val candidate = PendingExternalHandoff(
-            stableId = entry.stableId,
-            packageName = plan.app.packageName,
-            prompt = plan.prompt,
+        val decision = externalHandoffGate.evaluate(
+            AiExternalHandoffCandidate(
+                stableTargetId = entry.stableId,
+                packageName = plan.app.packageName,
+                prompt = plan.prompt,
+            ),
         )
-        if (pendingExternalHandoff == candidate) {
-            pendingExternalHandoff = null
-            return true
-        }
+        if (decision == AiExternalHandoffDecision.CONFIRMED) return true
 
-        pendingExternalHandoff = candidate
         notice = "Externe Übergabe vorbereitet: ${entry.title} erhält den eingegebenen Text. " +
             "Für die weitere Verarbeitung gelten die Bedingungen der Ziel-App. " +
             "Zum Bestätigen erneut „Text übergeben“ tippen; Ändern des Textes oder Ziels bricht ab."
@@ -264,7 +265,7 @@ class AiHubController(context: Context) {
     }
 
     private fun clearPendingExternalHandoff() {
-        pendingExternalHandoff = null
+        externalHandoffGate.clear()
     }
 
     private fun launchPublishedShortcut(surface: AiPublishedShortcutSurface): Result<Unit> = runCatching {
@@ -322,12 +323,6 @@ class AiHubController(context: Context) {
             .apply(intent, preferredTargetIds[intent], contextual)
             .take(limit)
     }
-
-    private data class PendingExternalHandoff(
-        val stableId: String,
-        val packageName: String,
-        val prompt: String,
-    )
 
     private companion object {
         const val MAX_PROMPT_CHARS = 32_000
