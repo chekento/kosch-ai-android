@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.ContactsContract
 import android.speech.RecognizerIntent
+import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.KeyboardShortcutGroup
 import android.view.KeyboardShortcutInfo
@@ -18,6 +19,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.ui.Alignment
@@ -27,9 +29,17 @@ import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.data.PendingDocumentKind
 import cloud.kosch.aiandroid.data.PendingDocumentStore
 import cloud.kosch.aiandroid.model.AssistantAnchor
+import cloud.kosch.aiandroid.model.GestureAction
+import cloud.kosch.aiandroid.model.GestureTrigger
+import cloud.kosch.aiandroid.model.HapticProfile
 import cloud.kosch.aiandroid.model.HomePage
+import cloud.kosch.aiandroid.model.LauncherPresentationPlanner
+import cloud.kosch.aiandroid.model.SettingsSection
+import cloud.kosch.aiandroid.model.SystemPanel
+import cloud.kosch.aiandroid.model.WorkspaceMode
 import cloud.kosch.aiandroid.system.DocumentGrantManager
 import cloud.kosch.aiandroid.system.HomeRoleController
+import cloud.kosch.aiandroid.system.LauncherGestureBindingResolver
 import cloud.kosch.aiandroid.system.ProfessionalShortcut
 import cloud.kosch.aiandroid.system.ProfessionalShortcutResolver
 import cloud.kosch.aiandroid.system.WidgetHostController
@@ -40,6 +50,7 @@ import cloud.kosch.aiandroid.ui.LauncherRoot
 import cloud.kosch.aiandroid.ui.SettingsCenterSurface
 import cloud.kosch.aiandroid.ui.SettingsEntryButton
 import cloud.kosch.aiandroid.ui.components.CompanionFace
+import cloud.kosch.aiandroid.ui.launcherGestureSurface
 import cloud.kosch.aiandroid.ui.theme.KoSchLauncherTheme
 import java.time.LocalDate
 
@@ -216,10 +227,35 @@ class MainActivity : ComponentActivity() {
             val settings = launcherViewModel.settings
             val aiHub = launcherViewModel.aiHub
             val assistantPresentation = settings.document.assistant
+            val gestureSurfaceEnabled = !controller.onboardingVisible &&
+                !settings.visible &&
+                !aiHub.visible &&
+                !controller.drawerVisible &&
+                !controller.providerChooserVisible &&
+                !controller.contextDetailsVisible &&
+                !controller.controlCenterVisible &&
+                !controller.phoneVisible &&
+                !controller.fileSheetVisible &&
+                !controller.fileWorkspaceVisible &&
+                !controller.widgetBoardVisible &&
+                !controller.appActionsVisible &&
+                !controller.folderSheetVisible &&
+                !controller.faqVisible &&
+                !controller.backupVisible &&
+                !controller.auditVisible
+
             KoSchLauncherTheme(
                 dynamicColor = settings.document.appearance.useMaterialYouAccents,
             ) {
-                Box {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .launcherGestureSurface(
+                            settings = settings.document.gestures,
+                            enabled = gestureSurfaceEnabled,
+                            onTrigger = ::handleLauncherGesture,
+                        ),
+                ) {
                     val unifiedHomeSelected = controller.homePage == HomePage.WORKSPACE && !controller.onboardingVisible
                     val legacyOverlayVisible = controller.drawerVisible ||
                         controller.providerChooserVisible ||
@@ -425,6 +461,70 @@ class MainActivity : ComponentActivity() {
         pendingAuditExportToken?.let { outState.putString(STATE_PENDING_AUDIT_EXPORT, it) }
         pendingInkExportToken?.let { outState.putString(STATE_PENDING_INK_EXPORT, it) }
         super.onSaveInstanceState(outState)
+    }
+
+    private fun handleLauncherGesture(trigger: GestureTrigger) {
+        val gestureSettings = launcherViewModel.settings.document.gestures
+        val action = LauncherGestureBindingResolver.actionFor(gestureSettings, trigger)
+        if (action == GestureAction.NONE) return
+        if (gestureSettings.haptics != HapticProfile.OFF) {
+            window.decorView.performHapticFeedback(HapticFeedbackConstants.CONTEXT_CLICK)
+        }
+
+        when (action) {
+            GestureAction.NONE -> Unit
+            GestureAction.OPEN_DRAWER -> controller.openDrawer()
+            GestureAction.OPEN_SEARCH,
+            GestureAction.OPEN_COMMAND_PALETTE -> controller.requestCommandFocus()
+            GestureAction.OPEN_HOME_STUDIO -> {
+                controller.switchHomePage(HomePage.WORKSPACE)
+                controller.selectWorkspaceMode(WorkspaceMode.EDIT)
+                controller.postNotice("Home-Bearbeitung aktiviert · Drag/Resize über Home Studio")
+            }
+            GestureAction.OPEN_SETTINGS -> launcherViewModel.settings.open()
+            GestureAction.OPEN_ASSISTANT -> {
+                if (launcherViewModel.assistant.settings.enabled) {
+                    requestVoiceInput()
+                } else {
+                    launcherViewModel.settings.open(SettingsSection.ASSISTANT)
+                }
+            }
+            GestureAction.OPEN_NOTIFICATIONS -> controller.openSystemPanel(SystemPanel.NOTIFICATIONS)
+            GestureAction.PREVIOUS_PAGE -> moveGesturePage(-1)
+            GestureAction.NEXT_PAGE -> moveGesturePage(1)
+            GestureAction.SYSTEM_QUICK_SETTINGS -> controller.openControlCenter()
+            GestureAction.LOCK_DEVICE_ROUTE -> controller.postNotice(
+                "Gerätesperre bleibt ohne ausdrücklich eingerichtete Android-Systemrolle blockiert",
+            )
+            GestureAction.CUSTOM_SHORTCUT -> {
+                val target = LauncherGestureBindingResolver.customTargetFor(gestureSettings, trigger)
+                controller.postNotice(
+                    if (target == null) {
+                        "Für diese Geste ist kein gültiges eigenes Ziel hinterlegt"
+                    } else {
+                        "Eigene Gesten-Ziele werden erst nach sicherer Action-Auflösung ausgeführt"
+                    },
+                )
+            }
+        }
+    }
+
+    private fun moveGesturePage(direction: Int) {
+        val home = launcherViewModel.homeWorkspace
+        val pages = home.document.pages
+        val currentIndex = pages.indexOfFirst { it.id == home.document.activePageId }
+        val nextIndex = LauncherPresentationPlanner.adjacentPageIndex(
+            settings = launcherViewModel.settings.document.pages,
+            currentIndex = currentIndex,
+            pageCount = pages.size,
+            direction = direction,
+        )
+        if (nextIndex == currentIndex || nextIndex !in pages.indices) {
+            controller.postNotice("Keine weitere Home-Seite in dieser Richtung")
+            return
+        }
+        controller.switchHomePage(HomePage.WORKSPACE)
+        home.activatePage(pages[nextIndex].id)
     }
 
     private fun requestHomeRole() {
