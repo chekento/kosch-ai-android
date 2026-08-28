@@ -69,6 +69,42 @@ class WidgetStackPolicyTest {
     }
 
     @Test
+    fun `renaming trims bounds and defaults blank title`() {
+        val stack = WidgetStack("s", "Stack", listOf(1))
+
+        assertEquals("Arbeit", WidgetStackPolicy.rename(stack, "  Arbeit  ")!!.title)
+        assertEquals("Widget Stack", WidgetStackPolicy.rename(stack, "   ")!!.title)
+        assertEquals(
+            WidgetStackPolicy.MAX_TITLE_CHARS,
+            WidgetStackPolicy.rename(stack, "x".repeat(100))!!.title.length,
+        )
+    }
+
+    @Test
+    fun `moving member preserves active widget identity`() {
+        val stack = WidgetStack(
+            id = "s",
+            title = "Stack",
+            appWidgetIds = listOf(10, 20, 30, 40),
+            activeIndex = 2,
+        )
+
+        val moved = WidgetStackPolicy.moveWidget(stack, appWidgetId = 10, delta = 3)!!
+
+        assertEquals(listOf(20, 30, 40, 10), moved.appWidgetIds)
+        assertEquals(30, moved.activeWidgetId)
+    }
+
+    @Test
+    fun `moving member is bounded at stack edges`() {
+        val stack = WidgetStack("s", "Stack", listOf(1, 2, 3), activeIndex = 1)
+
+        assertEquals(listOf(1, 2, 3), WidgetStackPolicy.moveWidget(stack, 1, -1)!!.appWidgetIds)
+        assertEquals(listOf(1, 2, 3), WidgetStackPolicy.moveWidget(stack, 3, 1)!!.appWidgetIds)
+        assertEquals(2, WidgetStackPolicy.moveWidget(stack, 1, -1)!!.activeWidgetId)
+    }
+
+    @Test
     fun `removing final widget removes the stack`() {
         assertNull(
             WidgetStackPolicy.removeWidget(
