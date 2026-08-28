@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import cloud.kosch.aiandroid.ai.UniversalQueryResult
+import cloud.kosch.aiandroid.ai.UniversalSearchEntry
 import cloud.kosch.aiandroid.ai.UniversalSearchIndex
 import cloud.kosch.aiandroid.ai.UniversalSearchQueryEngine
 import cloud.kosch.aiandroid.ai.UniversalSearchSources
@@ -11,13 +12,15 @@ import cloud.kosch.aiandroid.ai.UniversalSearchSources
 /**
  * Memory-only Universal Search session state.
  *
- * The controller never persists queries or result selections. Sources are rebuilt from current launcher snapshots on
- * every query so installed apps, pages, settings and portable actions cannot become stale authorization decisions.
- * Results remain typed targets; execution belongs to the existing launcher/AI/capability routes.
+ * Queries and selections are never persisted. The bounded entity index is built once when the palette opens and on
+ * explicit refresh, not on every keystroke. This keeps large app inventories responsive while execution still
+ * re-resolves every typed target against current runtime state before acting.
  */
 class UniversalSearchController(
     private val sourceProvider: () -> UniversalSearchSources,
 ) {
+    private var sessionEntries: List<UniversalSearchEntry> = emptyList()
+
     var visible by mutableStateOf(false)
         private set
     var query by mutableStateOf("")
@@ -26,6 +29,7 @@ class UniversalSearchController(
         private set
 
     fun open(initialQuery: String = "") {
+        sessionEntries = UniversalSearchIndex.build(sourceProvider())
         visible = true
         updateQuery(initialQuery)
     }
@@ -34,22 +38,25 @@ class UniversalSearchController(
         visible = false
         query = ""
         results = emptyList()
+        sessionEntries = emptyList()
     }
 
     fun updateQuery(value: String) {
         query = value.take(MAX_QUERY_CHARS)
-        results = if (query.isBlank()) {
-            emptyList()
-        } else {
-            val entries = UniversalSearchIndex.build(sourceProvider())
-            UniversalSearchQueryEngine.query(query, entries, MAX_RESULTS)
-        }
+        results = evaluate(query)
     }
 
-    /** Re-evaluates the current query after a local catalog/profile/page change without retaining search history. */
+    /** Rebuilds from current local snapshots and re-evaluates the current query without retaining any search history. */
     fun refresh() {
-        if (!visible || query.isBlank()) return
-        updateQuery(query)
+        if (!visible) return
+        sessionEntries = UniversalSearchIndex.build(sourceProvider())
+        results = evaluate(query)
+    }
+
+    private fun evaluate(value: String): List<UniversalQueryResult> = if (value.isBlank()) {
+        emptyList()
+    } else {
+        UniversalSearchQueryEngine.query(value, sessionEntries, MAX_RESULTS)
     }
 
     private companion object {
