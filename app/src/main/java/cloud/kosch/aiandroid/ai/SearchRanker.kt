@@ -11,6 +11,7 @@ data class SearchDocument(
 
 enum class SearchMatchReason {
     EXACT,
+    TRANSLITERATED,
     COMPACT_EXACT,
     TOKEN_PREFIX,
     PREFIX,
@@ -30,9 +31,9 @@ data class RankedSearchDocument(
 /**
  * Fully local search scorer shared by launcher search surfaces.
  *
- * Ranking is deterministic and explainable: exact/compact matches win, then multi-token word prefixes, regular
- * prefixes, contained terms, acronyms, tightly bounded one-edit typo recovery and finally subsequences. Short unrelated
- * queries are never typo-guessed.
+ * Ranking is deterministic and explainable: exact matches in the user's/script's original form win, then a bounded
+ * local romanization path, compact/multi-token prefixes, regular prefixes, contained terms, acronyms, tightly bounded
+ * one-edit typo recovery and finally subsequences. Short unrelated queries are never typo-guessed.
  */
 object SearchRanker {
     fun rank(query: String, documents: List<SearchDocument>): List<SearchDocument> =
@@ -68,6 +69,27 @@ object SearchRanker {
         val matches = buildList {
             matchScore(needle.spaced, candidate.spaced, compact = false)?.let(::add)
             matchScore(needle.compact, candidate.compact, compact = true)?.let(::add)
+
+            val transliterated = needle.romanizedSpaced.isNotEmpty() && candidate.romanizedSpaced.isNotEmpty() &&
+                (needle.usedRomanization || candidate.usedRomanization)
+            if (transliterated) {
+                matchScore(needle.romanizedSpaced, candidate.romanizedSpaced, compact = false)?.let { match ->
+                    add(
+                        SearchMatch(
+                            score = (match.score - ROMANIZATION_PENALTY).coerceAtLeast(1),
+                            reason = SearchMatchReason.TRANSLITERATED,
+                        ),
+                    )
+                }
+                matchScore(needle.romanizedCompact, candidate.romanizedCompact, compact = true)?.let { match ->
+                    add(
+                        SearchMatch(
+                            score = (match.score - ROMANIZATION_PENALTY - 10).coerceAtLeast(1),
+                            reason = SearchMatchReason.TRANSLITERATED,
+                        ),
+                    )
+                }
+            }
 
             if (needle.tokens.size > 1 && candidate.tokens.isNotEmpty() &&
                 needle.tokens.all { queryToken -> candidate.tokens.any { it.startsWith(queryToken) } }
@@ -142,19 +164,46 @@ object SearchRanker {
     }
 
     private fun String.searchVariants(): SearchVariants {
-        val spaced = Normalizer
-            .normalize(lowercase(Locale.GERMAN), Normalizer.Form.NFD)
-            .replace("\\p{M}+".toRegex(), "")
-            .replace("[^a-z0-9]+".toRegex(), " ")
-            .replace("\\s+".toRegex(), " ")
-            .trim()
+        val source = lowercase(Locale.ROOT)
+        val spaced = source.asciiSearchForm()
+        val romanizedSource = source.romanizeForSearch()
+        val romanizedSpaced = romanizedSource.asciiSearchForm()
         val tokens = spaced.split(' ').filter(String::isNotBlank)
         return SearchVariants(
             spaced = spaced,
             compact = spaced.replace(" ", ""),
             tokens = tokens,
             acronym = tokens.joinToString("") { token -> token.take(1) },
+            romanizedSpaced = romanizedSpaced,
+            romanizedCompact = romanizedSpaced.replace(" ", ""),
+            usedRomanization = romanizedSource != source,
         )
+    }
+
+    private fun String.asciiSearchForm(): String = Normalizer
+        .normalize(this, Normalizer.Form.NFD)
+        .replace("\\p{M}+".toRegex(), "")
+        .replace("ß", "ss")
+        .replace("æ", "ae")
+        .replace("œ", "oe")
+        .replace("ø", "o")
+        .replace("ł", "l")
+        .replace("đ", "d")
+        .replace("ð", "d")
+        .replace("þ", "th")
+        .replace("[^a-z0-9]+".toRegex(), " ")
+        .replace("\\s+".toRegex(), " ")
+        .trim()
+
+    /**
+     * Small embedded romanization table for launcher discovery. It deliberately covers common Cyrillic and Greek
+     * alphabets without pulling a network/service dependency into local search. Original-script matching is still
+     * scored first and therefore never loses to the romanized fallback.
+     */
+    private fun String.romanizeForSearch(): String = buildString(length) {
+        this@romanizeForSearch.forEach { character ->
+            append(ROMANIZATION[character] ?: character)
+        }
     }
 
     private data class SearchVariants(
@@ -162,11 +211,35 @@ object SearchRanker {
         val compact: String,
         val tokens: List<String>,
         val acronym: String,
+        val romanizedSpaced: String,
+        val romanizedCompact: String,
+        val usedRomanization: Boolean,
     )
 
     private data class SearchMatch(
         val score: Int,
         val reason: SearchMatchReason,
+    )
+
+    private const val ROMANIZATION_PENALTY = 30
+
+    private val ROMANIZATION: Map<Char, String> = mapOf(
+        // Cyrillic: Russian, Ukrainian, Belarusian, Bulgarian, Serbian and common regional additions.
+        'а' to "a", 'б' to "b", 'в' to "v", 'г' to "g", 'ґ' to "g", 'д' to "d",
+        'е' to "e", 'ё' to "yo", 'є' to "ye", 'ж' to "zh", 'з' to "z", 'и' to "i",
+        'і' to "i", 'ї' to "yi", 'й' to "y", 'к' to "k", 'л' to "l", 'м' to "m",
+        'н' to "n", 'о' to "o", 'п' to "p", 'р' to "r", 'с' to "s", 'т' to "t",
+        'у' to "u", 'ў' to "u", 'ф' to "f", 'х' to "kh", 'ц' to "ts", 'ч' to "ch",
+        'ш' to "sh", 'щ' to "shch", 'ъ' to "", 'ы' to "y", 'ь' to "", 'э' to "e",
+        'ю' to "yu", 'я' to "ya", 'ј' to "j", 'љ' to "lj", 'њ' to "nj", 'ђ' to "dj",
+        'ћ' to "c", 'џ' to "dz", 'ќ' to "k", 'ѓ' to "g", 'ѕ' to "dz",
+        // Greek incl. common precomposed tonos/dialytika characters.
+        'α' to "a", 'ά' to "a", 'β' to "v", 'γ' to "g", 'δ' to "d", 'ε' to "e",
+        'έ' to "e", 'ζ' to "z", 'η' to "i", 'ή' to "i", 'θ' to "th", 'ι' to "i",
+        'ί' to "i", 'ϊ' to "i", 'ΐ' to "i", 'κ' to "k", 'λ' to "l", 'μ' to "m",
+        'ν' to "n", 'ξ' to "x", 'ο' to "o", 'ό' to "o", 'π' to "p", 'ρ' to "r",
+        'σ' to "s", 'ς' to "s", 'τ' to "t", 'υ' to "y", 'ύ' to "y", 'ϋ' to "y",
+        'ΰ' to "y", 'φ' to "f", 'χ' to "ch", 'ψ' to "ps", 'ω' to "o", 'ώ' to "o",
     )
 }
 
