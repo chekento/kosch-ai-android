@@ -49,7 +49,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
     private val universalSearchShortcuts = UniversalSearchShortcutRepository(application)
     val universalSearch = UniversalSearchController {
-        UniversalSearchSourcesFactory.build(
+        UniversalSearchSourcesFactory.buildFromShortcutSources(
             apps = controller.apps,
             shortcutSources = universalSearchShortcuts.shortcuts,
             folders = controller.folders,
