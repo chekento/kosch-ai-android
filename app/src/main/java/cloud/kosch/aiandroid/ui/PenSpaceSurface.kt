@@ -56,8 +56,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import cloud.kosch.aiandroid.AiContextHandoffController
 import cloud.kosch.aiandroid.LauncherController
 import cloud.kosch.aiandroid.R
+import cloud.kosch.aiandroid.ai.AiContextHandoffPolicy
+import cloud.kosch.aiandroid.ai.PenAiContextPlanner
 import cloud.kosch.aiandroid.data.InkStrokeNormalizer
 import cloud.kosch.aiandroid.model.InkPoint
 import cloud.kosch.aiandroid.model.InkStroke
@@ -82,6 +85,7 @@ fun ColumnScope.PenSpaceSurface(
     var selectedTool by remember { mutableStateOf(InkTool.PEN) }
     var inkView by remember { mutableStateOf<PressureInkView?>(null) }
     var strokeCount by remember { mutableIntStateOf(controller.loadInkStrokes().size) }
+    val aiHandoff = remember { AiContextHandoffController() }
     val stylus = controller.stylusState
 
     Surface(
@@ -167,7 +171,22 @@ fun ColumnScope.PenSpaceSurface(
                     leadingIcon = { Icon(Icons.Rounded.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 )
                 AssistChip(
-                    onClick = onAsk,
+                    onClick = {
+                        val strokes = controller.loadInkStrokes()
+                        if (strokes.isEmpty()) {
+                            controller.postNotice("Noch keine Skizze vorhanden · Ask bleibt als normaler Texteinstieg verfügbar")
+                            onAsk()
+                        } else {
+                            val summary = PenAiContextPlanner.summarize(strokes)
+                            aiHandoff.prepare(
+                                AiContextHandoffPolicy.fromPenSketch(
+                                    title = "Pen-Space-Skizze",
+                                    summary = summary.text,
+                                    textualDescription = "Lokale Aggregatanalyse der Skizze; keine Rohkoordinaten oder SVG-Daten enthalten.",
+                                ),
+                            )
+                        }
+                    },
                     label = { Text("An Ask") },
                     leadingIcon = { Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(18.dp)) },
                 )
@@ -228,6 +247,23 @@ fun ColumnScope.PenSpaceSurface(
                 }
             }
         }
+    }
+
+    aiHandoff.draft?.let { draft ->
+        AiContextHandoffConsentSurface(
+            draft = draft,
+            onCancel = aiHandoff::cancel,
+            onConfirm = { question, selection ->
+                val confirmed = aiHandoff.confirm(
+                    userPrompt = question,
+                    userConfirmed = true,
+                    selection = selection,
+                )
+                if (confirmed != null) {
+                    controller.openProviderChooser(confirmed.prompt)
+                }
+            },
+        )
     }
 }
 
