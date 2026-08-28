@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -20,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import cloud.kosch.aiandroid.ai.SmartCollection
 import cloud.kosch.aiandroid.model.AdaptiveHomePresentation
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 import cloud.kosch.aiandroid.ui.theme.Mint
@@ -34,7 +34,7 @@ import cloud.kosch.aiandroid.ui.theme.Sky
 @Composable
 fun AdaptiveEdgePowerRail(
     presentation: AdaptiveHomePresentation,
-    onOpenApps: () -> Unit,
+    onOpenApps: (SmartCollection) -> Unit,
     onAsk: () -> Unit,
     onControls: () -> Unit,
     onPen: () -> Unit,
@@ -52,7 +52,7 @@ fun AdaptiveEdgePowerRail(
             modifier = Modifier.padding(horizontal = 6.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            IconButton(onClick = onOpenApps) {
+            IconButton(onClick = { onOpenApps(SmartCollection.ALL) }) {
                 Icon(Icons.Rounded.Apps, contentDescription = "Power Rail · Alle Apps")
             }
             IconButton(
