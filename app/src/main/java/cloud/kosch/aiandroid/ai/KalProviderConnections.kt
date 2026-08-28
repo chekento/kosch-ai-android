@@ -22,7 +22,7 @@ enum class KalProviderAuthMode {
 }
 
 enum class KalConnectionMaturity {
-    /** The provider publicly supports the auth family; product registration/configuration may still be required. */
+    /** The provider publicly supports the auth family and KAL has enough product support to expose the route. */
     SUPPORTED,
 
     /** KAL needs provider-side client/tenant/redirect configuration before a login can be offered. */
@@ -37,9 +37,8 @@ enum class KalNetworkExecutionBoundary {
     NONE,
 
     /**
-     * Direct provider traffic must cross an explicit network-capable boundary.
-     * The current launcher release intentionally has no INTERNET permission, so this cannot silently execute
-     * inside the launcher process.
+     * Direct provider traffic crosses KAL's explicit network/privacy gate. The Android INTERNET capability alone
+     * never authorizes a request; the product-level provider and privacy opt-ins remain authoritative.
      */
     EXPLICIT_NETWORK_CONNECTOR,
 }
@@ -105,10 +104,10 @@ object KalProviderConnectionRegistry {
             authOptions = listOf(
                 KalProviderAuthOption(
                     mode = KalProviderAuthMode.OAUTH_PKCE,
-                    maturity = KalConnectionMaturity.CONFIGURATION_REQUIRED,
+                    maturity = KalConnectionMaturity.SUPPORTED,
                     recommended = true,
                     label = "Mit OpenRouter verbinden",
-                    note = "OAuth/PKCE kann einen benutzerkontrollierten Provider-Key erzeugen; KAL benötigt dafür eine registrierte Client-/Redirect-Konfiguration.",
+                    note = "Offizieller OAuth/PKCE-Flow mit einmaligem Loopback-Callback; kein wiederverwendbares Client-Secret wird im APK benötigt.",
                 ),
                 KalProviderAuthOption(
                     mode = KalProviderAuthMode.API_KEY,
@@ -284,8 +283,8 @@ object KalPkce {
     private val verifierPattern = Regex("^[A-Za-z0-9._~-]{43,128}$")
 
     fun create(random: SecureRandom = SecureRandom()): KalPkceMaterial {
-        val verifierBytes = ByteArray(64).also(random::nextBytes)
-        val stateBytes = ByteArray(32).also(random::nextBytes)
+        val verifierBytes = ByteArray(64).also { random.nextBytes(it) }
+        val stateBytes = ByteArray(32).also { random.nextBytes(it) }
         val verifier = base64Url(verifierBytes)
         check(verifierPattern.matches(verifier))
         return KalPkceMaterial(
