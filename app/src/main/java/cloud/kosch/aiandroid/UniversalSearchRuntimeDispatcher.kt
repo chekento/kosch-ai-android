@@ -8,7 +8,6 @@ import cloud.kosch.aiandroid.ai.AiHubQuickActionPolicy
 import cloud.kosch.aiandroid.ai.UniversalQueryResult
 import cloud.kosch.aiandroid.ai.UniversalSearchExecutionPlan
 import cloud.kosch.aiandroid.ai.UniversalSearchExecutionPolicy
-import cloud.kosch.aiandroid.model.AppProfile
 import cloud.kosch.aiandroid.model.CustomLauncherActionValidation
 import cloud.kosch.aiandroid.model.CustomLauncherActionValidator
 import cloud.kosch.aiandroid.model.CustomLauncherTarget
@@ -25,6 +24,8 @@ import cloud.kosch.aiandroid.model.WorkspaceMode
  *
  * No search result is trusted as an authorization decision. Apps/shortcuts/actions/settings/pages are looked up again;
  * custom actions are validated again; ambiguous multi-profile package launches fail closed instead of guessing a user.
+ * The same validated custom-action route is reusable by gestures so search and gestures cannot drift into different
+ * execution/security behavior.
  */
 class UniversalSearchRuntimeDispatcher(
     context: Context,
@@ -42,8 +43,31 @@ class UniversalSearchRuntimeDispatcher(
             is UniversalSearchExecutionPlan.OpenFolder -> openFolder(plan.folderId)
             is UniversalSearchExecutionPlan.ActivatePage -> activatePage(plan.pageId)
             is UniversalSearchExecutionPlan.OpenSetting -> openSetting(plan.featureId)
-            is UniversalSearchExecutionPlan.ExecuteCustomAction -> executeCustomAction(plan.actionId)
+            is UniversalSearchExecutionPlan.ExecuteCustomAction -> executeCustomActionId(plan.actionId)
             is UniversalSearchExecutionPlan.OpenAiRoute -> openAiRoute(plan.routeId)
+        }
+    }
+
+    /** Safe launcher-owned custom action path shared by Universal Search and configured gesture bindings. */
+    fun executeCustomActionId(actionId: String) {
+        val action = viewModel.customActions.find(actionId)
+        if (action == null) {
+            stale("Eigene Aktion")
+            return
+        }
+        val normalized = when (val validation = CustomLauncherActionValidator.validate(action)) {
+            is CustomLauncherActionValidation.Valid -> validation.normalized
+            is CustomLauncherActionValidation.Invalid -> {
+                controller.postNotice("Eigene Aktion wurde blockiert: ${validation.reason}")
+                return
+            }
+        }
+        viewModel.universalSearch.close()
+        when (val target = normalized.target) {
+            is CustomLauncherTarget.WebUrl -> openValidatedUri(target.url, normalized.name)
+            is CustomLauncherTarget.DeepLink -> openValidatedUri(target.uri, normalized.name)
+            is CustomLauncherTarget.AppLaunch -> launchPackage(target.packageName, normalized.name)
+            is CustomLauncherTarget.Internal -> executeInternal(target.action)
         }
     }
 
@@ -124,28 +148,6 @@ class UniversalSearchRuntimeDispatcher(
         )
     }
 
-    private fun executeCustomAction(actionId: String) {
-        val action = viewModel.customActions.find(actionId)
-        if (action == null) {
-            stale("Eigene Aktion")
-            return
-        }
-        val normalized = when (val validation = CustomLauncherActionValidator.validate(action)) {
-            is CustomLauncherActionValidation.Valid -> validation.normalized
-            is CustomLauncherActionValidation.Invalid -> {
-                controller.postNotice("Eigene Aktion wurde blockiert: ${validation.reason}")
-                return
-            }
-        }
-        viewModel.universalSearch.close()
-        when (val target = normalized.target) {
-            is CustomLauncherTarget.WebUrl -> openValidatedUri(target.url, normalized.name)
-            is CustomLauncherTarget.DeepLink -> openValidatedUri(target.uri, normalized.name)
-            is CustomLauncherTarget.AppLaunch -> launchPackage(target.packageName, normalized.name)
-            is CustomLauncherTarget.Internal -> executeInternal(target.action)
-        }
-    }
-
     private fun openValidatedUri(uri: String, title: String) {
         runCatching {
             appContext.startActivity(
@@ -160,11 +162,7 @@ class UniversalSearchRuntimeDispatcher(
 
     private fun launchPackage(packageName: String, title: String) {
         val matches = controller.apps.filter { it.packageName == packageName }
-        val app = when (matches.size) {
-            0 -> null
-            1 -> matches.single()
-            else -> matches.singleOrNull { it.profile == AppProfile.PERSONAL }
-        }
+        val app = matches.singleOrNull()
         if (app == null) {
             controller.postNotice(
                 if (matches.isEmpty()) "$title: App ist nicht installiert" else
