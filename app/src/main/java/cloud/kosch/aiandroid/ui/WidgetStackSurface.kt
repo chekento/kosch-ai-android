@@ -399,7 +399,7 @@ private fun WidgetStackPreview(
                 ) {
                     AndroidView(
                         factory = { viewContext ->
-                            createWidgetView(viewContext, activeWidgetId, WidgetSizePreset.MEDIUM)
+                            createWidgetView(viewContext, activeWidgetId, WidgetSizePreset.STANDARD)
                                 ?: FrameLayout(viewContext)
                         },
                         modifier = Modifier.fillMaxSize(),
