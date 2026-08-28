@@ -1,12 +1,17 @@
 package cloud.kosch.aiandroid
 
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNode
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.kosch.aiandroid.model.SettingsSection
+import cloud.kosch.aiandroid.ui.UNIVERSAL_SEARCH_RESULT_TAG
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -34,7 +39,11 @@ class UniversalSearchInstrumentationTest {
             assertTextPresent("Universal Search")
             assertTextPresent("Rasterspalten")
             composeTestRule
-                .onNodeWithText("Rasterspalten", useUnmergedTree = true)
+                .onNode(
+                    hasTestTag(UNIVERSAL_SEARCH_RESULT_TAG)
+                        .and(hasAnyDescendant(hasText("Rasterspalten"))),
+                    useUnmergedTree = true,
+                )
                 .performClick()
             composeTestRule.waitForIdle()
 
