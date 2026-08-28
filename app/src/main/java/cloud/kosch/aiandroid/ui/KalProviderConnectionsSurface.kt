@@ -47,8 +47,9 @@ import cloud.kosch.aiandroid.ui.theme.Warm
 /**
  * Device-aware KAL provider connection editor.
  *
- * Credentials never enter LauncherSettingsDocument. Portable settings only control whether network providers may
- * execute at all; tokens and provider keys remain in SecureCredentialVault on this device.
+ * Credentials never enter LauncherSettingsDocument. Connecting an account is deliberately distinct from allowing
+ * KAL to route user prompts to it: OAuth needs the general network capability, while actual model execution still
+ * requires both existing AI + Privacy opt-ins.
  */
 @Composable
 fun ColumnScope.KalProviderConnectionsEditor(settings: LauncherSettingsController) {
@@ -69,8 +70,9 @@ fun ColumnScope.KalProviderConnectionsEditor(settings: LauncherSettingsControlle
 
     val ai = settings.document.ai
     val privacy = settings.document.privacy
+    val networkAllowed = privacy.allowNetworkFeatures
     val cloudMode = KalCloudAccessPolicy.effectiveMode(ai, privacy)
-    val cloudEnabled = cloudMode == KalCloudAccessMode.CONNECTED_PROVIDERS_ONLY
+    val cloudExecutionEnabled = cloudMode == KalCloudAccessMode.CONNECTED_PROVIDERS_ONLY
 
     LazyColumn(
         modifier = Modifier.weight(1f),
@@ -92,7 +94,7 @@ fun ColumnScope.KalProviderConnectionsEditor(settings: LauncherSettingsControlle
 
         item {
             Surface(
-                color = if (cloudEnabled) Mint.copy(alpha = 0.10f) else Warm.copy(alpha = 0.10f),
+                color = if (cloudExecutionEnabled) Mint.copy(alpha = 0.10f) else Warm.copy(alpha = 0.10f),
                 shape = RoundedCornerShape(16.dp),
             ) {
                 Column(
@@ -100,29 +102,33 @@ fun ColumnScope.KalProviderConnectionsEditor(settings: LauncherSettingsControlle
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Text(
-                        if (cloudEnabled) "Direkter Cloud-Zugriff: FREIGEGEBEN" else "Direkter Cloud-Zugriff: AUS",
-                        color = if (cloudEnabled) Mint else Warm,
+                        if (cloudExecutionEnabled) {
+                            "Direkte Provider-Nutzung: FREIGEGEBEN"
+                        } else {
+                            "Direkte Provider-Nutzung: AUS"
+                        },
+                        color = if (cloudExecutionEnabled) Mint else Warm,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        "Beide Schalter müssen aktiv sein. Konto-Verbindung und Datenfreigabe bleiben getrennte Entscheidungen.",
+                        "Die Netzwerkfreigabe erlaubt Verbindungsaufbau und Account-Verwaltung. Erst der zusätzliche AI-Routing-Schalter erlaubt KAL, bestätigte Anfragen an verbundene Provider zu senden.",
                         color = MutedMist,
                         style = MaterialTheme.typography.bodySmall,
                     )
                     NetworkGateRow(
-                        title = "Externe KI-Provider verwenden",
-                        subtitle = "AI-Routing darf verbundene Netzwerkprovider berücksichtigen.",
-                        checked = ai.networkProvidersEnabled,
-                        onCheckedChange = { enabled ->
-                            settings.applyAi(ai.copy(networkProvidersEnabled = enabled))
-                        },
-                    )
-                    NetworkGateRow(
                         title = "Netzwerkfunktionen erlauben",
-                        subtitle = "Übergeordnete Privacy-Freigabe für KAL-eigene Netzwerkaktionen.",
+                        subtitle = "Übergeordnete Privacy-Freigabe für KAL-eigene Netzwerkaktionen und Provider-Login.",
                         checked = privacy.allowNetworkFeatures,
                         onCheckedChange = { enabled ->
                             settings.applyPrivacy(privacy.copy(allowNetworkFeatures = enabled))
+                        },
+                    )
+                    NetworkGateRow(
+                        title = "Externe KI-Provider verwenden",
+                        subtitle = "AI-Routing darf verbundene Netzwerkprovider berücksichtigen und bestätigte Prompts senden.",
+                        checked = ai.networkProvidersEnabled,
+                        onCheckedChange = { enabled ->
+                            settings.applyAi(ai.copy(networkProvidersEnabled = enabled))
                         },
                     )
                 }
@@ -141,13 +147,19 @@ fun ColumnScope.KalProviderConnectionsEditor(settings: LauncherSettingsControlle
             ProviderConnectionCard(
                 profile = requireNotNull(KalProviderConnectionRegistry.profile("openrouter")),
                 status = when {
-                    openRouterConnected -> "Verbunden · Schlüssel verschlüsselt im Android Keystore"
+                    openRouterConnected && cloudExecutionEnabled -> "Verbunden · für AI-Routing freigegeben"
+                    openRouterConnected -> "Verbunden · Prompt-Routing bleibt aus"
                     openRouterConnecting -> "Autorisierung läuft im Systembrowser …"
                     else -> "Nicht verbunden"
                 },
                 statusPositive = openRouterConnected,
             ) {
                 if (openRouterConnected) {
+                    Text(
+                        "Schlüssel verschlüsselt im Android Keystore · nicht Bestandteil portabler Backups.",
+                        color = MutedMist,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
                     OutlinedButton(
                         onClick = {
                             openRouterConnector.cancel()
@@ -161,7 +173,7 @@ fun ColumnScope.KalProviderConnectionsEditor(settings: LauncherSettingsControlle
                     }
                 } else {
                     Button(
-                        enabled = cloudEnabled && !openRouterConnecting,
+                        enabled = networkAllowed && !openRouterConnecting,
                         onClick = {
                             openRouterConnecting = true
                             statusMessage = null
@@ -172,7 +184,7 @@ fun ColumnScope.KalProviderConnectionsEditor(settings: LauncherSettingsControlle
                                         is OpenRouterOAuthResult.Connected -> {
                                             openRouterConnected = hasOpenRouterCredential()
                                             statusMessage = if (openRouterConnected) {
-                                                "OpenRouter erfolgreich mit KAL verbunden."
+                                                "OpenRouter erfolgreich mit KAL verbunden. Prompt-Routing bleibt von der separaten Freigabe oben abhängig."
                                             } else {
                                                 "OpenRouter-Autorisierung war erfolgreich, der lokale Schlüsselstatus konnte aber nicht bestätigt werden."
                                             }
@@ -196,9 +208,9 @@ fun ColumnScope.KalProviderConnectionsEditor(settings: LauncherSettingsControlle
                         Text("Mit OpenRouter verbinden")
                     }
                 }
-                if (!cloudEnabled && !openRouterConnected) {
+                if (!networkAllowed && !openRouterConnected) {
                     Text(
-                        "Aktiviere zuerst beide Netzwerkfreigaben oben.",
+                        "Aktiviere für den Login nur „Netzwerkfunktionen erlauben“. Der AI-Routing-Schalter kann dabei AUS bleiben.",
                         color = MutedMist,
                         style = MaterialTheme.typography.labelSmall,
                     )
