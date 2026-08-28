@@ -149,6 +149,21 @@ class LauncherSettingsController(context: Context) {
     fun applyGestures(settings: GestureSettings): Boolean =
         persistSection(document.copy(gestures = settings.normalized()), "Gesten gespeichert")
 
+    /**
+     * Quick Personalize edits gesture and appearance drafts together. Persist both in one whole-document commit so
+     * a storage failure can never leave gestures updated while the icon selection still reflects the previous state.
+     */
+    fun applyQuickPersonalization(
+        gestures: GestureSettings,
+        appearance: AppearanceSettings,
+    ): Boolean = persistSection(
+        document.copy(
+            gestures = gestures.normalized(),
+            appearance = appearance.normalized(),
+        ),
+        "Gesten & Icons gespeichert",
+    )
+
     fun applySearch(settings: SearchSettings): Boolean =
         persistSection(document.copy(search = settings), "Such-Einstellungen gespeichert")
 
