@@ -25,25 +25,28 @@ class AppCatalog(
     private val callbackHandler: Handler,
     private val onCatalogChanged: () -> Unit,
 ) {
-    private val launcherApps = context.getSystemService(LauncherApps::class.java)
-    private val userManager = context.getSystemService(UserManager::class.java)
+    private val appContext = context.applicationContext
+    private val launcherApps = appContext.getSystemService(LauncherApps::class.java)
+    private val userManager = appContext.getSystemService(UserManager::class.java)
+    private val settingsStore = LauncherSettingsStore(appContext)
+    private val iconPackResolver = IconPackResolver(appContext)
     private var listening = false
 
     private val callback = object : LauncherApps.Callback() {
-        override fun onPackageRemoved(packageName: String, user: UserHandle) = onCatalogChanged()
-        override fun onPackageAdded(packageName: String, user: UserHandle) = onCatalogChanged()
-        override fun onPackageChanged(packageName: String, user: UserHandle) = onCatalogChanged()
+        override fun onPackageRemoved(packageName: String, user: UserHandle) = catalogChanged(packageName)
+        override fun onPackageAdded(packageName: String, user: UserHandle) = catalogChanged(packageName)
+        override fun onPackageChanged(packageName: String, user: UserHandle) = catalogChanged(packageName)
         override fun onPackagesAvailable(
             packageNames: Array<out String>,
             user: UserHandle,
             replacing: Boolean,
-        ) = onCatalogChanged()
+        ) = catalogChanged(packageNames)
 
         override fun onPackagesUnavailable(
             packageNames: Array<out String>,
             user: UserHandle,
             replacing: Boolean,
-        ) = onCatalogChanged()
+        ) = catalogChanged(packageNames)
     }
 
     fun startListening() {
@@ -58,31 +61,44 @@ class AppCatalog(
         listening = false
     }
 
-    fun loadApps(): List<LaunchableApp> = launcherApps.profiles
-        .flatMap { profile ->
-            val serial = userManager.getSerialNumberForUser(profile)
-            val profileType = profileType(profile)
-            runCatching { launcherApps.getActivityList(null, profile) }
-                .getOrDefault(emptyList())
-                .mapNotNull { activity ->
-                    runCatching {
-                        val component = activity.componentName
-                        LaunchableApp(
-                            key = "$serial:${component.flattenToShortString()}",
-                            label = activity.label?.toString()?.ifBlank { component.packageName }
-                                ?: component.packageName,
-                            packageName = component.packageName,
-                            componentName = component,
-                            user = activity.user,
-                            userSerialNumber = serial,
-                            profile = profileType,
-                            icon = activity.getBadgedIcon(0).safeBitmap().asImageBitmap(),
-                            legacyKeys = setOf("${activity.user.hashCode()}:${component.flattenToShortString()}"),
-                        )
-                    }.getOrNull()
-                }
-        }
-        .sortedBy { it.label.lowercase(Locale.getDefault()) }
+    fun loadApps(): List<LaunchableApp> {
+        val selectedIconPack = settingsStore.load().appearance.iconPackPackage
+        return launcherApps.profiles
+            .flatMap { profile ->
+                val serial = userManager.getSerialNumberForUser(profile)
+                val profileType = profileType(profile)
+                runCatching { launcherApps.getActivityList(null, profile) }
+                    .getOrDefault(emptyList())
+                    .mapNotNull { activity ->
+                        runCatching {
+                            val component = activity.componentName
+                            val systemIcon = activity.getBadgedIcon(0)
+                            val displayIcon = if (profileType == AppProfile.PERSONAL) {
+                                iconPackResolver.resolve(selectedIconPack, component, systemIcon)
+                            } else {
+                                // Keep Android's profile badge authoritative. Replacing it with an unbadged pack icon
+                                // would make personal/work identity visually ambiguous.
+                                systemIcon
+                            }
+                            LaunchableApp(
+                                key = "$serial:${component.flattenToShortString()}",
+                                label = activity.label?.toString()?.ifBlank { component.packageName }
+                                    ?: component.packageName,
+                                packageName = component.packageName,
+                                componentName = component,
+                                user = activity.user,
+                                userSerialNumber = serial,
+                                profile = profileType,
+                                icon = displayIcon.safeBitmap().asImageBitmap(),
+                                legacyKeys = setOf("${activity.user.hashCode()}:${component.flattenToShortString()}"),
+                            )
+                        }.getOrNull()
+                    }
+            }
+            .sortedBy { it.label.lowercase(Locale.getDefault()) }
+    }
+
+    fun loadIconPacks(): List<InstalledIconPack> = iconPackResolver.discover()
 
     fun launch(app: LaunchableApp) {
         launcherApps.startMainActivity(
@@ -142,6 +158,16 @@ class AppCatalog(
     /** Android permits this for the foreground default launcher; credentials remain system-owned. */
     fun requestWorkProfileQuietMode(profile: WorkProfileState, enabled: Boolean): Result<Boolean> =
         runCatching { userManager.requestQuietModeEnabled(enabled, profile.user) }
+
+    private fun catalogChanged(packageName: String) {
+        iconPackResolver.invalidate(packageName)
+        onCatalogChanged()
+    }
+
+    private fun catalogChanged(packageNames: Array<out String>) {
+        packageNames.forEach(iconPackResolver::invalidate)
+        onCatalogChanged()
+    }
 
     private fun Drawable.safeBitmap(): Bitmap = runCatching {
         toBitmap(width = ICON_SIZE_PX, height = ICON_SIZE_PX, config = Bitmap.Config.ARGB_8888)
