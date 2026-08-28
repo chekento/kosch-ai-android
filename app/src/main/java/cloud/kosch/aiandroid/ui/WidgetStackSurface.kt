@@ -4,6 +4,8 @@ import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.view.View
 import android.widget.FrameLayout
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -95,7 +97,7 @@ private fun resolveStackWidgetLabel(context: Context, appWidgetId: Int): StackWi
 }
 
 /**
- * Device-local manager for stacks of already-bound legacy Widget Board ids.
+ * Device-local manager for stacks of already bound legacy Widget Board ids.
  *
  * Selecting a widget here never allocates/binds an AppWidgetHost id. The caller supplies the existing host view
  * factory; this surface only groups ids that Android has already granted to KoSch.
@@ -114,9 +116,7 @@ fun WidgetStackManagerSheet(
         validIds.mapNotNull { resolveStackWidgetLabel(context, it) }.associateBy { it.appWidgetId }
     }
     var selectedIds by remember(validIds) { mutableStateOf<Set<Int>>(emptySet()) }
-    var selectedStackId by remember(stacks.stacks) {
-        mutableStateOf(stacks.stacks.firstOrNull()?.id)
-    }
+    var selectedStackId by remember { mutableStateOf(stacks.stacks.firstOrNull()?.id) }
 
     LaunchedEffect(stacks.stacks, selectedStackId) {
         if (selectedStackId !in stacks.stacks.map { it.id }.toSet()) {
@@ -189,9 +189,15 @@ fun WidgetStackManagerSheet(
                 }
                 items(validIds, key = { "candidate-$it" }) { widgetId ->
                     val label = labels[widgetId]
+                    val alreadySelected = widgetId in selectedIds
+                    val canAdd = alreadySelected || selectedIds.size < WidgetStackPolicy.MAX_WIDGETS_PER_STACK
                     Card(
                         onClick = {
-                            selectedIds = if (widgetId in selectedIds) selectedIds - widgetId else selectedIds + widgetId
+                            if (alreadySelected) {
+                                selectedIds = selectedIds - widgetId
+                            } else if (canAdd) {
+                                selectedIds = selectedIds + widgetId
+                            }
                         },
                         colors = CardDefaults.cardColors(containerColor = RaisedSurface),
                         shape = RoundedCornerShape(16.dp),
@@ -202,9 +208,14 @@ fun WidgetStackManagerSheet(
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             Checkbox(
-                                checked = widgetId in selectedIds,
+                                checked = alreadySelected,
+                                enabled = canAdd,
                                 onCheckedChange = { checked ->
-                                    selectedIds = if (checked) selectedIds + widgetId else selectedIds - widgetId
+                                    selectedIds = when {
+                                        !checked -> selectedIds - widgetId
+                                        selectedIds.size < WidgetStackPolicy.MAX_WIDGETS_PER_STACK -> selectedIds + widgetId
+                                        else -> selectedIds
+                                    }
                                 },
                             )
                             Column(Modifier.weight(1f)) {
@@ -221,9 +232,16 @@ fun WidgetStackManagerSheet(
                     }
                 }
                 item {
+                    Text(
+                        "${selectedIds.size} / ${WidgetStackPolicy.MAX_WIDGETS_PER_STACK} ausgewählt",
+                        color = MutedMist,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
+                    Spacer(Modifier.height(6.dp))
                     Button(
                         onClick = {
-                            if (stacks.createStack(selectedIds.toList())) {
+                            val orderedSelection = validIds.filter(selectedIds::contains)
+                            if (stacks.createStack(orderedSelection)) {
                                 selectedIds = emptySet()
                                 selectedStackId = stacks.stacks.lastOrNull()?.id
                             }
@@ -245,7 +263,9 @@ fun WidgetStackManagerSheet(
                 }
                 item {
                     Row(
-                        Modifier.fillMaxWidth(),
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         stacks.stacks.forEach { stack ->
@@ -270,7 +290,9 @@ fun WidgetStackManagerSheet(
                     }
                     item {
                         Row(
-                            Modifier.fillMaxWidth(),
+                            Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
                             WidgetStackMode.entries.forEach { mode ->
@@ -346,7 +368,6 @@ private fun WidgetStackPreview(
     onPrevious: () -> Unit,
     onNext: () -> Unit,
 ) {
-    val context = LocalContext.current
     val activeWidgetId = stack.activeWidgetId
 
     if (stack.mode == WidgetStackMode.AUTO_CYCLE && stack.appWidgetIds.size > 1 && stack.autoCycleSeconds > 0) {
