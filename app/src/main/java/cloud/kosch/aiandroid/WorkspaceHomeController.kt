@@ -15,6 +15,7 @@ import cloud.kosch.aiandroid.model.WorkspacePage
 import cloud.kosch.aiandroid.model.WorkspacePageEditor
 import cloud.kosch.aiandroid.model.WorkspaceWidgetEditor
 import java.lang.ref.WeakReference
+import java.util.ArrayDeque
 import java.util.UUID
 
 /**
@@ -24,6 +25,9 @@ import java.util.UUID
  * kept in a separate local store, so duplicate/restore operations cannot accidentally copy a device-bound appWidgetId
  * into another page or device. The persisted launcher layout-lock is enforced again at this controller boundary so a
  * future UI, inbound widget pin or accessibility path cannot mutate Home merely by forgetting to disable an edit button.
+ *
+ * Home Studio keeps a bounded in-process edit history. Undo/redo snapshots contain only the portable WorkspaceDocument;
+ * device-local widget bindings remain owned by WorkspaceWidgetBindingStore and are reconciled independently.
  */
 class WorkspaceHomeController(
     context: Context,
@@ -32,7 +36,8 @@ class WorkspaceHomeController(
     private val store = WorkspaceStore(context.applicationContext)
     private val settingsStore = LauncherSettingsStore(context.applicationContext)
     private val widgetBindingStore = WorkspaceWidgetBindingStore(context.applicationContext)
-    private var undoDocument: WorkspaceDocument? = null
+    private val undoStack = ArrayDeque<WorkspaceDocument>()
+    private val redoStack = ArrayDeque<WorkspaceDocument>()
 
     init {
         if (registerAsActive) activeController = WeakReference(this)
@@ -46,6 +51,12 @@ class WorkspaceHomeController(
         private set
     var canUndo by mutableStateOf(false)
         private set
+    var canRedo by mutableStateOf(false)
+        private set
+    var undoDepth by mutableStateOf(0)
+        private set
+    var redoDepth by mutableStateOf(0)
+        private set
 
     val activePage: WorkspacePage
         get() = document.pages.firstOrNull { it.id == document.activePageId } ?: document.pages.first()
@@ -57,8 +68,7 @@ class WorkspaceHomeController(
     fun reload() {
         document = store.loadWorkspaceDocument().normalized()
         widgetBindings = widgetBindingStore.load()
-        undoDocument = null
-        canUndo = false
+        clearHistory()
     }
 
     fun consumeStatus() {
@@ -334,16 +344,42 @@ class WorkspaceHomeController(
 
     fun undo() {
         if (!allowLayoutMutation()) return
-        val previous = undoDocument ?: return
+        val previous = undoStack.pollLast() ?: return
         val current = document
         if (!store.saveWorkspaceDocument(previous)) {
+            pushBounded(undoStack, previous)
+            syncHistoryState()
             statusMessage = "Rückgängig konnte nicht gespeichert werden"
             return
         }
+        pushBounded(redoStack, current)
         document = previous
-        undoDocument = current
-        canUndo = true
-        statusMessage = "Letzte Homescreen-Änderung rückgängig"
+        syncHistoryState()
+        statusMessage = if (undoDepth > 0) {
+            "Homescreen-Änderung rückgängig · $undoDepth weitere Schritte verfügbar"
+        } else {
+            "Homescreen-Änderung rückgängig"
+        }
+    }
+
+    fun redo() {
+        if (!allowLayoutMutation()) return
+        val next = redoStack.pollLast() ?: return
+        val current = document
+        if (!store.saveWorkspaceDocument(next)) {
+            pushBounded(redoStack, next)
+            syncHistoryState()
+            statusMessage = "Wiederholen konnte nicht gespeichert werden"
+            return
+        }
+        pushBounded(undoStack, current)
+        document = next
+        syncHistoryState()
+        statusMessage = if (redoDepth > 0) {
+            "Homescreen-Änderung wiederholt · $redoDepth weitere Schritte verfügbar"
+        } else {
+            "Homescreen-Änderung wiederholt"
+        }
     }
 
     /** Used by Home Studio: locked user pages are intentionally not exposed as editable entry points. */
@@ -430,15 +466,39 @@ class WorkspaceHomeController(
             return false
         }
         if (rememberUndo) {
-            undoDocument = document
-            canUndo = true
+            pushBounded(undoStack, document)
+            redoStack.clear()
+            syncHistoryState()
         }
         document = normalized
         message?.let { statusMessage = it }
         return true
     }
 
+    private fun pushBounded(
+        stack: ArrayDeque<WorkspaceDocument>,
+        snapshot: WorkspaceDocument,
+    ) {
+        if (stack.peekLast() == snapshot) return
+        while (stack.size >= MAX_HISTORY_DEPTH) stack.removeFirst()
+        stack.addLast(snapshot)
+    }
+
+    private fun clearHistory() {
+        undoStack.clear()
+        redoStack.clear()
+        syncHistoryState()
+    }
+
+    private fun syncHistoryState() {
+        undoDepth = undoStack.size
+        redoDepth = redoStack.size
+        canUndo = undoDepth > 0
+        canRedo = redoDepth > 0
+    }
+
     companion object {
+        private const val MAX_HISTORY_DEPTH = 30
         private var activeController: WeakReference<WorkspaceHomeController>? = null
 
         /**
