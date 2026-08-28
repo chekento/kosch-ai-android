@@ -354,7 +354,7 @@ fun LauncherRoot(
         WidgetBoardSheet(controller, requestWidget, createWidgetView, deleteWidget)
     }
     if (controller.appActionsVisible) {
-        AppActionsSheet(controller)
+        ContextualAppPopupSheet(controller)
     }
     if (controller.folderSheetVisible) {
         FolderSheet(controller)
