@@ -12,6 +12,8 @@ import cloud.kosch.aiandroid.model.ScopedSettingsDocument
 import cloud.kosch.aiandroid.model.SettingOverride
 import cloud.kosch.aiandroid.model.SettingsScopeResolver
 import cloud.kosch.aiandroid.model.WorkspaceDocument
+import cloud.kosch.aiandroid.model.WorkspaceObjectStylePreset
+import cloud.kosch.aiandroid.model.WorkspaceObjectStylePresets
 
 /** Runtime facade for persistent Global → Page → Object inheritance. */
 class ScopedSettingsController(context: Context) {
@@ -46,6 +48,9 @@ class ScopedSettingsController(context: Context) {
         },
         "Objekt-Stil gespeichert",
     )
+
+    fun applyObjectStylePreset(itemId: String, preset: WorkspaceObjectStylePreset): Boolean =
+        setObjectOverrides(itemId, WorkspaceObjectStylePresets.overrides(preset))
 
     fun resolve(
         featureId: String,
