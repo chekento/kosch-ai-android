@@ -304,6 +304,7 @@ private fun SettingsDetailPane(
                 SettingsSection.WIDGETS -> WidgetSettingsEditor(settings)
                 SettingsSection.APPEARANCE -> AppearanceSettingsEditor(settings)
                 SettingsSection.ASSISTANT -> AssistantSettingsEditor(settings, assistant, descriptor.features)
+                SettingsSection.API -> KalProviderConnectionsEditor(settings)
                 SettingsSection.ACCESSIBILITY -> AccessibilitySettingsEditor(settings)
                 SettingsSection.PRIVACY -> PrivacySettingsEditor(settings)
                 SettingsSection.BACKUP -> BackupSettingsEditor(settings)
