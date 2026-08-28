@@ -6,6 +6,11 @@
              a genuine eligible security/network capability exists and the Google Play VpnService declaration gate
              is satisfied. KoSchConsentVpnService itself remains inert and never establishes a tunnel.
         -->
+        <activity
+            android:name=".SecurityNetworkActivity"
+            android:exported="false"
+            android:screenOrientation="unspecified" />
+
         <service
             android:name=".security.KoSchConsentVpnService"
             android:exported="true"
