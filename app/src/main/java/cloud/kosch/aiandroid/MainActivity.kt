@@ -56,6 +56,8 @@ import cloud.kosch.aiandroid.ui.SettingsCenterSurface
 import cloud.kosch.aiandroid.ui.SettingsEntryButton
 import cloud.kosch.aiandroid.ui.UniversalSearchEntryButton
 import cloud.kosch.aiandroid.ui.UniversalSearchSurface
+import cloud.kosch.aiandroid.ui.WidgetStackEntryButton
+import cloud.kosch.aiandroid.ui.WidgetStackManagerSheet
 import cloud.kosch.aiandroid.ui.components.CompanionFace
 import cloud.kosch.aiandroid.ui.launcherGestureSurface
 import cloud.kosch.aiandroid.ui.theme.KoSchLauncherTheme
@@ -73,6 +75,7 @@ class MainActivity : ComponentActivity() {
     private var pendingAuditExportToken: String? = null
     private var pendingInkExportToken: String? = null
     private var personalizationVisible by mutableStateOf(false)
+    private var widgetStacksVisible by mutableStateOf(false)
 
     private val homeRoleRequest = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -219,6 +222,7 @@ class MainActivity : ComponentActivity() {
         pendingWidgetId = savedInstanceState
             ?.getInt(STATE_PENDING_WIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
             ?.takeUnless { it == AppWidgetManager.INVALID_APPWIDGET_ID }
+        widgetStacksVisible = savedInstanceState?.getBoolean(STATE_WIDGET_STACKS_VISIBLE, false) == true
         widgetHostController = WidgetHostController(applicationContext)
         documentGrantManager = DocumentGrantManager(applicationContext)
         pendingDocumentStore = PendingDocumentStore(applicationContext)
@@ -237,6 +241,7 @@ class MainActivity : ComponentActivity() {
         controller.widgetIds.toList()
             .filterNot(widgetHostController::isValid)
             .forEach(controller::removeWidgetRecord)
+        launcherViewModel.widgetStacks.repair(widgetHostController.hostedIds())
 
         setContent {
             val settings = launcherViewModel.settings
@@ -246,6 +251,7 @@ class MainActivity : ComponentActivity() {
             val gestureSurfaceEnabled = !controller.onboardingVisible &&
                 !settings.visible &&
                 !personalizationVisible &&
+                !widgetStacksVisible &&
                 !aiHub.visible &&
                 !universalSearch.visible &&
                 !controller.drawerVisible &&
@@ -275,7 +281,8 @@ class MainActivity : ComponentActivity() {
                         ),
                 ) {
                     val unifiedHomeSelected = controller.homePage == HomePage.WORKSPACE && !controller.onboardingVisible
-                    val legacyOverlayVisible = controller.drawerVisible ||
+                    val legacyOverlayVisible = widgetStacksVisible ||
+                        controller.drawerVisible ||
                         controller.providerChooserVisible ||
                         controller.contextDetailsVisible ||
                         controller.controlCenterVisible ||
@@ -416,6 +423,17 @@ class MainActivity : ComponentActivity() {
                             onDismiss = universalSearch::close,
                         )
                     }
+                    if (controller.widgetBoardVisible && !widgetStacksVisible) {
+                        WidgetStackEntryButton(onClick = ::openWidgetStacks)
+                    }
+                    if (widgetStacksVisible) {
+                        WidgetStackManagerSheet(
+                            stacks = launcherViewModel.widgetStacks,
+                            boundWidgetIds = widgetHostController.hostedIds().sorted(),
+                            createWidgetView = widgetHostController::createView,
+                            onDismiss = ::closeWidgetStacksToBoard,
+                        )
+                    }
                 }
             }
         }
@@ -429,6 +447,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         controller.refreshSystemState()
+        launcherViewModel.widgetStacks.repair(widgetHostController.hostedIds())
         launcherViewModel.universalSearch.refresh()
     }
 
@@ -474,6 +493,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_ESCAPE && widgetStacksVisible) {
+            closeWidgetStacksToBoard()
+            return true
+        }
         if (keyCode == KeyEvent.KEYCODE_ESCAPE && launcherViewModel.universalSearch.visible) {
             launcherViewModel.universalSearch.close()
             return true
@@ -532,6 +555,7 @@ class MainActivity : ComponentActivity() {
         pendingBackupExportToken?.let { outState.putString(STATE_PENDING_BACKUP_EXPORT, it) }
         pendingAuditExportToken?.let { outState.putString(STATE_PENDING_AUDIT_EXPORT, it) }
         pendingInkExportToken?.let { outState.putString(STATE_PENDING_INK_EXPORT, it) }
+        outState.putBoolean(STATE_WIDGET_STACKS_VISIBLE, widgetStacksVisible)
         super.onSaveInstanceState(outState)
     }
 
@@ -704,6 +728,7 @@ class MainActivity : ComponentActivity() {
         pendingWidgetId = null
         if (widgetHostController.isValid(appWidgetId)) {
             controller.acceptWidget(appWidgetId)
+            launcherViewModel.widgetStacks.repair(widgetHostController.hostedIds())
         } else {
             widgetHostController.deleteId(appWidgetId)
             controller.postNotice("Das Widget wurde nicht gebunden")
@@ -718,6 +743,18 @@ class MainActivity : ComponentActivity() {
     private fun deleteWidget(appWidgetId: Int) {
         widgetHostController.deleteId(appWidgetId)
         controller.removeWidgetRecord(appWidgetId)
+        launcherViewModel.widgetStacks.repair(widgetHostController.hostedIds())
+    }
+
+    private fun openWidgetStacks() {
+        launcherViewModel.widgetStacks.repair(widgetHostController.hostedIds())
+        controller.closeWidgetBoard()
+        widgetStacksVisible = true
+    }
+
+    private fun closeWidgetStacksToBoard() {
+        widgetStacksVisible = false
+        controller.openWidgetBoard()
     }
 
     private fun forgetDocument() {
@@ -735,6 +772,7 @@ class MainActivity : ComponentActivity() {
         const val STATE_PENDING_BACKUP_EXPORT = "pending_backup_export"
         const val STATE_PENDING_AUDIT_EXPORT = "pending_audit_export"
         const val STATE_PENDING_INK_EXPORT = "pending_ink_export"
+        const val STATE_WIDGET_STACKS_VISIBLE = "widget_stacks_visible"
         const val BACKUP_MIME_TYPE = "application/vnd.kosch.workspace-backup"
         const val EXTRA_USE_SYSTEM_CONTACTS_PICKER = "android.intent.extra.USE_SYSTEM_CONTACTS_PICKER"
     }
