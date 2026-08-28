@@ -201,7 +201,8 @@ fun UnifiedWorkspaceHomeScreen(
                     .padding(
                         horizontal = presentation.horizontalPaddingDp.dp,
                         vertical = presentation.verticalPaddingDp.dp,
-                    ),
+                    )
+                    .padding(end = if (presentation.showEdgePowerRail) 62.dp else 0.dp),
                 verticalArrangement = Arrangement.spacedBy(presentation.verticalGapDp.dp),
             ) {
                 UnifiedHomeHeader(
@@ -244,6 +245,20 @@ fun UnifiedWorkspaceHomeScreen(
                     requestVoiceInput = requestVoiceInput,
                 )
             }
+
+            AdaptiveEdgePowerRail(
+                presentation = presentation,
+                onOpenApps = controller::openDrawer,
+                onAsk = {
+                    askFocusRequester.requestFocus()
+                    keyboardController?.show()
+                },
+                onControls = controller::openControlCenter,
+                onPen = controller::openPenSpace,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .padding(end = 8.dp),
+            )
         }
     }
 
@@ -616,10 +631,12 @@ private fun UnifiedHomeDock(
                 }
             }
             Spacer(Modifier.weight(1f))
-            Button(onClick = onAsk) {
-                Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text("Ask")
+            if (!presentation.showEdgePowerRail) {
+                Button(onClick = onAsk) {
+                    Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
+                    Spacer(Modifier.width(6.dp))
+                    Text("Ask")
+                }
             }
         }
     }
