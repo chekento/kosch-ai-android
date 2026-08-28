@@ -5,6 +5,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -20,6 +21,7 @@ import kotlin.math.hypot
  *
  * The stream is inspected in the Final pointer pass. If a child consumed any event, the launcher gesture is dropped.
  * This is the important conflict rule: widgets, buttons, scrollables and Home Studio drag targets always win.
+ * Mouse drags are excluded; desktop users already have explicit pointer affordances and keyboard shortcuts.
  */
 fun Modifier.launcherGestureSurface(
     settings: GestureSettings,
@@ -34,6 +36,14 @@ fun Modifier.launcherGestureSurface(
 
         awaitEachGesture {
             val down = awaitFirstDown(requireUnconsumed = false)
+            if (down.type == PointerType.Mouse) {
+                while (true) {
+                    val event = awaitPointerEvent(PointerEventPass.Final)
+                    if (event.changes.none { it.pressed }) break
+                }
+                return@awaitEachGesture
+            }
+
             val start = down.position
             val startTime = down.uptimeMillis
             var end = start
