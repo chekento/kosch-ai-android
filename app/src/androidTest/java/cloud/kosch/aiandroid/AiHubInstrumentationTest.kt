@@ -47,10 +47,10 @@ class AiHubInstrumentationTest {
             composeTestRule.onNodeWithText("Browser", useUnmergedTree = true).performClick()
             composeTestRule.waitForIdle()
 
-            // LazyColumn only composes the currently visible cards. Verify the visible Browser surface here and
-            // assert the complete catalog against the controller snapshot below instead of depending on scroll state.
+            // AOSP managed-device images guarantee the Android system browser route, but not proprietary browsers
+            // such as Chrome. LazyColumn also only composes the currently visible cards. Verify the portable system
+            // route in UI and the complete install/discovery catalog against the controller snapshot below.
             assertTextPresent("Android Systembrowser")
-            assertTextPresent("Google Chrome")
 
             val browserTitles = viewModel.aiHub.entries(viewModel.controller.apps)
                 .filter { it.kind == AiHubEntryKind.BROWSER || it.kind == AiHubEntryKind.SYSTEM_BROWSER }
