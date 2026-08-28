@@ -53,14 +53,21 @@ class WorkspaceDragDropInstrumentationTest {
             composeTestRule.onNodeWithText("Home Studio", useUnmergedTree = true).performClick()
             composeTestRule.waitForIdle()
             composeTestRule.onNodeWithText(
-                "Ziehen · skalieren · Seiten verwalten",
+                "Ziehen · skalieren · gestalten · Seiten verwalten",
                 substring = true,
                 useUnmergedTree = true,
             ).fetchSemanticsNode()
 
+            val itemDescription = "App. Ziehen zum Verschieben. Tippen für Größe und Stil"
+            composeTestRule
+                .onNodeWithContentDescription(itemDescription, useUnmergedTree = true)
+                .performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithText("Stil", useUnmergedTree = true).fetchSemanticsNode()
+
             composeTestRule
                 .onNodeWithContentDescription(
-                    "App. Ziehen zum Verschieben. Tippen für Größenoptionen",
+                    "App. Ziehen zum Verschieben. Ausgewählt. Größe und Stil verfügbar",
                     useUnmergedTree = true,
                 )
                 .performTouchInput {
