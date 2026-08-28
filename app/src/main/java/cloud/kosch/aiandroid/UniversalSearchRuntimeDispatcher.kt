@@ -143,7 +143,7 @@ class UniversalSearchRuntimeDispatcher(
             }
         }
         viewModel.universalSearch.close()
-        viewModel.openSmartAiHub(
+        viewModel.openAiHub(
             initialPrompt = quickAction?.let { AiHubQuickActionPolicy.apply(it, "") }.orEmpty(),
         )
     }
