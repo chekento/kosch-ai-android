@@ -38,6 +38,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -54,6 +55,8 @@ import cloud.kosch.aiandroid.ui.theme.MutedMist
 import cloud.kosch.aiandroid.ui.theme.RaisedSurface
 import cloud.kosch.aiandroid.ui.theme.Sky
 import cloud.kosch.aiandroid.ui.theme.Violet
+
+const val UNIVERSAL_SEARCH_RESULT_TAG = "universal-search-result"
 
 /**
  * Launcher-wide, memory-only command/search palette.
@@ -245,6 +248,7 @@ private fun UniversalEntityResult(
     Card(
         modifier = Modifier
             .fillMaxWidth()
+            .testTag(UNIVERSAL_SEARCH_RESULT_TAG)
             .clickable(onClick = onClick),
         colors = CardDefaults.cardColors(containerColor = RaisedSurface.copy(alpha = 0.94f)),
         shape = RoundedCornerShape(18.dp),
