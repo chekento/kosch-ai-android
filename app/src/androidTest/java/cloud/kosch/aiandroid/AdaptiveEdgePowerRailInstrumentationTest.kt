@@ -1,8 +1,7 @@
 package cloud.kosch.aiandroid
 
-import androidx.compose.ui.test.assertDoesNotExist
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -10,6 +9,7 @@ import cloud.kosch.aiandroid.model.AdaptiveHomePresentation
 import cloud.kosch.aiandroid.ui.AdaptiveEdgePowerRail
 import cloud.kosch.aiandroid.ui.theme.KoSchLauncherTheme
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -38,10 +38,13 @@ class AdaptiveEdgePowerRailInstrumentationTest {
             }
         }
 
-        composeTestRule.onNodeWithContentDescription("Power Rail · Alle Apps").assertExists().performClick()
-        composeTestRule.onNodeWithContentDescription("Power Rail · Ask").assertExists().performClick()
-        composeTestRule.onNodeWithContentDescription("Power Rail · Kontrollzentrum").assertExists().performClick()
-        composeTestRule.onNodeWithContentDescription("Power Rail · Pen Space").assertDoesNotExist()
+        assertPresent("Power Rail · Alle Apps")
+        assertPresent("Power Rail · Ask")
+        assertPresent("Power Rail · Kontrollzentrum")
+        assertAbsent("Power Rail · Pen Space")
+        composeTestRule.onNodeWithContentDescription("Power Rail · Alle Apps").performClick()
+        composeTestRule.onNodeWithContentDescription("Power Rail · Ask").performClick()
+        composeTestRule.onNodeWithContentDescription("Power Rail · Kontrollzentrum").performClick()
 
         composeTestRule.runOnIdle {
             assertEquals(1, apps)
@@ -67,12 +70,25 @@ class AdaptiveEdgePowerRailInstrumentationTest {
             }
         }
 
-        composeTestRule
-            .onNodeWithContentDescription("Power Rail · Pen Space · für Stift priorisiert")
-            .assertExists()
-            .performClick()
+        val description = "Power Rail · Pen Space · für Stift priorisiert"
+        assertPresent(description)
+        composeTestRule.onNodeWithContentDescription(description).performClick()
 
         composeTestRule.runOnIdle { assertEquals(1, pen) }
+    }
+
+    private fun assertPresent(description: String) {
+        val nodes = composeTestRule
+            .onAllNodesWithContentDescription(description, useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        assertTrue("Expected at least one node with content description '$description'", nodes.isNotEmpty())
+    }
+
+    private fun assertAbsent(description: String) {
+        val nodes = composeTestRule
+            .onAllNodesWithContentDescription(description, useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        assertTrue("Expected no node with content description '$description'", nodes.isEmpty())
     }
 
     private fun presentation(
