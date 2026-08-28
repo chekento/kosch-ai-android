@@ -1,6 +1,8 @@
 package cloud.kosch.aiandroid
 
 import android.app.Application
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -12,8 +14,10 @@ import cloud.kosch.aiandroid.ai.AiHubRoutingContext
 import cloud.kosch.aiandroid.ai.PenAiContextPlanner
 import cloud.kosch.aiandroid.ai.UniversalSearchSourcesFactory
 import cloud.kosch.aiandroid.data.WorkspaceWidgetHostRecovery
+import cloud.kosch.aiandroid.model.AdaptiveInputRuntimeState
 import cloud.kosch.aiandroid.model.HomePage
 import cloud.kosch.aiandroid.model.SceneId
+import cloud.kosch.aiandroid.system.AdaptiveInputDeviceMonitor
 import cloud.kosch.aiandroid.system.UniversalSearchShortcutRepository
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
@@ -29,6 +33,11 @@ import kotlinx.coroutines.launch
  */
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
     val controller = LauncherController(application).also(LauncherController::start)
+    private val adaptiveInputMonitor = AdaptiveInputDeviceMonitor(
+        context = application,
+        callbackHandler = Handler(Looper.getMainLooper()),
+        onChanged = AdaptiveInputRuntimeState::publish,
+    ).also(AdaptiveInputDeviceMonitor::start)
 
     init {
         // AppWidgetHost ids survive process death. Reconcile them before Home loads the device-local binding map.
@@ -217,6 +226,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     override fun onCleared() {
+        adaptiveInputMonitor.stop()
         universalSearch.close()
         universalSearchShortcuts.clear()
         aiContextHandoff.cancel()
