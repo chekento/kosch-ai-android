@@ -34,7 +34,7 @@ object WorkspaceObjectStylePresets {
 
     /** Null values mean remove this object-level override and inherit page/global state. */
     fun overrides(preset: WorkspaceObjectStylePreset): Map<String, PortableSettingValue?> = when (preset) {
-        WorkspaceObjectStylePreset.INHERIT -> objectFeatureIds.associateWith { null }
+        WorkspaceObjectStylePreset.INHERIT -> objectFeatureIds.associateWith { null as PortableSettingValue? }
         WorkspaceObjectStylePreset.CLEAN -> base(
             FEATURE_OBJECT_CORNER_DP to PortableSettingValue.Integer(18),
             FEATURE_OBJECT_CONTENT_SCALE to PortableSettingValue.Decimal(1.0),
@@ -86,7 +86,7 @@ object WorkspaceObjectStylePresets {
 
     /** Presets replace the object style as one coherent state instead of leaving stale overrides from older presets. */
     private fun base(vararg values: Pair<String, PortableSettingValue>): Map<String, PortableSettingValue?> {
-        val reset = objectFeatureIds.associateWith<String, PortableSettingValue?> { null }.toMutableMap()
+        val reset = objectFeatureIds.associateWith { null as PortableSettingValue? }.toMutableMap()
         values.forEach { (featureId, value) -> reset[featureId] = value }
         return reset
     }
