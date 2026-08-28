@@ -1,10 +1,14 @@
 package cloud.kosch.aiandroid.ai
 
+import cloud.kosch.aiandroid.model.AiSettings
+import cloud.kosch.aiandroid.model.PrivacySettings
+
 /**
  * Explicit product-level gate for direct networked AI execution.
  *
- * Network capability and user permission are deliberately separate. Even if a future release contains the Android
- * INTERNET permission, KAL must remain local-first until the user deliberately enables direct provider connections.
+ * Android network capability and user permission are deliberately separate. KAL remains local-first unless BOTH
+ * existing settings gates are enabled: AI provider networking and the broader privacy/network permission. No third
+ * persistent cloud switch is introduced here.
  */
 enum class KalCloudAccessMode {
     OFF,
@@ -31,6 +35,22 @@ data class KalCloudAccessDecision(
 )
 
 object KalCloudAccessPolicy {
+    fun effectiveMode(ai: AiSettings, privacy: PrivacySettings): KalCloudAccessMode =
+        if (ai.networkProvidersEnabled && privacy.allowNetworkFeatures) {
+            KalCloudAccessMode.CONNECTED_PROVIDERS_ONLY
+        } else {
+            KalCloudAccessMode.OFF
+        }
+
+    fun evaluate(
+        ai: AiSettings,
+        privacy: PrivacySettings,
+        request: KalCloudRequest,
+    ): KalCloudAccessDecision = evaluate(
+        mode = effectiveMode(ai, privacy),
+        request = request,
+    )
+
     fun evaluate(
         mode: KalCloudAccessMode,
         request: KalCloudRequest,
