@@ -20,11 +20,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.ArrowDownward
+import androidx.compose.material.icons.rounded.ArrowUpward
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.Layers
 import androidx.compose.material.icons.rounded.RemoveCircleOutline
@@ -42,6 +45,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -116,6 +120,7 @@ fun WidgetStackManagerSheet(
         validIds.mapNotNull { resolveStackWidgetLabel(context, it) }.associateBy { it.appWidgetId }
     }
     var selectedIds by remember(validIds) { mutableStateOf<Set<Int>>(emptySet()) }
+    var newStackTitle by remember { mutableStateOf("") }
     var selectedStackId by remember { mutableStateOf(stacks.stacks.firstOrNull()?.id) }
 
     LaunchedEffect(stacks.stacks, selectedStackId) {
@@ -187,6 +192,16 @@ fun WidgetStackManagerSheet(
                 item {
                     Text("Neuen Stack zusammenstellen", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 }
+                item {
+                    OutlinedTextField(
+                        value = newStackTitle,
+                        onValueChange = { newStackTitle = it.take(WidgetStackPolicy.MAX_TITLE_CHARS) },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        label = { Text("Stack-Name") },
+                        placeholder = { Text("z. B. Arbeit, Medien, Tagesübersicht") },
+                    )
+                }
                 items(validIds, key = { "candidate-$it" }) { widgetId ->
                     val label = labels[widgetId]
                     val alreadySelected = widgetId in selectedIds
@@ -241,8 +256,9 @@ fun WidgetStackManagerSheet(
                     Button(
                         onClick = {
                             val orderedSelection = validIds.filter(selectedIds::contains)
-                            if (stacks.createStack(orderedSelection)) {
+                            if (stacks.createStack(orderedSelection, newStackTitle)) {
                                 selectedIds = emptySet()
+                                newStackTitle = ""
                                 selectedStackId = stacks.stacks.lastOrNull()?.id
                             }
                         },
@@ -279,6 +295,9 @@ fun WidgetStackManagerSheet(
 
                 val stack = stacks.stacks.firstOrNull { it.id == selectedStackId }
                 if (stack != null) {
+                    item(key = "title-${stack.id}-${stack.title}") {
+                        WidgetStackTitleEditor(stack = stack, stacks = stacks)
+                    }
                     item(key = "preview-${stack.id}-${stack.activeWidgetId}") {
                         WidgetStackPreview(
                             stack = stack,
@@ -319,19 +338,66 @@ fun WidgetStackManagerSheet(
                             }
                         }
                     }
-                    items(stack.appWidgetIds, key = { "member-${stack.id}-$it" }) { widgetId ->
+                    if (stack.mode == WidgetStackMode.AUTO_CYCLE) {
+                        item {
+                            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    "Auto-Wechsel nach ${stack.autoCycleSeconds} s",
+                                    color = MutedMist,
+                                    style = MaterialTheme.typography.labelSmall,
+                                )
+                                Row(
+                                    Modifier
+                                        .fillMaxWidth()
+                                        .horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                ) {
+                                    AUTO_CYCLE_PRESETS.forEach { seconds ->
+                                        FilterChip(
+                                            selected = stack.autoCycleSeconds == seconds,
+                                            onClick = {
+                                                stacks.setMode(
+                                                    stackId = stack.id,
+                                                    mode = WidgetStackMode.AUTO_CYCLE,
+                                                    autoCycleSeconds = seconds,
+                                                )
+                                            },
+                                            label = { Text(cycleLabel(seconds)) },
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    itemsIndexed(stack.appWidgetIds, key = { _, id -> "member-${stack.id}-$id" }) { index, widgetId ->
                         val label = labels[widgetId]
                         Row(
                             Modifier.fillMaxWidth().padding(vertical = 4.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            Text(
-                                label?.label ?: "Widget $widgetId",
-                                modifier = Modifier.weight(1f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    label?.label ?: "Widget $widgetId",
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                                if (stack.activeWidgetId == widgetId) {
+                                    Text("Aktiv", color = Mint, style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                            IconButton(
+                                onClick = { stacks.moveWidget(stack.id, widgetId, -1) },
+                                enabled = index > 0,
+                            ) {
+                                Icon(Icons.Rounded.ArrowUpward, contentDescription = "Widget im Stack nach oben")
+                            }
+                            IconButton(
+                                onClick = { stacks.moveWidget(stack.id, widgetId, 1) },
+                                enabled = index < stack.appWidgetIds.lastIndex,
+                            ) {
+                                Icon(Icons.Rounded.ArrowDownward, contentDescription = "Widget im Stack nach unten")
+                            }
                             if (stack.activeWidgetId != widgetId) {
                                 TextButton(onClick = { stacks.select(stack.id, widgetId) }) {
                                     Text("Zeigen")
@@ -356,6 +422,33 @@ fun WidgetStackManagerSheet(
             }
 
             item { Spacer(Modifier.height(24.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun WidgetStackTitleEditor(
+    stack: WidgetStack,
+    stacks: WidgetStackController,
+) {
+    var title by remember(stack.id, stack.title) { mutableStateOf(stack.title) }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        OutlinedTextField(
+            value = title,
+            onValueChange = { title = it.take(WidgetStackPolicy.MAX_TITLE_CHARS) },
+            modifier = Modifier.weight(1f),
+            singleLine = true,
+            label = { Text("Name") },
+        )
+        Button(
+            onClick = { stacks.renameStack(stack.id, title) },
+            enabled = title.trim() != stack.title,
+        ) {
+            Text("Speichern")
         }
     }
 }
@@ -430,3 +523,11 @@ private fun WidgetStackPreview(
         }
     }
 }
+
+private fun cycleLabel(seconds: Int): String = when {
+    seconds < 60 -> "${seconds}s"
+    seconds % 60 == 0 -> "${seconds / 60} min"
+    else -> "${seconds}s"
+}
+
+private val AUTO_CYCLE_PRESETS = listOf(15, 30, 60, 300, 900)
