@@ -17,6 +17,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.URL
 import java.net.URLDecoder
+import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -51,6 +52,7 @@ class OpenRouterOAuthConnector(
 ) : AutoCloseable {
     private val appContext = context.applicationContext
     private val closed = AtomicBoolean(false)
+    private val cancellationRequested = AtomicBoolean(false)
     @Volatile private var activeServer: ServerSocket? = null
 
     /**
@@ -60,6 +62,7 @@ class OpenRouterOAuthConnector(
     fun prepare(onResult: (OpenRouterOAuthResult) -> Unit): OpenRouterOAuthLaunchPlan {
         check(!closed.get()) { "Connector is closed" }
         check(activeServer == null) { "An OpenRouter authorization is already active" }
+        cancellationRequested.set(false)
 
         val pkce = KalPkce.create()
         val server = ServerSocket().apply {
@@ -83,7 +86,7 @@ class OpenRouterOAuthConnector(
             }.fold(
                 onSuccess = { it },
                 onFailure = { throwable ->
-                    if (closed.get()) OpenRouterOAuthResult.Cancelled
+                    if (closed.get() || cancellationRequested.get()) OpenRouterOAuthResult.Cancelled
                     else OpenRouterOAuthResult.Failed(safeFailureReason(throwable))
                 },
             )
@@ -103,18 +106,22 @@ class OpenRouterOAuthConnector(
             addCategory(Intent.CATEGORY_BROWSABLE)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        return runCatching {
+        val launched = runCatching {
             appContext.startActivity(intent)
             true
         }.getOrDefault(false)
+        if (!launched) cancel()
+        return launched
     }
 
     fun cancel() {
+        cancellationRequested.set(true)
         activeServer?.let(::closeServer)
     }
 
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
+        cancellationRequested.set(true)
         activeServer?.let(::closeServer)
         executor.shutdownNow()
     }
@@ -123,9 +130,10 @@ class OpenRouterOAuthConnector(
         server.accept().use { socket ->
             require(socket.inetAddress.isLoopbackAddress) { "OAuth callback was not local" }
             socket.soTimeout = SOCKET_READ_TIMEOUT_MS
-            val requestLine = BufferedReader(
+            val reader = BufferedReader(
                 InputStreamReader(socket.getInputStream(), StandardCharsets.US_ASCII),
-            ).use { it.readLine() ?: error("Empty OAuth callback") }
+            )
+            val requestLine = reader.readLine() ?: error("Empty OAuth callback")
             require(requestLine.length <= MAX_REQUEST_LINE_LENGTH) { "OAuth callback was too large" }
 
             val code = OpenRouterOAuthProtocol.codeFromRequestLine(requestLine, expectedPath)
@@ -238,15 +246,17 @@ class OpenRouterOAuthConnector(
 
 /** Pure protocol helpers kept testable without Android/network I/O. */
 object OpenRouterOAuthProtocol {
-    fun authorizationUrl(callbackUrl: String, codeChallenge: String): String = Uri.Builder()
-        .scheme("https")
-        .authority("openrouter.ai")
-        .path("auth")
-        .appendQueryParameter("callback_url", callbackUrl)
-        .appendQueryParameter("code_challenge", codeChallenge)
-        .appendQueryParameter("code_challenge_method", "S256")
-        .build()
-        .toString()
+    fun authorizationUrl(callbackUrl: String, codeChallenge: String): String {
+        require(callbackUrl.startsWith("http://127.0.0.1:")) { "OpenRouter mobile callback must be loopback" }
+        require(codeChallenge.isNotBlank())
+        return buildString {
+            append("https://openrouter.ai/auth?callback_url=")
+            append(urlEncode(callbackUrl))
+            append("&code_challenge=")
+            append(urlEncode(codeChallenge))
+            append("&code_challenge_method=S256")
+        }
+    }
 
     fun codeFromRequestLine(requestLine: String, expectedPath: String): String? {
         val parts = requestLine.split(' ')
@@ -269,4 +279,8 @@ object OpenRouterOAuthProtocol {
             ?.let { URLDecoder.decode(it, StandardCharsets.UTF_8.name()) }
             ?.takeIf { it.isNotBlank() }
     }
+
+    private fun urlEncode(value: String): String = URLEncoder
+        .encode(value, StandardCharsets.UTF_8.name())
+        .replace("+", "%20")
 }
