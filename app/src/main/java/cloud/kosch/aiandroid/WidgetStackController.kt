@@ -51,6 +51,12 @@ class WidgetStackController(context: Context) {
         return persist(updated, "Widget-Stack entfernt")
     }
 
+    fun renameStack(stackId: String, title: String): Boolean = mutate(
+        stackId,
+        { WidgetStackPolicy.rename(it, title) },
+        "Widget-Stack umbenannt",
+    )
+
     fun next(stackId: String): Boolean = mutate(stackId, WidgetStackPolicy::next, "Nächstes Widget")
 
     fun previous(stackId: String): Boolean = mutate(stackId, WidgetStackPolicy::previous, "Vorheriges Widget")
@@ -65,6 +71,12 @@ class WidgetStackController(context: Context) {
         stackId,
         { WidgetStackPolicy.addWidget(it, appWidgetId) },
         "Widget zum Stack hinzugefügt",
+    )
+
+    fun moveWidget(stackId: String, appWidgetId: Int, delta: Int): Boolean = mutate(
+        stackId,
+        { WidgetStackPolicy.moveWidget(it, appWidgetId, delta) },
+        "Widget-Reihenfolge geändert",
     )
 
     fun removeWidget(stackId: String, appWidgetId: Int): Boolean {
