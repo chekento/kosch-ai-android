@@ -54,6 +54,8 @@ import cloud.kosch.aiandroid.ui.PersonalizationEntryButton
 import cloud.kosch.aiandroid.ui.PersonalizationQuickSurface
 import cloud.kosch.aiandroid.ui.SettingsCenterSurface
 import cloud.kosch.aiandroid.ui.SettingsEntryButton
+import cloud.kosch.aiandroid.ui.UniversalSearchEntryButton
+import cloud.kosch.aiandroid.ui.UniversalSearchSurface
 import cloud.kosch.aiandroid.ui.components.CompanionFace
 import cloud.kosch.aiandroid.ui.launcherGestureSurface
 import cloud.kosch.aiandroid.ui.theme.KoSchLauncherTheme
@@ -65,6 +67,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var widgetHostController: WidgetHostController
     private lateinit var documentGrantManager: DocumentGrantManager
     private lateinit var pendingDocumentStore: PendingDocumentStore
+    private lateinit var universalSearchDispatcher: UniversalSearchRuntimeDispatcher
     private var pendingWidgetId: Int? = null
     private var pendingBackupExportToken: String? = null
     private var pendingAuditExportToken: String? = null
@@ -219,6 +222,12 @@ class MainActivity : ComponentActivity() {
         widgetHostController = WidgetHostController(applicationContext)
         documentGrantManager = DocumentGrantManager(applicationContext)
         pendingDocumentStore = PendingDocumentStore(applicationContext)
+        universalSearchDispatcher = UniversalSearchRuntimeDispatcher(
+            context = applicationContext,
+            viewModel = launcherViewModel,
+            requestVoiceInput = ::requestVoiceInput,
+            requestDocument = ::requestDocument,
+        )
         pendingBackupExportToken = savedInstanceState?.getString(STATE_PENDING_BACKUP_EXPORT)
             ?.takeIf { pendingDocumentStore.contains(PendingDocumentKind.BACKUP, it) }
         pendingAuditExportToken = savedInstanceState?.getString(STATE_PENDING_AUDIT_EXPORT)
@@ -232,11 +241,13 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings = launcherViewModel.settings
             val aiHub = launcherViewModel.aiHub
+            val universalSearch = launcherViewModel.universalSearch
             val assistantPresentation = settings.document.assistant
             val gestureSurfaceEnabled = !controller.onboardingVisible &&
                 !settings.visible &&
                 !personalizationVisible &&
                 !aiHub.visible &&
+                !universalSearch.visible &&
                 !controller.drawerVisible &&
                 !controller.providerChooserVisible &&
                 !controller.contextDetailsVisible &&
@@ -308,10 +319,17 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    if (unifiedHomeVisible && !aiHub.visible && !settings.visible && !personalizationVisible) {
+                    if (
+                        unifiedHomeVisible &&
+                        !aiHub.visible &&
+                        !settings.visible &&
+                        !personalizationVisible &&
+                        !universalSearch.visible
+                    ) {
                         SettingsEntryButton(
                             onClick = {
                                 personalizationVisible = false
+                                universalSearch.close()
                                 aiHub.close()
                                 settings.open()
                             },
@@ -321,6 +339,7 @@ class MainActivity : ComponentActivity() {
                         )
                         PersonalizationEntryButton(
                             onClick = {
+                                universalSearch.close()
                                 settings.close()
                                 aiHub.close()
                                 personalizationVisible = true
@@ -329,15 +348,25 @@ class MainActivity : ComponentActivity() {
                                 .align(Alignment.TopEnd)
                                 .padding(end = 18.dp, top = 122.dp),
                         )
+                        UniversalSearchEntryButton(
+                            onClick = {
+                                personalizationVisible = false
+                                launcherViewModel.openUniversalSearch()
+                            },
+                            modifier = Modifier
+                                .align(Alignment.TopEnd)
+                                .padding(end = 18.dp, top = 168.dp),
+                        )
                         AiHubEntryButton(
                             onClick = {
                                 personalizationVisible = false
+                                universalSearch.close()
                                 settings.close()
                                 aiHub.open()
                             },
                             modifier = Modifier
                                 .align(Alignment.TopEnd)
-                                .padding(end = 18.dp, top = 168.dp),
+                                .padding(end = 18.dp, top = 214.dp),
                         )
                     }
 
@@ -380,6 +409,13 @@ class MainActivity : ComponentActivity() {
                             apps = controller.apps,
                         )
                     }
+                    if (universalSearch.visible) {
+                        UniversalSearchSurface(
+                            search = universalSearch,
+                            onExecute = universalSearchDispatcher::execute,
+                            onDismiss = universalSearch::close,
+                        )
+                    }
                 }
             }
         }
@@ -393,6 +429,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         controller.refreshSystemState()
+        launcherViewModel.universalSearch.refresh()
     }
 
     override fun onStop() {
@@ -422,7 +459,7 @@ class MainActivity : ComponentActivity() {
         ) ?: return super.onKeyShortcut(keyCode, event)
         controller.closeTopSurface()
         when (shortcut) {
-            ProfessionalShortcut.COMMAND -> controller.requestCommandFocus()
+            ProfessionalShortcut.COMMAND -> launcherViewModel.openUniversalSearch()
             ProfessionalShortcut.APPS -> controller.openDrawer()
             ProfessionalShortcut.PRO_DESK -> controller.openProDesk()
             ProfessionalShortcut.CONTROL_CENTER -> controller.openControlCenter()
@@ -437,6 +474,10 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (keyCode == KeyEvent.KEYCODE_ESCAPE && launcherViewModel.universalSearch.visible) {
+            launcherViewModel.universalSearch.close()
+            return true
+        }
         if (keyCode == KeyEvent.KEYCODE_ESCAPE && personalizationVisible) {
             personalizationVisible = false
             return true
@@ -463,7 +504,7 @@ class MainActivity : ComponentActivity() {
         data += KeyboardShortcutGroup(
             "KoSch Professional",
             listOf(
-                KeyboardShortcutInfo("Command Bar", KeyEvent.KEYCODE_K, KeyEvent.META_CTRL_ON),
+                KeyboardShortcutInfo("Universal Search", KeyEvent.KEYCODE_K, KeyEvent.META_CTRL_ON),
                 KeyboardShortcutInfo("Apps", KeyEvent.KEYCODE_SPACE, KeyEvent.META_CTRL_ON),
                 KeyboardShortcutInfo("Pro Desk", KeyEvent.KEYCODE_H, KeyEvent.META_CTRL_ON),
                 KeyboardShortcutInfo("Kontrollzentrum", KeyEvent.KEYCODE_COMMA, KeyEvent.META_CTRL_ON),
@@ -506,7 +547,7 @@ class MainActivity : ComponentActivity() {
             GestureAction.NONE -> Unit
             GestureAction.OPEN_DRAWER -> controller.openDrawer()
             GestureAction.OPEN_SEARCH,
-            GestureAction.OPEN_COMMAND_PALETTE -> controller.requestCommandFocus()
+            GestureAction.OPEN_COMMAND_PALETTE -> launcherViewModel.openUniversalSearch()
             GestureAction.OPEN_HOME_STUDIO -> {
                 controller.switchHomePage(HomePage.WORKSPACE)
                 controller.selectWorkspaceMode(WorkspaceMode.EDIT)
