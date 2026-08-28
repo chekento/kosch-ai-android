@@ -55,9 +55,11 @@ fun ColumnScope.KalProviderConnectionsEditor(settings: LauncherSettingsControlle
     val context = LocalContext.current
     val vault = remember(context) { SecureCredentialVault(context) }
     val openRouterConnector = remember(context) { OpenRouterOAuthConnector(context, vault) }
-    var openRouterConnected by remember {
-        mutableStateOf(vault.contains("openrouter", SecureCredentialType.OAUTH_GENERATED_KEY))
-    }
+    fun hasOpenRouterCredential(): Boolean =
+        vault.contains("openrouter", SecureCredentialType.OAUTH_GENERATED_KEY) ||
+            vault.contains("openrouter", SecureCredentialType.API_KEY)
+
+    var openRouterConnected by remember { mutableStateOf(hasOpenRouterCredential()) }
     var openRouterConnecting by remember { mutableStateOf(false) }
     var statusMessage by remember { mutableStateOf<String?>(null) }
 
@@ -163,31 +165,29 @@ fun ColumnScope.KalProviderConnectionsEditor(settings: LauncherSettingsControlle
                         onClick = {
                             openRouterConnecting = true
                             statusMessage = null
-                            val plan = runCatching {
-                                openRouterConnector.prepare { result ->
+                            val result = runCatching {
+                                openRouterConnector.prepare { oauthResult ->
                                     openRouterConnecting = false
-                                    when (result) {
+                                    when (oauthResult) {
                                         is OpenRouterOAuthResult.Connected -> {
-                                            openRouterConnected = vault.contains(
-                                                "openrouter",
-                                                SecureCredentialType.OAUTH_GENERATED_KEY,
-                                            )
+                                            openRouterConnected = hasOpenRouterCredential()
                                             statusMessage = if (openRouterConnected) {
                                                 "OpenRouter erfolgreich mit KAL verbunden."
                                             } else {
                                                 "OpenRouter-Autorisierung war erfolgreich, der lokale Schlüsselstatus konnte aber nicht bestätigt werden."
                                             }
                                         }
-                                        is OpenRouterOAuthResult.Failed -> statusMessage = result.reason
+                                        is OpenRouterOAuthResult.Failed -> statusMessage = oauthResult.reason
                                         OpenRouterOAuthResult.Cancelled -> statusMessage = "OpenRouter-Verbindung abgebrochen."
                                     }
                                 }
-                            }.getOrElse { throwable ->
-                                openRouterConnecting = false
-                                statusMessage = throwable.message ?: "OpenRouter-Verbindung konnte nicht gestartet werden."
-                                return@Button
                             }
-                            if (!openRouterConnector.openAuthorizationPage(plan)) {
+                            val plan = result.getOrNull()
+                            if (plan == null) {
+                                openRouterConnecting = false
+                                statusMessage = result.exceptionOrNull()?.message
+                                    ?: "OpenRouter-Verbindung konnte nicht gestartet werden."
+                            } else if (!openRouterConnector.openAuthorizationPage(plan)) {
                                 openRouterConnecting = false
                                 statusMessage = "Systembrowser konnte für OpenRouter nicht geöffnet werden."
                             }
