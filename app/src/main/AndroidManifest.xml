@@ -92,11 +92,6 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".SecurityNetworkActivity"
-            android:exported="false"
-            android:screenOrientation="unspecified" />
-
         <service
             android:name=".assistant.AssistantScreenShareService"
             android:exported="false"
@@ -113,9 +108,9 @@
         </service>
 
         <!--
-             Production contract: no VpnService is declared here while the N1 service remains an inert consent
-             prototype. Debug builds add the prototype through src/debug/AndroidManifest.xml. A future production
-             declaration requires a real eligible security/network capability plus the corresponding Play disclosure.
+             Production contract: the N1 VPN consent prototype and its SecurityNetworkActivity are declared only in
+             src/debug/AndroidManifest.xml. A future production declaration requires a real eligible security/network
+             capability plus the corresponding Google Play VpnService disclosure and evidence gate.
         -->
     </application>
 
