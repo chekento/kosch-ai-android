@@ -34,7 +34,7 @@ object UniversalSearchSourcesFactory {
                 appLabel = app.label,
             )
         }
-        return build(
+        return buildFromShortcutSources(
             apps = apps,
             shortcutSources = shortcuts,
             folders = folders,
@@ -45,7 +45,7 @@ object UniversalSearchSourcesFactory {
     }
 
     /** Preferred path for the async, device-local launcher-wide published-shortcut cache. */
-    fun build(
+    fun buildFromShortcutSources(
         apps: List<LaunchableApp>,
         shortcutSources: List<UniversalShortcutSource>,
         folders: List<LauncherFolder>,
