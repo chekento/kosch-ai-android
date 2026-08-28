@@ -107,9 +107,11 @@ class IconPackResolver(context: Context) {
         var event = parser.eventType
         while (event != XmlPullParser.END_DOCUMENT && entries.size < MAX_PACK_ENTRIES) {
             if (event == XmlPullParser.START_TAG && parser.name.equals("item", ignoreCase = true)) {
-                val component = parser.attributeValue(null, "component")
-                val drawable = parser.attributeValue(null, "drawable")?.trim()?.take(MAX_DRAWABLE_NAME)
-                val key = component?.let(IconPackComponentKey::normalize)
+                val component: String? = parser.getAttributeValue(null, "component")
+                val drawable: String? = parser.getAttributeValue(null, "drawable")
+                    ?.trim()
+                    ?.take(MAX_DRAWABLE_NAME)
+                val key = component?.let { IconPackComponentKey.normalize(it) }
                 if (key != null && !drawable.isNullOrBlank() && DRAWABLE_NAME.matches(drawable)) {
                     entries.putIfAbsent(key, drawable)
                 }
