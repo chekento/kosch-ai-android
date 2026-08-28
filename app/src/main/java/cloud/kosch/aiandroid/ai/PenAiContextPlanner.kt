@@ -1,5 +1,6 @@
 package cloud.kosch.aiandroid.ai
 
+import cloud.kosch.aiandroid.model.InkPoint
 import cloud.kosch.aiandroid.model.InkStroke
 import cloud.kosch.aiandroid.model.InkTool
 import kotlin.math.roundToInt
@@ -38,6 +39,25 @@ data class PenAiContextSummary(
         }
 }
 
+data class PenAiLassoSummary(
+    val selected: PenAiContextSummary,
+    val selectedStrokeCount: Int,
+    val totalStrokeCount: Int,
+    val selectionSharePercent: Int,
+) {
+    val text: String
+        get() = buildString {
+            append("Lasso-Auswahl: ")
+                .append(selectedStrokeCount)
+                .append(" von ")
+                .append(totalStrokeCount)
+                .append(" Strichen · ca. ")
+                .append(selectionSharePercent)
+                .append("% der Striche ausgewählt")
+            if (selectedStrokeCount > 0) append(" · ").append(selected.text)
+        }
+}
+
 object PenAiContextPlanner {
     fun summarize(strokes: List<InkStroke>): PenAiContextSummary {
         val points = strokes.flatMap(InkStroke::points)
@@ -62,4 +82,65 @@ object PenAiContextPlanner {
             verticalCoveragePercent = coverage(finiteY),
         )
     }
+
+    /**
+     * Privacy-first Circle/Lasso-to-Ask core.
+     *
+     * The polygon exists only as an input to this local calculation. The returned object contains no lasso vertices,
+     * no selected point coordinates and no SVG. A caller may turn the textual aggregate into an explicit
+     * AiContextHandoff draft, which still requires the normal user confirmation before any AI route sees it.
+     */
+    fun summarizeLassoSelection(
+        strokes: List<InkStroke>,
+        lassoPoints: List<InkPoint>,
+    ): PenAiLassoSummary {
+        val validPolygon = lassoPoints
+            .filter { it.x.isFinite() && it.y.isFinite() }
+            .map { Point2(it.x.coerceIn(0f, 1f), it.y.coerceIn(0f, 1f)) }
+        if (validPolygon.size < MIN_LASSO_POINTS) {
+            return PenAiLassoSummary(
+                selected = summarize(emptyList()),
+                selectedStrokeCount = 0,
+                totalStrokeCount = strokes.size,
+                selectionSharePercent = 0,
+            )
+        }
+
+        val selectedStrokes = strokes.filter { stroke ->
+            stroke.points.any { point ->
+                point.x.isFinite() && point.y.isFinite() &&
+                    pointInPolygon(Point2(point.x, point.y), validPolygon)
+            }
+        }
+        val share = if (strokes.isEmpty()) 0 else {
+            ((selectedStrokes.size.toFloat() / strokes.size.toFloat()) * 100f).roundToInt().coerceIn(0, 100)
+        }
+        return PenAiLassoSummary(
+            selected = summarize(selectedStrokes),
+            selectedStrokeCount = selectedStrokes.size,
+            totalStrokeCount = strokes.size,
+            selectionSharePercent = share,
+        )
+    }
+
+    private fun pointInPolygon(point: Point2, polygon: List<Point2>): Boolean {
+        var inside = false
+        var previous = polygon.last()
+        polygon.forEach { current ->
+            val crosses = (current.y > point.y) != (previous.y > point.y)
+            if (crosses) {
+                val denominator = previous.y - current.y
+                if (denominator != 0f) {
+                    val intersectionX = (previous.x - current.x) * (point.y - current.y) / denominator + current.x
+                    if (point.x < intersectionX) inside = !inside
+                }
+            }
+            previous = current
+        }
+        return inside
+    }
+
+    private data class Point2(val x: Float, val y: Float)
+
+    private const val MIN_LASSO_POINTS = 3
 }
