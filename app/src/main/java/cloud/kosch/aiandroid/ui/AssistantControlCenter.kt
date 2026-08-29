@@ -238,8 +238,8 @@ fun AssistantControlCenter(
 
         item {
             ControlSection(
-                title = "Presence Mode",
-                body = "Vom reinen Portal bis zum sichtbaren Agenten – die Rechte bleiben davon unabhängig.",
+                title = "Presence Mode · vorbereitet",
+                body = "Die Auswahl wird bereits gespeichert. Die vollständige visuelle/runtime-seitige Differenzierung von Portal, Ambient, Floating, Full und Agent ist in diesem APK noch nicht komplett implementiert; Rechte bleiben davon unabhängig.",
             ) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(AssistantPresenceMode.entries, key = { it.name }) { mode ->
@@ -255,8 +255,8 @@ fun AssistantControlCenter(
 
         item {
             ControlSection(
-                title = "Wake Word",
-                body = "Standardmäßig aus. „Computer“, Assistentenname oder ein eigenes Wake Word sind möglich.",
+                title = "Wake Word · vorbereitet",
+                body = "Standardmäßig aus. „Computer“, Assistentenname oder ein eigenes Wake Word können als lokale Policy vorbereitet werden. Dieses APK enthält noch keinen kontinuierlich lauschenden Wake-Word-Detektor; die Auswahl startet keine Mikrofonaufnahme.",
             ) {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(AssistantWakeWordMode.entries, key = { it.name }) { mode ->
@@ -274,17 +274,21 @@ fun AssistantControlCenter(
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true,
                         label = { Text("Eigenes Wake Word") },
-                        supportingText = { Text("Mindestens 2 Zeichen; Entwürfe bleiben speicherbar.") },
+                        supportingText = { Text("Mindestens 2 Zeichen; Konfiguration bleibt speicherbar, Detektor noch nicht aktiv.") },
                     )
                 }
                 Text(
-                    if (effectiveWakeWord == null) "Aktivierung: AUS / noch ungültig" else "Aktivierung: „$effectiveWakeWord“",
+                    if (effectiveWakeWord == null) {
+                        "Konfiguriert: AUS / noch ungültig · Detektor nicht aktiv"
+                    } else {
+                        "Konfiguriert: „$effectiveWakeWord“ · Detektor noch nicht aktiv"
+                    },
                     color = if (agent.preferences.wakeWordMode != AssistantWakeWordMode.OFF && effectiveWakeWord == null) Warm else MutedMist,
                     style = MaterialTheme.typography.bodySmall,
                 )
                 ControlToggleRow(
-                    title = "Wake Word lokal erkennen",
-                    body = "Audio für die Aktivierung nicht an einen Netzwerkprovider senden.",
+                    title = "Lokaler Wake-Word-Modus · vorbereitet",
+                    body = "Policy für eine künftige lokale Erkennung. Dieser Schalter startet heute keine Audioaufnahme und sendet kein Aktivierungs-Audio an einen Netzwerkprovider.",
                     checked = agent.preferences.localWakeWordOnly,
                     onCheckedChange = agent::setLocalWakeWordOnly,
                 )
