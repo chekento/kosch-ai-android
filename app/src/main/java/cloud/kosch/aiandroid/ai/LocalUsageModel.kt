@@ -1,5 +1,6 @@
 package cloud.kosch.aiandroid.ai
 
+import cloud.kosch.aiandroid.data.LauncherPrivacyRuntimePolicy
 import cloud.kosch.aiandroid.model.AppUsageSignal
 import kotlin.math.ln
 
@@ -32,12 +33,15 @@ object LocalUsageModel {
         keys: List<String>,
         signals: Map<String, AppUsageSignal>,
         nowEpochMillis: Long,
-    ): List<String> = keys.withIndex()
-        .sortedWith(
-            compareByDescending<IndexedValue<String>> { score(signals[it.value], nowEpochMillis) }
-                .thenBy(IndexedValue<String>::index),
-        )
-        .map(IndexedValue<String>::value)
+    ): List<String> {
+        if (!LauncherPrivacyRuntimePolicy.localUsageLearningEnabled) return keys
+        return keys.withIndex()
+            .sortedWith(
+                compareByDescending<IndexedValue<String>> { score(signals[it.value], nowEpochMillis) }
+                    .thenBy(IndexedValue<String>::index),
+            )
+            .map(IndexedValue<String>::value)
+    }
 
     internal fun score(signal: AppUsageSignal?, nowEpochMillis: Long): Double {
         if (signal == null) return 0.0
