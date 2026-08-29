@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import cloud.kosch.aiandroid.data.LauncherSettingsStore
 import cloud.kosch.aiandroid.model.ThemeMode
 
 val Ink = Color(0xFF071018)
@@ -94,17 +95,20 @@ private val KalTypography = Typography(
 @Composable
 fun KoSchLauncherTheme(
     dynamicColor: Boolean = false,
-    mode: ThemeMode = ThemeMode.THEME_DEFINED,
+    mode: ThemeMode? = null,
     content: @Composable () -> Unit,
 ) {
+    val context = LocalContext.current
+    // MainActivity already observes the settings document for dynamicColor. Recomposition therefore re-reads the
+    // same atomically persisted document here when mode changes, without creating a second preference listener.
+    val effectiveMode = mode ?: LauncherSettingsStore(context).load().appearance.mode
     val systemDark = isSystemInDarkTheme()
-    val dark = when (mode) {
+    val dark = when (effectiveMode) {
         ThemeMode.SYSTEM -> systemDark
         ThemeMode.LIGHT -> false
         ThemeMode.DARK,
         ThemeMode.THEME_DEFINED -> true
     }
-    val context = LocalContext.current
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && dark -> dynamicDarkColorScheme(context)
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> dynamicLightColorScheme(context)
