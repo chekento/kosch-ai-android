@@ -46,6 +46,7 @@ import cloud.kosch.aiandroid.system.SystemActionGateway
  *
  * Prompt handoff is deliberately two-step and process-local. The first user gesture only stages the exact destination
  * and prompt and shows a disclosure. A second unchanged gesture is required before Android receives the Share intent.
+ * Direct provider execution is injected from LauncherViewModel and remains independently gated by KalCloudAccessPolicy.
  */
 class AiHubController(context: Context) {
     private val appContext = context.applicationContext
@@ -57,6 +58,7 @@ class AiHubController(context: Context) {
     private val publishedSurfaceCache = mutableMapOf<String, AiPublishedSurfaceSnapshot>()
     private val externalHandoffGate = AiExternalHandoffGate()
     private var defaultRoutingContextProvider: () -> AiHubRoutingContext = { AiHubRoutingContext() }
+    private var providerSettingsOpener: () -> Unit = {}
 
     var visible by mutableStateOf(false)
         private set
@@ -70,10 +72,27 @@ class AiHubController(context: Context) {
         private set
     var routingContext by mutableStateOf(AiHubRoutingContext())
         private set
+    var directProvider by mutableStateOf<OpenRouterDirectController?>(null)
+        private set
 
     /** Supplies abstract launcher context for old/direct open() call sites without coupling this controller to Home. */
     fun setDefaultRoutingContextProvider(provider: () -> AiHubRoutingContext) {
         defaultRoutingContextProvider = provider
+    }
+
+    /** Injects the ViewModel-owned direct-provider runtime so Compose never creates a duplicate network state holder. */
+    fun setDirectProviderController(controller: OpenRouterDirectController) {
+        directProvider = controller
+    }
+
+    /** Keeps Settings navigation behind the Hub boundary rather than coupling AiHubSurface to MainActivity. */
+    fun setProviderSettingsOpener(opener: () -> Unit) {
+        providerSettingsOpener = opener
+    }
+
+    fun openProviderSettings() {
+        close()
+        providerSettingsOpener()
     }
 
     fun entries(apps: List<LaunchableApp>): List<AiHubEntry> = AiHubCatalog.entries(apps, hiddenIds)
@@ -186,6 +205,7 @@ class AiHubController(context: Context) {
     ) {
         publishedSurfaceCache.clear()
         clearPendingExternalHandoff()
+        directProvider?.refreshState()
         routingContext = context ?: defaultRoutingContextProvider()
         prompt = initialPrompt.take(MAX_PROMPT_CHARS)
         notice = null
