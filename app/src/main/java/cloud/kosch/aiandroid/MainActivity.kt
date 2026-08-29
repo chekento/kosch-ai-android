@@ -46,15 +46,12 @@ import cloud.kosch.aiandroid.system.LauncherGestureBindingResolver
 import cloud.kosch.aiandroid.system.ProfessionalShortcut
 import cloud.kosch.aiandroid.system.ProfessionalShortcutResolver
 import cloud.kosch.aiandroid.system.WidgetHostController
-import cloud.kosch.aiandroid.ui.AiHubEntryButton
 import cloud.kosch.aiandroid.ui.AiHubSurface
 import cloud.kosch.aiandroid.ui.DragDropWorkspaceHomeScreen
+import cloud.kosch.aiandroid.ui.KalHomeQuickMenu
 import cloud.kosch.aiandroid.ui.LauncherRoot
-import cloud.kosch.aiandroid.ui.PersonalizationEntryButton
 import cloud.kosch.aiandroid.ui.PersonalizationQuickSurface
 import cloud.kosch.aiandroid.ui.SettingsCenterSurface
-import cloud.kosch.aiandroid.ui.SettingsEntryButton
-import cloud.kosch.aiandroid.ui.UniversalSearchEntryButton
 import cloud.kosch.aiandroid.ui.UniversalSearchSurface
 import cloud.kosch.aiandroid.ui.WidgetStackEntryButton
 import cloud.kosch.aiandroid.ui.WidgetStackManagerSheet
@@ -333,47 +330,30 @@ class MainActivity : ComponentActivity() {
                         !personalizationVisible &&
                         !universalSearch.visible
                     ) {
-                        SettingsEntryButton(
-                            onClick = {
+                        KalHomeQuickMenu(
+                            onSearch = {
+                                personalizationVisible = false
+                                launcherViewModel.openUniversalSearch()
+                            },
+                            onAiHub = {
                                 personalizationVisible = false
                                 universalSearch.close()
-                                aiHub.close()
-                                settings.open()
+                                settings.close()
+                                launcherViewModel.openAiHub()
                             },
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(end = 18.dp, top = 76.dp),
-                        )
-                        PersonalizationEntryButton(
-                            onClick = {
+                            onPersonalize = {
                                 universalSearch.close()
                                 settings.close()
                                 aiHub.close()
                                 personalizationVisible = true
                             },
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(end = 18.dp, top = 122.dp),
-                        )
-                        UniversalSearchEntryButton(
-                            onClick = {
-                                personalizationVisible = false
-                                launcherViewModel.openUniversalSearch()
-                            },
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(end = 18.dp, top = 168.dp),
-                        )
-                        AiHubEntryButton(
-                            onClick = {
+                            onSettings = {
                                 personalizationVisible = false
                                 universalSearch.close()
-                                settings.close()
-                                aiHub.open()
+                                aiHub.close()
+                                settings.open()
                             },
-                            modifier = Modifier
-                                .align(Alignment.TopEnd)
-                                .padding(end = 18.dp, top = 214.dp),
+                            modifier = Modifier.align(Alignment.TopEnd),
                         )
                     }
 
@@ -390,8 +370,8 @@ class MainActivity : ComponentActivity() {
                             onClick = ::requestVoiceInput,
                             modifier = Modifier
                                 .align(assistantAlignment)
-                                .padding(horizontal = 18.dp, vertical = 150.dp)
-                                .size(width = (76f * scale).dp, height = (68f * scale).dp)
+                                .padding(horizontal = 18.dp, vertical = 142.dp)
+                                .size(width = (92f * scale).dp, height = (108f * scale).dp)
                                 .alpha(assistantPresentation.opacity),
                         )
                     }
@@ -525,7 +505,7 @@ class MainActivity : ComponentActivity() {
         deviceId: Int,
     ) {
         data += KeyboardShortcutGroup(
-            "KoSch Professional",
+            "KAL Professional",
             listOf(
                 KeyboardShortcutInfo("Universal Search", KeyEvent.KEYCODE_K, KeyEvent.META_CTRL_ON),
                 KeyboardShortcutInfo("Apps", KeyEvent.KEYCODE_SPACE, KeyEvent.META_CTRL_ON),
@@ -580,7 +560,7 @@ class MainActivity : ComponentActivity() {
             GestureAction.OPEN_SETTINGS -> launcherViewModel.settings.open()
             GestureAction.OPEN_ASSISTANT -> {
                 if (launcherViewModel.assistant.settings.enabled) {
-                    requestVoiceInput()
+                    launcherViewModel.assistant.open()
                 } else {
                     launcherViewModel.settings.open(SettingsSection.ASSISTANT)
                 }
@@ -666,7 +646,7 @@ class MainActivity : ComponentActivity() {
                     .onSuccess { token ->
                         pendingBackupExportToken = token
                         runCatching {
-                            backupCreateRequest.launch("kosch-workspace-${LocalDate.now()}.koschbackup")
+                            backupCreateRequest.launch("kal-workspace-${LocalDate.now()}.koschbackup")
                         }.onFailure {
                             pendingDocumentStore.discard(PendingDocumentKind.BACKUP, pendingBackupExportToken)
                             pendingBackupExportToken = null
@@ -688,7 +668,7 @@ class MainActivity : ComponentActivity() {
         pendingDocumentStore.stage(PendingDocumentKind.AUDIT, controller.auditCsv())
             .onSuccess { token ->
                 pendingAuditExportToken = token
-                runCatching { auditCreateRequest.launch("kosch-audit-${LocalDate.now()}.csv") }
+                runCatching { auditCreateRequest.launch("kal-audit-${LocalDate.now()}.csv") }
                     .onFailure {
                         pendingDocumentStore.discard(PendingDocumentKind.AUDIT, pendingAuditExportToken)
                         pendingAuditExportToken = null
@@ -703,7 +683,7 @@ class MainActivity : ComponentActivity() {
         pendingDocumentStore.stage(PendingDocumentKind.INK_SVG, controller.inkSvg())
             .onSuccess { token ->
                 pendingInkExportToken = token
-                runCatching { inkCreateRequest.launch("kosch-pen-space-${LocalDate.now()}.svg") }
+                runCatching { inkCreateRequest.launch("kal-pen-space-${LocalDate.now()}.svg") }
                     .onFailure {
                         pendingDocumentStore.discard(PendingDocumentKind.INK_SVG, pendingInkExportToken)
                         pendingInkExportToken = null
