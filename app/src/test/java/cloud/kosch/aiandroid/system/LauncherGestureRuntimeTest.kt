@@ -98,15 +98,45 @@ class LauncherGestureRuntimeTest {
     }
 
     @Test
-    fun bindingsNeverInventAnAction() {
+    fun ordinaryHorizontalSwipesNavigatePagesWhenUnbound() {
         val settings = GestureSettings(
             bindings = listOf(GestureBinding(GestureTrigger.SWIPE_UP, GestureAction.OPEN_DRAWER)),
         )
-        assertEquals(GestureAction.OPEN_DRAWER, LauncherGestureBindingResolver.actionFor(settings, GestureTrigger.SWIPE_UP))
-        assertEquals(GestureAction.NONE, LauncherGestureBindingResolver.actionFor(settings, GestureTrigger.SWIPE_DOWN))
+
+        assertEquals(
+            GestureAction.NEXT_PAGE,
+            LauncherGestureBindingResolver.actionFor(settings, GestureTrigger.SWIPE_LEFT),
+        )
+        assertEquals(
+            GestureAction.PREVIOUS_PAGE,
+            LauncherGestureBindingResolver.actionFor(settings, GestureTrigger.SWIPE_RIGHT),
+        )
         assertEquals(
             GestureAction.NONE,
-            LauncherGestureBindingResolver.actionFor(settings.copy(enabled = false), GestureTrigger.SWIPE_UP),
+            LauncherGestureBindingResolver.actionFor(settings, GestureTrigger.SWIPE_DOWN),
+        )
+    }
+
+    @Test
+    fun explicitBindingsAlwaysOverridePageSwipeFallback() {
+        val settings = GestureSettings(
+            bindings = listOf(
+                GestureBinding(GestureTrigger.SWIPE_LEFT, GestureAction.OPEN_SEARCH),
+                GestureBinding(GestureTrigger.SWIPE_RIGHT, GestureAction.NONE),
+            ),
+        )
+
+        assertEquals(
+            GestureAction.OPEN_SEARCH,
+            LauncherGestureBindingResolver.actionFor(settings, GestureTrigger.SWIPE_LEFT),
+        )
+        assertEquals(
+            GestureAction.NONE,
+            LauncherGestureBindingResolver.actionFor(settings, GestureTrigger.SWIPE_RIGHT),
+        )
+        assertEquals(
+            GestureAction.NONE,
+            LauncherGestureBindingResolver.actionFor(settings.copy(enabled = false), GestureTrigger.SWIPE_LEFT),
         )
     }
 
