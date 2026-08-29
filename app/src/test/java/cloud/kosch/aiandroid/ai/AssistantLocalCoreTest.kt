@@ -38,7 +38,8 @@ class AssistantLocalCoreTest {
         assertEquals(input, reply.handoffPrompt)
         assertEquals(AssistantVisualState.OFFLINE, reply.visualState)
         assertEquals(AssistantActionRisk.EXTERNAL_SIDE_EFFECT, reply.actionRisk)
-        assertTrue(reply.text.contains("kein generatives Modell", ignoreCase = true))
+        assertTrue(reply.text.contains("kein direkt verwendbarer Provider", ignoreCase = true))
+        assertTrue(reply.text.contains("AI Hub", ignoreCase = true))
     }
 
     @Test
@@ -59,6 +60,7 @@ class AssistantLocalCoreTest {
         assertNull(reply.command)
         assertNull(reply.handoffPrompt)
         assertTrue(reply.text.contains("Launcher-Befehle"))
-        assertTrue(reply.text.contains("Auswahl"))
+        assertTrue(reply.text.contains("freigegebenen Provider", ignoreCase = true))
+        assertTrue(reply.text.contains("AI Hub", ignoreCase = true))
     }
 }
