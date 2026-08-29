@@ -8,7 +8,7 @@ This document turns `KoSch_AI_Launcher_Assistant_Asset_Matrix_v1.xlsx` into a re
 2. **Visual source/reference:** `Futuristische Roboter-Asset-Übersicht.png`.
 3. **Runtime mirror:** `DefaultAssistantAssetManifest` in the Android project.
 
-If the older overview sheet disagrees with the matrix, the matrix wins. In particular, the APK contract uses eight shared portal frames (`000..007`), not the older fourteen-frame reference sequence.
+If the older overview sheet disagrees with the matrix, the matrix wins. In particular, the APK contract uses eight shared portal frames (`000..007`), not the older fourteen-frame reference sequence, and the E mouth slot is named `ee`.
 
 ## Exact v1 inventory
 
@@ -37,9 +37,15 @@ Required animation contracts:
 - Y rotation: 24 frames in 15° steps from `000` through `345`;
 - `asst_default_turn_y_180.webp` must be a true back view;
 - shared portal: `portal_default_000.webp` through `portal_default_007.webp`;
-- visemes: `sil`, `pp`, `ff`, `th`, `dd`, `kk`, `ch`, `ss`, `nn`, `rr`, `aa`, `e`, `ih`, `oh`, `ou`.
+- visemes: `sil`, `pp`, `ff`, `th`, `dd`, `kk`, `ch`, `ss`, `nn`, `rr`, `aa`, `ee`, `ih`, `oh`, `ou`.
 
-The complete filename list lives in `DefaultAssistantAssetManifest`; CI unit tests lock its counts and uniqueness.
+The E grapheme/runtime enum maps to the exact matrix asset code `ee`, therefore the required file is:
+
+`asst_default_mouth_viseme_ee.webp`
+
+There is no `asst_default_mouth_viseme_e.webp` slot in the v1 runtime contract.
+
+The complete filename list lives in `DefaultAssistantAssetManifest`; CI unit tests lock its counts, uniqueness and the `ee` filename contract.
 
 ## Master -> APK export
 
@@ -56,7 +62,7 @@ Every exported file must be visually checked at actual companion size, not only 
 
 ## Face-anchor calibration — do not guess
 
-Eyes and mouth are 128×128 overlay canvases but are rendered onto the 384×384 body canvas. Their placement is intentionally **uncalibrated** in the current manifest, so the APK remains on the Canvas fallback even if a complete file set is accidentally packaged.
+Eyes and mouth are 128×128 overlay canvases but are rendered onto the 384×384 body canvas. Their placement is intentionally **uncalibrated** in the current manifest, so the APK remains on the Canvas/procedural fallback even if a complete file set is accidentally packaged.
 
 Calibration must use the final exported front-neutral body:
 
@@ -84,8 +90,9 @@ Before setting `faceCalibration.isCalibrated == true`, verify at minimum:
 2. blink closed and both wink states;
 3. extreme eye directions (`up_left`, `down_right`);
 4. widest mouth states (`aa`, `laugh`, `surprised`, `yawn`);
-5. no overlay pixel leaves its intended black face panel;
-6. no glow or alpha seam appears when scaled at companion size.
+5. `ee` and the other 14 viseme overlays align with the same calibrated mouth anchor;
+6. no overlay pixel leaves its intended black face panel;
+7. no glow or alpha seam appears when scaled at companion size.
 
 The source image name and body filename remain part of the calibration record. When the underlying body geometry changes, increment the asset version and remeasure anchors instead of reusing old coordinates.
 
@@ -97,7 +104,9 @@ The source image name and body filename remain part of the calibration record. W
 2. no Default-Assistant/theme-scoped unexpected WebP is present;
 3. face calibration contains valid normalized eye **and** mouth rectangles.
 
-Anything else remains on the Canvas avatar. Individual corrupt, oversized or wrongly dimensioned files are additionally rejected by `AssistantAssetRuntime` during decode.
+Anything else remains on the complete procedural fallback. Individual corrupt, oversized or wrongly dimensioned files are additionally rejected by `AssistantAssetRuntime` during decode.
+
+The current repository intentionally does not yet package the calibrated 150-file Default WebP set. Missing final artwork is therefore not treated as a partially successful sprite mode; HOME remains on the safe procedural renderer until the whole pack passes the gate.
 
 ## Animation guidance
 
@@ -110,6 +119,12 @@ Use the matrix FPS ranges as upper guidance, not as an obligation to redraw unne
 
 Prefer transforms/interpolation for micro-motion where it preserves visual quality. Keep reduced-motion support independent from asset availability.
 
+## Character-pack extension
+
+`default`, `anime_female` and `anime_male` share the same standardized slot philosophy. Final Anime packs must use their own `assetPackId` namespaces but preserve the same pose/action, spawn, turn, eye and 15-viseme schema so the runtime does not require character-specific behavioral code.
+
+Until those calibrated packs exist, Anime Female and Anime Male use distinct procedural fallbacks; this is a runtime fallback, not a substitute source asset for the final exports.
+
 ## Stage boundary
 
-This B-B stage establishes inventory, completeness and calibration gates. It does **not** claim that the 150 final WebPs have already been exported. The B-C runtime now contains fail-safe eye/mouth compositing, deterministic micro-motion and TTS range/PCM-driven mouth signals, but the WebP path deliberately remains inactive until real anchors and the complete export are committed. See `ASSISTANT_RUNTIME_BC.md`.
+This export stage establishes inventory, completeness and calibration gates. It does **not** claim that the 150 final Default WebPs or final Anime packs have already been exported. The runtime already contains fail-safe eye/mouth compositing, deterministic micro-motion and TTS range/PCM-driven mouth signals, but the WebP path deliberately remains inactive until real anchors and the complete export are committed. See `ASSISTANT_RUNTIME_BC.md`.
