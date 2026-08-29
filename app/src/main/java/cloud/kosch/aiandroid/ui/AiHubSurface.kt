@@ -101,8 +101,6 @@ fun AiHubEntryButton(
 fun AiHubSurface(
     hub: AiHubController,
     apps: List<LaunchableApp>,
-    directProvider: OpenRouterDirectController,
-    onOpenProviderSettings: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var filter by remember { mutableStateOf(AiHubFilter.SMART) }
@@ -110,6 +108,7 @@ fun AiHubSurface(
     val recommendations = hub.recommendations(apps)
     val routeDecision = hub.routeDecision(apps)
     val currentTask = hub.inferredTask()
+    val directProvider = hub.directProvider
     val recommendationReasons = recommendations.associate { it.entry.stableId to it.reason }
     val bestRecommendation = recommendations.firstOrNull()
     val bestShortcut = if (bestRecommendation != null) {
@@ -246,12 +245,14 @@ fun AiHubSurface(
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                item(key = "direct-openrouter") {
-                    DirectOpenRouterCard(
-                        direct = directProvider,
-                        prompt = hub.prompt,
-                        onOpenProviderSettings = onOpenProviderSettings,
-                    )
+                if (directProvider != null) {
+                    item(key = "direct-openrouter") {
+                        DirectOpenRouterCard(
+                            direct = directProvider,
+                            prompt = hub.prompt,
+                            onOpenProviderSettings = hub::openProviderSettings,
+                        )
+                    }
                 }
                 if (entries.isEmpty()) {
                     item(key = "empty") {
