@@ -55,6 +55,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.AiHubController
+import cloud.kosch.aiandroid.OpenRouterDirectController
 import cloud.kosch.aiandroid.ai.AiHubDecisionConfidence
 import cloud.kosch.aiandroid.ai.AiHubEntry
 import cloud.kosch.aiandroid.ai.AiHubEntryKind
@@ -100,6 +101,8 @@ fun AiHubEntryButton(
 fun AiHubSurface(
     hub: AiHubController,
     apps: List<LaunchableApp>,
+    directProvider: OpenRouterDirectController,
+    onOpenProviderSettings: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var filter by remember { mutableStateOf(AiHubFilter.SMART) }
@@ -145,7 +148,7 @@ fun AiHubSurface(
                 Column(modifier = Modifier.weight(1f)) {
                     Text("AI & Browser Hub", style = MaterialTheme.typography.headlineSmall)
                     Text(
-                        "Local Core → On-device → veröffentlichte App-Schnittstelle → Play Store",
+                        "Local Core → On-device → verbundener Provider → App-Schnittstelle → Play Store",
                         color = MutedMist,
                         style = MaterialTheme.typography.labelMedium,
                     )
@@ -239,22 +242,34 @@ fun AiHubSurface(
                 }
             }
 
-            if (entries.isEmpty()) {
-                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Keine sichtbaren Einträge", color = MutedMist)
-                        if (hub.hiddenIds.isNotEmpty()) {
-                            TextButton(onClick = { hub.restoreAll() }) {
-                                Text("Ausgeblendete Vorschläge zurückholen")
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                item(key = "direct-openrouter") {
+                    DirectOpenRouterCard(
+                        direct = directProvider,
+                        prompt = hub.prompt,
+                        onOpenProviderSettings = onOpenProviderSettings,
+                    )
+                }
+                if (entries.isEmpty()) {
+                    item(key = "empty") {
+                        Box(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 28.dp),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text("Keine sichtbaren App-/Browser-Einträge", color = MutedMist)
+                                if (hub.hiddenIds.isNotEmpty()) {
+                                    TextButton(onClick = { hub.restoreAll() }) {
+                                        Text("Ausgeblendete Vorschläge zurückholen")
+                                    }
+                                }
                             }
                         }
                     }
-                }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.fillMaxWidth().weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
+                } else {
                     items(entries, key = AiHubEntry::stableId) { entry ->
                         val published = remember(entry.stableId, entry.installedApp?.key) {
                             hub.publishedSurfaces(entry)
@@ -278,8 +293,8 @@ fun AiHubSurface(
                             onDismiss = { hub.dismiss(entry) },
                         )
                     }
-                    item { Spacer(Modifier.size(12.dp)) }
                 }
+                item { Spacer(Modifier.size(12.dp)) }
             }
         }
     }
@@ -309,6 +324,187 @@ private fun PowerPromptStrip(
                         Icon(Icons.Rounded.AutoAwesome, contentDescription = null, modifier = Modifier.size(15.dp))
                     },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun DirectOpenRouterCard(
+    direct: OpenRouterDirectController,
+    prompt: String,
+    onOpenProviderSettings: () -> Unit,
+) {
+    val stateLabel = when {
+        direct.connected && direct.cloudExecutionEnabled -> "VERBUNDEN · FREIGEGEBEN"
+        direct.connected -> "VERBUNDEN · ROUTING AUS"
+        else -> "NICHT VERBUNDEN"
+    }
+    val stateColor = when {
+        direct.connected && direct.cloudExecutionEnabled -> Mint
+        direct.connected -> Sky
+        else -> MutedMist
+    }
+
+    Surface(
+        color = Violet.copy(alpha = 0.10f),
+        shape = RoundedCornerShape(18.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(13.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        "DIRECT PROVIDER · OPENROUTER",
+                        color = Violet,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Text(
+                        "Optionaler direkter HTTPS-Pfad; Local Core und App-Handoffs bleiben unabhängig verfügbar.",
+                        color = MutedMist,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                Text(stateLabel, color = stateColor, style = MaterialTheme.typography.labelSmall)
+            }
+
+            when {
+                !direct.connected -> {
+                    Text(
+                        "Kein Inhalt wird an OpenRouter gesendet. Verbinde den Provider zuerst bewusst in den API-/Provider-Einstellungen.",
+                        color = MutedMist,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    OutlinedButton(onClick = onOpenProviderSettings, modifier = Modifier.fillMaxWidth()) {
+                        Text("Provider verbinden")
+                    }
+                }
+                !direct.cloudExecutionEnabled -> {
+                    Text(
+                        "OpenRouter ist verbunden, aber die getrennten Netzwerk- und AI-Routing-Freigaben sind noch AUS. Ohne beide Gates findet keine Modellanfrage statt.",
+                        color = MutedMist,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    OutlinedButton(onClick = onOpenProviderSettings, modifier = Modifier.fillMaxWidth()) {
+                        Text("Freigaben prüfen")
+                    }
+                }
+                else -> {
+                    Text(
+                        "Nur ein Tipp auf „Direkt an OpenRouter senden“ überträgt den aktuell sichtbaren Prompt. Screen, Kamera, Dateien oder weitere Launcher-Daten werden nicht automatisch angehängt.",
+                        color = MutedMist,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedButton(
+                            onClick = direct::loadModels,
+                            enabled = !direct.loadingModels && !direct.sending,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(if (direct.loadingModels) "Lade Modelle …" else "Modelle laden")
+                        }
+                        OutlinedButton(onClick = onOpenProviderSettings) {
+                            Text("Provider")
+                        }
+                    }
+
+                    OutlinedTextField(
+                        value = direct.selectedModelId,
+                        onValueChange = direct::updateModelId,
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("OpenRouter Modell-ID") },
+                        placeholder = { Text("Modelle laden oder ID eingeben") },
+                        singleLine = true,
+                    )
+
+                    if (direct.models.isNotEmpty()) {
+                        Text(
+                            "${direct.models.size} kompatible Textmodelle geladen · Auswahlvorschläge",
+                            color = MutedMist,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(7.dp),
+                        ) {
+                            direct.models.take(8).forEach { model ->
+                                FilterChip(
+                                    selected = direct.selectedModelId == model.id,
+                                    onClick = { direct.chooseModel(model.id) },
+                                    label = {
+                                        Text(
+                                            model.name,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                        )
+                                    },
+                                )
+                            }
+                        }
+                    }
+
+                    Button(
+                        onClick = { direct.send(prompt) },
+                        enabled = prompt.isNotBlank() &&
+                            direct.selectedModelId.isNotBlank() &&
+                            !direct.loadingModels &&
+                            !direct.sending,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(7.dp))
+                        Text(if (direct.sending) "Sende …" else "Direkt an OpenRouter senden")
+                    }
+                }
+            }
+
+            direct.notice?.let { message ->
+                Text(message, color = Sky, style = MaterialTheme.typography.bodySmall)
+            }
+
+            direct.response?.let { response ->
+                Surface(
+                    color = DeepSurface.copy(alpha = 0.88f),
+                    shape = RoundedCornerShape(14.dp),
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp),
+                    ) {
+                        Text(
+                            "OPENROUTER · ${response.modelId}",
+                            color = Mint,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                        Text(
+                            response.text.take(MAX_VISIBLE_PROVIDER_RESPONSE_CHARS),
+                            style = MaterialTheme.typography.bodyMedium,
+                            maxLines = 24,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        response.costUsd?.let { cost ->
+                            Text(
+                                "Vom Provider gemeldete Kosten: $cost USD",
+                                color = MutedMist,
+                                style = MaterialTheme.typography.labelSmall,
+                            )
+                        }
+                        TextButton(onClick = direct::clearResponse) {
+                            Text("Antwort schließen")
+                        }
+                    }
+                }
             }
         }
     }
@@ -686,3 +882,5 @@ private fun actionLabel(entry: AiHubEntry, hasPrompt: Boolean): String = when (e
         "Öffnen"
     }
 }
+
+private const val MAX_VISIBLE_PROVIDER_RESPONSE_CHARS = 20_000
