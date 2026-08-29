@@ -74,6 +74,8 @@ import cloud.kosch.aiandroid.model.TileAction
 import cloud.kosch.aiandroid.model.WorkspaceItem
 import cloud.kosch.aiandroid.model.WorkspaceItemContent
 import cloud.kosch.aiandroid.model.WorkspaceObjectStyleResolver
+import cloud.kosch.aiandroid.model.WorkspacePageIndicatorPolicy
+import cloud.kosch.aiandroid.model.WorkspacePagePolicy
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 import cloud.kosch.aiandroid.ui.theme.Mint
 import cloud.kosch.aiandroid.ui.theme.MutedMist
@@ -403,20 +405,42 @@ private fun ReferenceLegacyActionItem(
 private fun CompactPageDots(home: WorkspaceHomeController, modifier: Modifier = Modifier) {
     val pages = home.document.pages
     if (pages.size <= 1) return
+    val activeIndex = pages.indexOfFirst { it.id == home.document.activePageId }.coerceAtLeast(0)
+    val slots = WorkspacePageIndicatorPolicy.slots(pages.size, activeIndex)
+
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        pages.forEach { page ->
-            val selected = page.id == home.document.activePageId
-            Surface(
-                modifier = Modifier
-                    .size(if (selected) 9.dp else 7.dp)
-                    .clickable { home.activatePage(page.id) },
-                shape = CircleShape,
-                color = if (selected) Color.White else Color.White.copy(alpha = 0.38f),
-            ) {}
+        slots.forEach { pageIndex ->
+            if (pageIndex == null) {
+                Text(
+                    text = "…",
+                    color = Color.White.copy(alpha = 0.52f),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            } else {
+                val page = pages[pageIndex]
+                val selected = page.id == home.document.activePageId
+                val system = WorkspacePagePolicy.isSystem(page)
+                val baseColor = if (system) Sky else Color.White
+                Surface(
+                    modifier = Modifier
+                        .size(if (selected) 9.dp else 7.dp)
+                        .semantics {
+                            role = Role.Button
+                            contentDescription = buildString {
+                                append(page.title)
+                                append(", Seite ${pageIndex + 1} von ${pages.size}")
+                                if (system) append(", KAL-Bereich") else append(", persönliche Seite")
+                            }
+                        }
+                        .clickable { home.activatePage(page.id) },
+                    shape = CircleShape,
+                    color = if (selected) baseColor else baseColor.copy(alpha = 0.38f),
+                ) {}
+            }
         }
     }
 }
