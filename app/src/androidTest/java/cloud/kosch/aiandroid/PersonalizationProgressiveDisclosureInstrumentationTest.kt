@@ -1,6 +1,5 @@
 package cloud.kosch.aiandroid
 
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -43,9 +42,12 @@ class PersonalizationProgressiveDisclosureInstrumentationTest {
         composeTestRule
             .onNodeWithText("Gesten bearbeiten", useUnmergedTree = true)
             .fetchSemanticsNode()
-        composeTestRule
-            .onNodeWithText("Nach oben wischen", useUnmergedTree = true)
-            .assertDoesNotExist()
+        check(
+            composeTestRule
+                .onAllNodesWithText("Nach oben wischen", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty(),
+        ) { "Detailed gesture rows must stay collapsed until the user requests them." }
 
         composeTestRule
             .onNodeWithText("Gesten bearbeiten", useUnmergedTree = true)
