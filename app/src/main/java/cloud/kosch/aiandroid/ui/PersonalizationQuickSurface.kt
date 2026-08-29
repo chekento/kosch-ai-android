@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.RestartAlt
 import androidx.compose.material3.Button
@@ -59,13 +60,14 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Fast, low-cognitive-load customization for the two launcher features users expect to tweak most often.
- * The full Settings Center remains authoritative; this surface writes through the same controller and store.
+ * Fast, low-cognitive-load customization for the launcher features users expect to tweak most often.
+ * Home Studio owns spatial editing; the full Settings Center remains authoritative for expert settings.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PersonalizationQuickSurface(
     settings: LauncherSettingsController,
+    onOpenHomeStudio: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -99,11 +101,24 @@ fun PersonalizationQuickSurface(
             ) {
                 Icon(Icons.Rounded.Palette, contentDescription = null, tint = Sky)
                 Column(Modifier.weight(1f)) {
-                    Text("Schnell personalisieren", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Text("Wichtige Gesten & Icons", color = MutedMist)
+                    Text("Anpassen", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text("Homescreen, wichtige Gesten & Icons", color = MutedMist)
                 }
                 TextButton(onClick = onDismiss) { Text("Fertig") }
             }
+
+            OutlinedButton(
+                onClick = onOpenHomeStudio,
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Icon(Icons.Rounded.Edit, contentDescription = null)
+                Text("Home Studio öffnen")
+            }
+            Text(
+                "Apps, Widgets, Ordner und Seiten direkt anordnen – ohne den normalen Homescreen mit Bearbeitungsbuttons zu füllen.",
+                color = MutedMist,
+                style = MaterialTheme.typography.bodySmall,
+            )
 
             Surface(color = RaisedSurface, shape = RoundedCornerShape(20.dp)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -216,7 +231,7 @@ fun PersonalizationQuickSurface(
             }
 
             Text(
-                "Tipp: Raster, Dock, Ordner, Widgets, KI, Datenschutz und Barrierefreiheit bleiben im Settings Center übersichtlich nach Bereichen getrennt.",
+                "Raster, Dock, Ordner, Widgets, KI, Datenschutz und Barrierefreiheit bleiben im Settings Center übersichtlich nach Bereichen getrennt.",
                 color = Mint,
                 style = MaterialTheme.typography.labelSmall,
             )
