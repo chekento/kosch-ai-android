@@ -1,6 +1,5 @@
 package cloud.kosch.aiandroid
 
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -45,9 +44,12 @@ class SettingsCenterInstrumentationTest {
         search.fetchSemanticsNode()
 
         // Expert/diagnostic areas do not dominate the first screen, but stay one search away.
-        composeTestRule
-            .onNodeWithText("Erweitert & Diagnose", useUnmergedTree = true)
-            .assertDoesNotExist()
+        check(
+            composeTestRule
+                .onAllNodesWithText("Erweitert & Diagnose", useUnmergedTree = true)
+                .fetchSemanticsNodes()
+                .isEmpty(),
+        ) { "Advanced diagnostics must not dominate the initial Settings Center view." }
         search.performTextInput("Erweitert")
         composeTestRule.waitForIdle()
         composeTestRule
