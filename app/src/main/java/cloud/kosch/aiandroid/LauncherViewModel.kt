@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 /**
- * Owns launcher, unified Home, Settings Center, AI/browser Hub, Universal Search, portable custom actions and
+ * Owns launcher, unified Home, Settings Center, AI/browser Hub, News, Universal Search, portable custom actions and
  * Assistant runtimes across Activity recreation.
  *
  * Device-local widget host ownership is reconciled before Home loads. Portable launcher settings and scoped
@@ -81,6 +81,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             customActions = customActions.actions,
         )
     }
+    val news = NewsFeedController(application, viewModelScope)
 
     init {
         // Migrate every legacy provider entry path to the task-aware AI Hub without duplicating command parsing.
@@ -143,6 +144,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
         initialPrompt: String = "",
         requestedOrigin: AiHubOrigin = AiHubOrigin.HOME,
     ) {
+        news.close()
         universalSearch.close()
         settings.close()
         directProvider.refreshState()
@@ -153,6 +155,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     fun openUniversalSearch(initialQuery: String = "") {
+        news.close()
         aiHub.close()
         settings.close()
         controller.closeTopSurface()
@@ -163,6 +166,14 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
             universalSearchShortcuts.refresh(controller.apps)
             universalSearch.refresh()
         }
+    }
+
+    fun openNews() {
+        aiHub.close()
+        universalSearch.close()
+        settings.close()
+        controller.closeTopSurface()
+        news.open(networkAllowed = settings.document.privacy.allowNetworkFeatures)
     }
 
     /** Prepares a memory-only preview. It does not open the AI Hub and transfers no file content. */
@@ -269,6 +280,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     override fun onCleared() {
         adaptiveInputMonitor.stop()
+        news.close()
         universalSearch.close()
         universalSearchShortcuts.clear()
         aiContextHandoff.cancel()
