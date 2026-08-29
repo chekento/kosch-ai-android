@@ -50,10 +50,27 @@ class WorkspaceDragDropInstrumentationTest {
             }
             composeTestRule.waitForIdle()
 
-            composeTestRule.onNodeWithText("Home Studio", useUnmergedTree = true).performClick()
+            // Normal Home stays free of edit chrome. The supported discoverable path is KAL Menü -> Anpassen -> Home Studio.
+            composeTestRule
+                .onNodeWithContentDescription("KAL Menü", useUnmergedTree = true)
+                .performClick()
             composeTestRule.waitForIdle()
+            composeTestRule
+                .onNodeWithText("Anpassen", useUnmergedTree = true)
+                .performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule
+                .onNodeWithText("Home Studio öffnen", useUnmergedTree = true)
+                .performClick()
+
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule
+                    .onAllNodesWithText("Home Studio", useUnmergedTree = true)
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
             composeTestRule.onNodeWithText(
-                "Ziehen · skalieren · gestalten · Seiten verwalten",
+                "Apps · Widgets · Seiten · Raster · Drag & Drop",
                 substring = true,
                 useUnmergedTree = true,
             ).fetchSemanticsNode()
