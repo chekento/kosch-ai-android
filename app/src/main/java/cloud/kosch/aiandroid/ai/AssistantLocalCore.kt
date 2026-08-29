@@ -28,26 +28,26 @@ class AssistantLocalCore(
 
         val normalized = raw.normalized()
         if (normalized in greetingPhrases) {
-            return AssistantLocalReply("Hallo. Ich bin dein optionaler KoSch-Assistent. Launcher-Befehle kann ich lokal ausführen; freie KI-Fragen übergebe ich nur nach deiner Auswahl.")
+            return AssistantLocalReply("Hallo. Ich bin dein optionaler KAL Assistant. Launcher-Befehle kann ich lokal ausführen; freie KI-Fragen beantworte ich über einen bereits von dir freigegebenen Provider oder übergebe sie bewusst an den AI Hub.")
         }
         if (normalized in thanksPhrases) {
             return AssistantLocalReply("Gern.")
         }
         if (normalized in privacyPhrases) {
             return AssistantLocalReply(
-                "Dieser Chat bleibt in der aktuellen Sitzung. Der Local Core braucht kein Internet. Für generative Antworten wählst du den Zielanbieter ausdrücklich selbst.",
+                "Dieser Chat bleibt in der aktuellen Sitzung. Der Local Core braucht kein Internet. Ein externer Provider wird nur verwendet, wenn du ihn verbunden und Cloud Access ausdrücklich freigegeben hast.",
             )
         }
         if (normalized in helpPhrases) {
             return AssistantLocalReply(
-                "Ich kann Apps, Szenen, Kamera, Kalender, Dateien, Widgets, Einstellungen und weitere Launcher-Funktionen lokal anstoßen. Für eine freie KI-Frage biete ich dir anschließend eine bewusste Anbieterübergabe an.",
+                "Ich kann Apps, Szenen, Kamera, Kalender, Dateien, Widgets, Einstellungen und weitere Launcher-Funktionen lokal anstoßen. Freie KI-Fragen können über einen bereits freigegebenen Provider direkt im Chat beantwortet werden; sonst bleibt die bewusste Anbieterübergabe verfügbar.",
             )
         }
 
         return when (val command = commandPlanner.plan(raw)) {
             LauncherCommand.Empty -> AssistantLocalReply("Sag oder schreib mir, was ich für dich tun soll.")
             is LauncherCommand.RoutePrompt -> AssistantLocalReply(
-                text = "Das ist eine freie KI-Anfrage. Im aktuellen Offline-Build ist kein generatives Modell eingebettet. Ich kann den Text unverändert an einen von dir gewählten KI-Anbieter übergeben.",
+                text = "Für diese freie KI-Anfrage ist gerade kein direkt verwendbarer Provider vollständig freigegeben. Ich kann den Text unverändert im AI Hub weitergeben.",
                 handoffPrompt = command.prompt,
                 visualState = AssistantVisualState.OFFLINE,
                 actionRisk = AssistantCommandRiskClassifier.risk(command),
