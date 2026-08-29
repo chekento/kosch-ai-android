@@ -1,16 +1,20 @@
 package cloud.kosch.aiandroid.ui.theme
 
 import android.os.Build
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
+import cloud.kosch.aiandroid.model.ThemeMode
 
 val Ink = Color(0xFF071018)
 val DeepSurface = Color(0xFF0E1A24)
@@ -22,7 +26,7 @@ val Sky = Color(0xFF80BFFF)
 val Violet = Color(0xFFB7A7FF)
 val Warm = Color(0xFFFFC979)
 
-private val LauncherColorScheme = darkColorScheme(
+private val LauncherDarkColorScheme = darkColorScheme(
     primary = Mint,
     onPrimary = Color(0xFF003731),
     primaryContainer = Color(0xFF155248),
@@ -41,6 +45,27 @@ private val LauncherColorScheme = darkColorScheme(
     onSurfaceVariant = MutedMist,
     outline = Color(0xFF718994),
     error = Color(0xFFFFB4AB),
+)
+
+private val LauncherLightColorScheme = lightColorScheme(
+    primary = Color(0xFF006B61),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFF9EF2E7),
+    onPrimaryContainer = Color(0xFF00201C),
+    secondary = Color(0xFF17618E),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFCBE6FF),
+    onSecondaryContainer = Color(0xFF001E30),
+    tertiary = Color(0xFF66558E),
+    onTertiary = Color.White,
+    background = Color(0xFFF6FAFC),
+    onBackground = Color(0xFF172126),
+    surface = Color(0xFFFDFEFF),
+    onSurface = Color(0xFF172126),
+    surfaceVariant = Color(0xFFE1EAEE),
+    onSurfaceVariant = Color(0xFF3F494D),
+    outline = Color(0xFF6F797D),
+    error = Color(0xFFBA1A1A),
 )
 
 /**
@@ -69,12 +94,22 @@ private val KalTypography = Typography(
 @Composable
 fun KoSchLauncherTheme(
     dynamicColor: Boolean = false,
+    mode: ThemeMode = ThemeMode.THEME_DEFINED,
     content: @Composable () -> Unit,
 ) {
-    val colorScheme = if (dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        dynamicDarkColorScheme(LocalContext.current)
-    } else {
-        LauncherColorScheme
+    val systemDark = isSystemInDarkTheme()
+    val dark = when (mode) {
+        ThemeMode.SYSTEM -> systemDark
+        ThemeMode.LIGHT -> false
+        ThemeMode.DARK,
+        ThemeMode.THEME_DEFINED -> true
+    }
+    val context = LocalContext.current
+    val colorScheme = when {
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && dark -> dynamicDarkColorScheme(context)
+        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> dynamicLightColorScheme(context)
+        dark -> LauncherDarkColorScheme
+        else -> LauncherLightColorScheme
     }
     MaterialTheme(
         colorScheme = colorScheme,
