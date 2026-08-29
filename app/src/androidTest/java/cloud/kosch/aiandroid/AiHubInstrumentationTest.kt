@@ -51,6 +51,7 @@ class AiHubInstrumentationTest {
             // such as Chrome. LazyColumn also only composes the currently visible cards. Verify the portable system
             // route in UI and the complete install/discovery catalog against the controller snapshot below.
             assertTextPresent("Android Systembrowser")
+            assertTextAbsent("DIRECT PROVIDER · OPENROUTER")
 
             val browserTitles = viewModel.aiHub.entries(viewModel.controller.apps)
                 .filter { it.kind == AiHubEntryKind.BROWSER || it.kind == AiHubEntryKind.SYSTEM_BROWSER }
@@ -119,6 +120,13 @@ class AiHubInstrumentationTest {
             .onAllNodesWithText(text, substring = true, useUnmergedTree = true)
             .fetchSemanticsNodes()
         assertTrue("Expected at least one node containing '$text'", nodes.isNotEmpty())
+    }
+
+    private fun assertTextAbsent(text: String) {
+        val nodes = composeTestRule
+            .onAllNodesWithText(text, substring = true, useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        assertTrue("Expected no node containing '$text'", nodes.isEmpty())
     }
 
     private fun dismissOnboardingIfVisible() {
