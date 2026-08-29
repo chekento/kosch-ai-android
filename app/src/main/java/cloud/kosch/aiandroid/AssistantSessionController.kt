@@ -36,6 +36,8 @@ class AssistantSessionController(context: Context) {
     private var lastVisualReadyRequestId = -1L
     private var lastVisualFailureGeneration = -1L
     private var generativeRequester: ((String) -> Boolean)? = null
+    private var generativeReadinessProvider: (() -> String)? = null
+    private var lastGenerativeReadinessText: String? = null
     private var pendingGenerativeSpeech: ((String) -> Boolean)? = null
 
     var settings by mutableStateOf(store.load())
@@ -71,8 +73,15 @@ class AssistantSessionController(context: Context) {
         generativeRequester = requester
     }
 
+    /** Read-only provider status shown in chat. The callback must not mutate provider/cloud configuration. */
+    fun setGenerativeReadinessProvider(provider: (() -> String)?) {
+        generativeReadinessProvider = provider
+        lastGenerativeReadinessText = null
+    }
+
     fun open() {
         sheetVisible = true
+        publishGenerativeReadinessIfChanged()
     }
 
     fun closeSheet() {
@@ -98,6 +107,7 @@ class AssistantSessionController(context: Context) {
                 "Bereit. Launcher-Befehle laufen lokal. Ein bereits freigegebener KI-Provider kann hier direkt antworten; sonst bleibt die bewusste Anbieterübergabe verfügbar.",
             )
         }
+        if (enabled && sheetVisible) publishGenerativeReadinessIfChanged()
     }
 
     fun setVoiceInputEnabled(enabled: Boolean) {
@@ -136,14 +146,17 @@ class AssistantSessionController(context: Context) {
         messages = emptyList()
         handoffPrompt = null
         pendingGenerativeSpeech = null
+        lastGenerativeReadinessText = null
         clearSpeechSignal()
         attentionSignal = AssistantAttentionSignal.Idle
         AssistantVisualContextRuntime.discard()
         visualState = if (settings.enabled) AssistantVisualState.IDLE else AssistantVisualState.DISABLED
+        if (settings.enabled && sheetVisible) publishGenerativeReadinessIfChanged()
     }
 
     fun close() {
         generativeRequester = null
+        generativeReadinessProvider = null
         pendingGenerativeSpeech = null
         AssistantVisualContextRuntime.setEventListener(null)
         AssistantVisualContextRuntime.discard()
@@ -253,6 +266,7 @@ class AssistantSessionController(context: Context) {
 
         append(AssistantMessageRole.ASSISTANT, reply.text)
         handoffPrompt = providerPrompt
+        publishGenerativeReadinessIfChanged()
 
         when (reply.command) {
             null -> visualState = reply.visualState
@@ -307,6 +321,7 @@ class AssistantSessionController(context: Context) {
         )
         handoffPrompt = fallbackPrompt?.trim()?.take(MAX_MESSAGE_LENGTH)?.takeIf(String::isNotBlank)
         visualState = AssistantVisualState.ERROR
+        publishGenerativeReadinessIfChanged()
     }
 
     fun visualContextReady(metadata: AssistantVisualContextRuntime.Metadata) {
@@ -403,6 +418,19 @@ class AssistantSessionController(context: Context) {
         if (!matchesActiveSpeech(utteranceId)) return
         clearSpeechSignal()
         if (settings.enabled) visualState = AssistantVisualState.ERROR
+    }
+
+    private fun publishGenerativeReadinessIfChanged() {
+        if (!settings.enabled) return
+        val text = generativeReadinessProvider
+            ?.invoke()
+            ?.trim()
+            ?.take(MAX_MESSAGE_LENGTH)
+            ?.takeIf(String::isNotBlank)
+            ?: return
+        if (text == lastGenerativeReadinessText) return
+        lastGenerativeReadinessText = text
+        append(AssistantMessageRole.ASSISTANT, "KI-Status: $text")
     }
 
     private fun handleVisualContextEvent(event: AssistantVisualContextRuntime.Event) {
