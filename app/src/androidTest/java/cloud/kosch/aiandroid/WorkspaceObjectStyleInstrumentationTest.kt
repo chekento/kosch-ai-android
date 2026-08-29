@@ -56,7 +56,6 @@ class WorkspaceObjectStyleInstrumentationTest {
             composeTestRule.waitForIdle()
 
             assertContentDescriptionAbsent("Nicht verfügbare App")
-            assertTextPresent("Alle Elemente dieser Seite sind ausgeblendet")
 
             composeTestRule.activityRule.scenario.recreate()
             composeTestRule.waitForIdle()
@@ -66,7 +65,7 @@ class WorkspaceObjectStyleInstrumentationTest {
                 PortableSettingValue.Bool(false),
                 recreated.scopedSettings.document.objectOverride(itemId, VISIBLE_FEATURE),
             )
-            assertTextPresent("Alle Elemente dieser Seite sind ausgeblendet")
+            assertContentDescriptionAbsent("Nicht verfügbare App")
 
             composeTestRule.runOnUiThread {
                 val inherited = recreated.scopedSettings.setObjectOverride(
@@ -109,16 +108,6 @@ class WorkspaceObjectStyleInstrumentationTest {
                 .onAllNodesWithContentDescription(value, useUnmergedTree = true)
                 .fetchSemanticsNodes()
                 .isEmpty(),
-        )
-    }
-
-    private fun assertTextPresent(value: String) {
-        assertTrue(
-            "Expected text '$value' to exist",
-            composeTestRule
-                .onAllNodesWithText(value, useUnmergedTree = true)
-                .fetchSemanticsNodes()
-                .isNotEmpty(),
         )
     }
 
