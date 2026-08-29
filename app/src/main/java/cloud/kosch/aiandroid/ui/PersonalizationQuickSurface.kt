@@ -75,7 +75,7 @@ fun PersonalizationQuickSurface(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
-    val activity = context as? ComponentActivity
+    val activity = remember(context) { context.findComponentActivity() }
     val launcherViewModel = remember(activity) {
         activity?.let { ViewModelProvider(it)[LauncherViewModel::class.java] }
     }
@@ -253,6 +253,12 @@ fun PersonalizationQuickSurface(
             Spacer(Modifier.height(18.dp))
         }
     }
+}
+
+private tailrec fun android.content.Context.findComponentActivity(): ComponentActivity? = when (this) {
+    is ComponentActivity -> this
+    is android.content.ContextWrapper -> baseContext.findComponentActivity()
+    else -> null
 }
 
 @Composable
