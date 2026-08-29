@@ -1,6 +1,6 @@
 # Roadmap
 
-Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn Abbruch, Fehlerfall, Restore und Nutzerkontrolle mitgebaut sind.
+Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn Abbruch, Fehlerfall, Restore und Nutzerkontrolle mitgebaut sind. Parallel dazu bleibt der sichtbare Launcher-Produkttrack verbindlich: Security darf Releases blockieren, aber die Produktentwicklung nicht ersetzen.
 
 ## M1 – Launcher Vertical Slice
 
@@ -138,6 +138,55 @@ Die Reihenfolge folgt Vertrauensgrenzen. Ein Feature gilt erst als fertig, wenn 
 - [ ] lokale Zusammenfassung und strukturierte Befehle mit Schema-Validator
 - [ ] lokaler, je Quelle löschbarer Embedding-Index für Apps, Shortcuts und explizit gewählte Dateien
 - [ ] 9,5-Gate erst nach Messwerten, Accessibility-/OEM-Lab und geschlossenen Führungs-Gaps neu prüfen
+
+## Launcher Product Track – Home Studio & Settings Center
+
+- [x] Home Studio als sichtbare Launcher-Editierfläche für Drag/Drop, Cross-Page-Drop und Undo
+- [x] Core für Seiten-Duplizierung, Element-Resize und Auto-Anordnen
+- [x] versioniertes `LauncherSettingsDocument` als portable Settings-Grundstruktur
+- [x] Settings-Informationsarchitektur mit mindestens 22 Haupttabs festlegen
+- [x] atomarer Settings Store mit vollständigem versioniertem Codec, Validierung und portablem Import/Export
+- [ ] explizite Migrationskette für zukünftige Settings-Schema-Versionen
+- [x] adaptive Settings-Center-Shell mit Suche und eigenem Launcher-Navigationseintrag
+- [ ] Breadcrumbs, Favoriten/pinned Settings und „zuletzt geändert“
+- [ ] Scope-System Global → Seite → Objekt mit explizitem „Standard erben“
+- [x] globales Home-Raster live anbinden mit verlustfreiem Reflow, Apply/Discard und Settings-Undo
+- [ ] Rasterprofile für Portrait/Landscape/Tablet/Foldable und Reflow-Vorschau vor Commit
+- [x] Appearance-Basis live: Material-You-Schalter plus persistente Motion-/Blur-/Opacity-/Corner-/Scale-Tokens
+- [ ] Appearance vollständig visuell anwenden: Motion, Blur, Transparenz, Corner Scale, Wallpaper und Profile
+- [x] Assistant-Settings-Basis live: Aktivierung, Position, Größe, Deckkraft, Voice Input/Output und persistente Verhaltenstoggles
+- [ ] Assistant-Verhalten vollständig verdrahten: Charakter, Spawn/Portal, Idle, Gaze, Emotion, Viseme, Live Chat und Per-Page Sichtbarkeit
+- [ ] Themes: Auswahl, Preview, Import, Export, Rollback und Capability-Manifest
+- [ ] Icon Packs global und pro Objekt
+- [ ] Gesture Matrix global, pro Seite und pro Element
+- [ ] Widgets/Stacks vollständig über Settings/Inspector konfigurierbar
+- [ ] Apps, Drawer, Dock, Folder, Badge und Search Settings vollständig anbinden
+- [ ] KI-/Modell-Einstellungen mit Local-first/Ask/Default-Provider-Routing
+- [ ] API-/Provider-Settings mit Endpoint, Model ID und Vault-Alias; Secret Values niemals im Settings-Dokument
+- [ ] Voice/TTS/STT und Audio-Routing-Einstellungen
+- [ ] Smartpen/Pen-Space-Konfiguration
+- [ ] Automationen/Kontextregeln mit Dry Run und Preview/Apply
+- [ ] Accessibility-Profile als echte Designvarianten
+- [ ] Privacy/Security-Einstellungen in Settings integrieren, Security Center bleibt Detailbereich statt Produktzentrum
+- [ ] Backup/Restore mit Teilbereichsauswahl, Dry Run und Konfliktvorschau
+- [ ] Teil-Reset pro Setting, Gruppe und Tab sowie kompletter Reset
+- [ ] Settings Teil-Import/-Export ohne Secrets/Widget-IDs/URI-Grants
+- [ ] Tests für Migration, Process Death, Import/Export, Scope-Vererbung, große Settings-Datenmengen und OEM-Konfiguration
+
+## Launcher Product Track – Eigene Verknüpfungen & Links
+
+- [ ] eigene Verknüpfungen als first-class Launcher-Objekt mit stabiler ID, Name, Beschreibung und frei wählbarem Icon
+- [ ] sichere HTTP-/HTTPS-Links und Android-Deep-Links
+- [ ] definierte sichere Intent-Vorlagen und launcherinterne Actions; keine ungeprüften rohen Intent-Extras aus Importen ausführen
+- [ ] optionales Zielprofil/Work-Profile, sofern Android die Aktion dort zulässt
+- [ ] Platzierung auf Home-Seiten, im Dock, in Ordnern und in der Command Palette
+- [ ] eigene Links in App-Suche und globaler Suche auffindbar machen
+- [ ] Verknüpfungen als Ziel für Tap, Long Press, Swipe/Geste, Smartpen-Taste und Automation/Rule Engine
+- [ ] per-Link Darstellung: eigenes Icon, Label, Farbe/Theme-Override, Badge-Verhalten und Öffnungsart
+- [ ] Editor mit Validierung, Testen/Vorschau, Duplizieren, Deaktivieren und Löschen mit Undo
+- [ ] portable Import-/Export- und Backup-Unterstützung mit Schema-/Scheme-Validierung
+- [ ] Migration/Restore bei fehlenden Ziel-Apps oder nicht mehr unterstützten Deep Links verständlich darstellen
+- [ ] Tests für URL-Schemes, Deep-Link-Fallback, Profile, Import-Manipulation und nicht auflösbare Ziele
 
 ## M3 – Sichere Agenten und optionale APIs
 

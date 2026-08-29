@@ -35,6 +35,11 @@ class AssistantSessionController(context: Context) {
     private var visualStateAfterSpeech = AssistantVisualState.IDLE
     private var lastVisualReadyRequestId = -1L
     private var lastVisualFailureGeneration = -1L
+    private var launcherControlRequester: ((String) -> String?)? = null
+    private var generativeRequester: ((String) -> Boolean)? = null
+    private var generativeReadinessProvider: (() -> String)? = null
+    private var lastGenerativeReadinessText: String? = null
+    private var pendingGenerativeSpeech: ((String) -> Boolean)? = null
 
     var settings by mutableStateOf(store.load())
         private set
@@ -61,8 +66,31 @@ class AssistantSessionController(context: Context) {
         }
     }
 
+    /**
+     * Local, closed-vocabulary launcher/settings bridge. Returning null means the input was not a supported local
+     * control request and may continue through visual/local-command/generative routing.
+     */
+    fun setLauncherControlRequester(requester: ((String) -> String?)?) {
+        launcherControlRequester = requester
+    }
+
+    /**
+     * ViewModel-owned bridge to an explicitly configured provider. The requester must return false when no network
+     * request was actually started so the safe handoff path remains visible. Nothing here can enable Cloud Access.
+     */
+    fun setGenerativeRequester(requester: ((String) -> Boolean)?) {
+        generativeRequester = requester
+    }
+
+    /** Read-only provider status shown in chat. The callback must not mutate provider/cloud configuration. */
+    fun setGenerativeReadinessProvider(provider: (() -> String)?) {
+        generativeReadinessProvider = provider
+        lastGenerativeReadinessText = null
+    }
+
     fun open() {
         sheetVisible = true
+        publishGenerativeReadinessIfChanged()
     }
 
     fun closeSheet() {
@@ -77,6 +105,7 @@ class AssistantSessionController(context: Context) {
         awaitingVoice = false
         clearSpeechSignal()
         if (!enabled) {
+            pendingGenerativeSpeech = null
             attentionSignal = AssistantAttentionSignal.Idle
             AssistantVisualContextRuntime.discard()
         }
@@ -84,9 +113,10 @@ class AssistantSessionController(context: Context) {
         if (enabled && messages.isEmpty()) {
             append(
                 AssistantMessageRole.ASSISTANT,
-                "Bereit. Launcher-Befehle laufen lokal; freie KI-Anfragen gebe ich nur nach deiner Auswahl weiter.",
+                "Bereit. Ich kann Apps öffnen sowie Launcher-Einstellungen und Darstellung direkt lokal ändern. Für freie Wissensfragen nutze ich nur einen von dir eingerichteten KI-Anbieter.",
             )
         }
+        if (enabled && sheetVisible) publishGenerativeReadinessIfChanged()
     }
 
     fun setVoiceInputEnabled(enabled: Boolean) {
@@ -96,7 +126,10 @@ class AssistantSessionController(context: Context) {
 
     fun setSpeechOutputEnabled(enabled: Boolean) {
         updateSettings(settings.copy(speechOutputEnabled = enabled))
-        if (!enabled && speechSignal.active) speechInterrupted()
+        if (!enabled) {
+            pendingGenerativeSpeech = null
+            if (speechSignal.active) speechInterrupted()
+        }
     }
 
     fun setReducedMotion(enabled: Boolean) {
@@ -121,13 +154,20 @@ class AssistantSessionController(context: Context) {
     fun clearSession() {
         messages = emptyList()
         handoffPrompt = null
+        pendingGenerativeSpeech = null
+        lastGenerativeReadinessText = null
         clearSpeechSignal()
         attentionSignal = AssistantAttentionSignal.Idle
         AssistantVisualContextRuntime.discard()
         visualState = if (settings.enabled) AssistantVisualState.IDLE else AssistantVisualState.DISABLED
+        if (settings.enabled && sheetVisible) publishGenerativeReadinessIfChanged()
     }
 
     fun close() {
+        launcherControlRequester = null
+        generativeRequester = null
+        generativeReadinessProvider = null
+        pendingGenerativeSpeech = null
         AssistantVisualContextRuntime.setEventListener(null)
         AssistantVisualContextRuntime.discard()
         mainHandler.removeCallbacksAndMessages(null)
@@ -202,6 +242,18 @@ class AssistantSessionController(context: Context) {
         handoffPrompt = null
         visualState = AssistantVisualState.THINKING
 
+        val launcherControlReply = launcherControlRequester?.invoke(input)
+            ?.trim()
+            ?.take(MAX_MESSAGE_LENGTH)
+            ?.takeIf(String::isNotBlank)
+        if (launcherControlReply != null) {
+            append(AssistantMessageRole.ASSISTANT, launcherControlReply)
+            handoffPrompt = null
+            visualState = AssistantVisualState.IDLE
+            if (settings.speechOutputEnabled) requestSpeech(launcherControlReply)
+            return
+        }
+
         val visualRequest = AssistantVisualContextRequestParser.parseRequest(input)
         if (visualRequest != null) {
             val accepted = requestVisualContext(visualRequest.source) ||
@@ -223,8 +275,20 @@ class AssistantSessionController(context: Context) {
         }
 
         val reply = localCore.reply(input)
+        val providerPrompt = reply.handoffPrompt?.takeIf(String::isNotBlank)
+        if (providerPrompt != null) {
+            val started = generativeRequester?.invoke(providerPrompt) == true
+            if (started) {
+                pendingGenerativeSpeech = if (settings.speechOutputEnabled) requestSpeech else null
+                handoffPrompt = null
+                visualState = AssistantVisualState.THINKING
+                return
+            }
+        }
+
         append(AssistantMessageRole.ASSISTANT, reply.text)
-        handoffPrompt = reply.handoffPrompt
+        handoffPrompt = providerPrompt
+        publishGenerativeReadinessIfChanged()
 
         when (reply.command) {
             null -> visualState = reply.visualState
@@ -248,8 +312,38 @@ class AssistantSessionController(context: Context) {
             reply.text.isNotBlank()
         ) {
             requestSpeech(reply.text)
-            // The TTS listener switches to SPEAKING only when Android reports actual playback.
         }
+    }
+
+    fun consumeGenerativeResponse(text: String) {
+        if (!settings.enabled) {
+            pendingGenerativeSpeech = null
+            return
+        }
+        val normalized = text.trim().take(MAX_MESSAGE_LENGTH)
+        if (normalized.isBlank()) {
+            consumeGenerativeFailure("Der verbundene Provider hat keine Textantwort geliefert", null)
+            return
+        }
+        append(AssistantMessageRole.ASSISTANT, normalized)
+        handoffPrompt = null
+        visualState = AssistantVisualState.IDLE
+        val speech = pendingGenerativeSpeech
+        pendingGenerativeSpeech = null
+        if (settings.speechOutputEnabled) speech?.invoke(normalized)
+    }
+
+    fun consumeGenerativeFailure(reason: String, fallbackPrompt: String?) {
+        pendingGenerativeSpeech = null
+        if (!settings.enabled) return
+        val safeReason = reason.trim().take(320).ifBlank { "Die Provider-Anfrage ist fehlgeschlagen" }
+        append(
+            AssistantMessageRole.ASSISTANT,
+            "$safeReason. Deine Frage bleibt hier erhalten; du kannst das KI-Modell gezielt verbinden oder später erneut senden.",
+        )
+        handoffPrompt = fallbackPrompt?.trim()?.take(MAX_MESSAGE_LENGTH)?.takeIf(String::isNotBlank)
+        visualState = AssistantVisualState.ERROR
+        publishGenerativeReadinessIfChanged()
     }
 
     fun visualContextReady(metadata: AssistantVisualContextRuntime.Metadata) {
@@ -346,6 +440,19 @@ class AssistantSessionController(context: Context) {
         if (!matchesActiveSpeech(utteranceId)) return
         clearSpeechSignal()
         if (settings.enabled) visualState = AssistantVisualState.ERROR
+    }
+
+    private fun publishGenerativeReadinessIfChanged() {
+        if (!settings.enabled) return
+        val text = generativeReadinessProvider
+            ?.invoke()
+            ?.trim()
+            ?.take(MAX_MESSAGE_LENGTH)
+            ?.takeIf(String::isNotBlank)
+            ?: return
+        if (text == lastGenerativeReadinessText) return
+        lastGenerativeReadinessText = text
+        append(AssistantMessageRole.ASSISTANT, "KI-Status: $text")
     }
 
     private fun handleVisualContextEvent(event: AssistantVisualContextRuntime.Event) {

@@ -43,14 +43,16 @@ class VpnConsentContractInstrumentationTest {
     }
 
     @Test
-    fun n1Package_stillHasNoInternetPermission() {
+    fun packageNetworkPermissions_matchProviderAndN1Separation() {
         val packageInfo = context.packageManager.getPackageInfo(
             context.packageName,
             PackageManager.PackageInfoFlags.of(PackageManager.GET_PERMISSIONS.toLong()),
         )
         val requested = packageInfo.requestedPermissions.orEmpty().toSet()
 
-        assertFalse(Manifest.permission.INTERNET in requested)
+        // INTERNET is a deliberate package capability for foreground, explicitly connected AI providers. It does not
+        // activate the separate N1 VPN prototype; that boundary is asserted by the engine-state contract below.
+        assertTrue(Manifest.permission.INTERNET in requested)
         assertTrue(Manifest.permission.ACCESS_NETWORK_STATE in requested)
     }
 

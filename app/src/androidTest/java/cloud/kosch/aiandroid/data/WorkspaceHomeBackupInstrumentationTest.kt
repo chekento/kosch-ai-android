@@ -3,6 +3,8 @@ package cloud.kosch.aiandroid.data
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.kosch.aiandroid.WorkspaceHomeController
+import cloud.kosch.aiandroid.model.WorkspaceCellBounds
+import cloud.kosch.aiandroid.model.WorkspaceItem
 import cloud.kosch.aiandroid.model.WorkspaceItemContent
 import cloud.kosch.aiandroid.model.WorkspacePageEditor
 import org.json.JSONObject
@@ -74,14 +76,42 @@ class WorkspaceHomeBackupInstrumentationTest {
     fun portableBackupV3_rejectsEmbeddedAndroidWidgetHostId() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         val store = WorkspaceStore(context)
-        val payload = store.createPortableSnapshot()
+        val original = store.loadWorkspaceDocument()
+        var payloadToWipe: ByteArray? = null
         var tamperedToWipe: ByteArray? = null
         try {
+            val homeId = original.activePageId
+            val fixtureItem = WorkspaceItem(
+                id = "item:test:tamper-widget",
+                bounds = WorkspaceCellBounds(0, 0, 2, 2),
+                content = WorkspaceItemContent.Widget("cloud.kosch.fixture/.Widget"),
+            )
+            val fixture = original.copy(
+                pages = original.pages.map { page ->
+                    if (page.id == homeId) page.copy(items = page.items + fixtureItem) else page
+                },
+            ).normalized()
+            assertTrue(store.saveWorkspaceDocument(fixture))
+
+            val payload = store.createPortableSnapshot()
+            payloadToWipe = payload
             val root = JSONObject(payload.toString(StandardCharsets.UTF_8))
-            val workspace = root.getJSONObject("workspaceV7")
-            val firstPage = workspace.getJSONArray("pages").getJSONObject(0)
-            val firstItem = firstPage.getJSONArray("items").getJSONObject(0)
-            firstItem.put("appWidgetId", 12345)
+            val pages = root.getJSONObject("workspaceV7").getJSONArray("pages")
+            var targetItem: JSONObject? = null
+            for (pageIndex in 0 until pages.length()) {
+                val page = pages.getJSONObject(pageIndex)
+                val items = page.getJSONArray("items")
+                for (itemIndex in 0 until items.length()) {
+                    val item = items.getJSONObject(itemIndex)
+                    if (item.optString("id") == fixtureItem.id) {
+                        targetItem = item
+                        break
+                    }
+                }
+                if (targetItem != null) break
+            }
+            requireNotNull(targetItem) { "Portable fixture item missing from backup" }
+                .put("appWidgetId", 12345)
             val tampered = root.toString().toByteArray(StandardCharsets.UTF_8)
             tamperedToWipe = tampered
 
@@ -92,8 +122,9 @@ class WorkspaceHomeBackupInstrumentationTest {
                 // Expected: Android widget host IDs are deliberately device-bound.
             }
         } finally {
-            payload.fill(0)
+            payloadToWipe?.fill(0)
             tamperedToWipe?.fill(0)
+            store.saveWorkspaceDocument(original)
         }
     }
 }

@@ -1,6 +1,7 @@
 package cloud.kosch.aiandroid.data
 
 import android.content.Context
+import android.content.SharedPreferences
 import cloud.kosch.aiandroid.model.AssistantAgentPreferences
 import cloud.kosch.aiandroid.model.AssistantPresenceMode
 import cloud.kosch.aiandroid.model.AssistantWakeWordMode
@@ -41,18 +42,34 @@ class AssistantAgentStore(context: Context) {
     )
 
     fun save(settings: AssistantAgentPreferences) {
-        saveInternal(settings = settings, allowObservationOptIn = false)
+        saveInternal(settings = settings, allowObservationOptIn = false, synchronous = false)
     }
 
     /** Dedicated persistence path for a direct Settings/UI user gesture. */
     fun saveUserObservationOptIn(settings: AssistantAgentPreferences) {
-        saveInternal(settings = settings, allowObservationOptIn = true)
+        saveInternal(settings = settings, allowObservationOptIn = true, synchronous = false)
     }
 
-    private fun saveInternal(settings: AssistantAgentPreferences, allowObservationOptIn: Boolean) {
-        require(validIdentifier(settings.characterId)) { "Ungültige Charakter-ID" }
-        require(validAssistantName(settings.assistantName)) { "Ungültiger Assistentenname" }
-        require(validWakeWordDraft(settings.customWakeWord)) { "Ungültiges Wake Word" }
+    /**
+     * Transaction-friendly restore boundary for an already sanitized portable backup.
+     * Observation and action execution must be false and therefore can never be escalated by restore.
+     */
+    fun restorePortable(settings: AssistantAgentPreferences): Boolean {
+        require(!settings.screenObservationEnabled) { "Portable restore cannot enable Screen-Awareness" }
+        require(!settings.cameraObservationEnabled) { "Portable restore cannot enable Camera-Awareness" }
+        require(!settings.actionExecutionEnabled) { "Portable restore cannot enable action execution" }
+        require(settings.confirmationRequiredForExternalActions) {
+            "Portable restore must keep external-action confirmation enabled"
+        }
+        return saveInternal(settings = settings, allowObservationOptIn = false, synchronous = true)
+    }
+
+    private fun saveInternal(
+        settings: AssistantAgentPreferences,
+        allowObservationOptIn: Boolean,
+        synchronous: Boolean,
+    ): Boolean {
+        validate(settings)
         val currentScreen = preferences.getBoolean(KEY_SCREEN_OBSERVATION, false)
         val currentCamera = preferences.getBoolean(KEY_CAMERA_OBSERVATION, false)
         require(allowObservationOptIn || currentScreen || !settings.screenObservationEnabled) {
@@ -61,8 +78,12 @@ class AssistantAgentStore(context: Context) {
         require(allowObservationOptIn || currentCamera || !settings.cameraObservationEnabled) {
             "Camera-Awareness darf nur manuell aktiviert werden"
         }
-        preferences.edit()
-            .putString(KEY_CHARACTER_ID, settings.characterId)
+        val editor = preferences.edit().write(settings)
+        return if (synchronous) editor.commit() else true.also { editor.apply() }
+    }
+
+    private fun SharedPreferences.Editor.write(settings: AssistantAgentPreferences): SharedPreferences.Editor =
+        putString(KEY_CHARACTER_ID, settings.characterId)
             .putString(KEY_ASSISTANT_NAME, settings.assistantName.trim())
             .putString(KEY_PRESENCE_MODE, settings.presenceMode.name)
             .putString(KEY_WAKE_WORD_MODE, settings.wakeWordMode.name)
@@ -72,7 +93,11 @@ class AssistantAgentStore(context: Context) {
             .putBoolean(KEY_CAMERA_OBSERVATION, settings.cameraObservationEnabled)
             .putBoolean(KEY_ACTION_EXECUTION, settings.actionExecutionEnabled)
             .putBoolean(KEY_CONFIRM_EXTERNAL, settings.confirmationRequiredForExternalActions)
-            .apply()
+
+    private fun validate(settings: AssistantAgentPreferences) {
+        require(validIdentifier(settings.characterId)) { "Ungültige Charakter-ID" }
+        require(validAssistantName(settings.assistantName)) { "Ungültiger Assistentenname" }
+        require(validWakeWordDraft(settings.customWakeWord)) { "Ungültiges Wake Word" }
     }
 
     private fun validIdentifier(value: String): Boolean =

@@ -10,7 +10,7 @@ class AssistantSpeechDynamicsTest {
     @Test
     fun visemeEnum_matchesExactMatrixOrder() {
         assertEquals(
-            listOf("sil", "pp", "ff", "th", "dd", "kk", "ch", "ss", "nn", "rr", "aa", "e", "ih", "oh", "ou"),
+            listOf("sil", "pp", "ff", "th", "dd", "kk", "ch", "ss", "nn", "rr", "aa", "ee", "ih", "oh", "ou"),
             AssistantViseme.entries.map(AssistantViseme::code),
         )
     }
@@ -32,6 +32,17 @@ class AssistantSpeechDynamicsTest {
         )
         assertTrue(
             AssistantVisemeMapper.fromText("a".repeat(200)).size <= AssistantSpeechSignal.MAX_RANGE_VISEMES,
+        )
+    }
+
+    @Test
+    fun matrixEeSlot_isUsedForEAndEeGraphemes() {
+        assertEquals("ee", AssistantViseme.E.code)
+        assertEquals(listOf(AssistantViseme.E), AssistantVisemeMapper.fromText("e"))
+        assertEquals(listOf(AssistantViseme.E), AssistantVisemeMapper.fromText("ee"))
+        assertEquals(
+            "asst_default_mouth_viseme_ee.webp",
+            AssistantAssetCatalog.mouthVisemeFile(AssistantViseme.E),
         )
     }
 

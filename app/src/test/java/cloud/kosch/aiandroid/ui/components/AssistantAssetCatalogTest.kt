@@ -28,10 +28,11 @@ class AssistantAssetCatalogTest {
     @Test
     fun visemeContract_containsExactlyFifteenCodes() {
         assertEquals(
-            listOf("sil", "pp", "ff", "th", "dd", "kk", "ch", "ss", "nn", "rr", "aa", "e", "ih", "oh", "ou"),
+            listOf("sil", "pp", "ff", "th", "dd", "kk", "ch", "ss", "nn", "rr", "aa", "ee", "ih", "oh", "ou"),
             AssistantAssetCatalog.visemes,
         )
         assertEquals("asst_default_mouth_viseme_aa.webp", AssistantAssetCatalog.mouthVisemeFile("aa"))
+        assertEquals("asst_default_mouth_viseme_ee.webp", AssistantAssetCatalog.mouthVisemeFile(AssistantViseme.E))
         assertEquals(
             "asst_default_mouth_viseme_oh.webp",
             AssistantAssetCatalog.mouthVisemeFile(AssistantViseme.OH),

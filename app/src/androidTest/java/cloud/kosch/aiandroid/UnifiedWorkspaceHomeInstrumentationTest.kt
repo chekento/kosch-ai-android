@@ -1,7 +1,6 @@
 package cloud.kosch.aiandroid
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -10,6 +9,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.kosch.aiandroid.data.WorkspaceStore
 import cloud.kosch.aiandroid.model.HomePage
+import cloud.kosch.aiandroid.model.WorkspaceDocument
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -22,66 +22,77 @@ class UnifiedWorkspaceHomeInstrumentationTest {
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun userHomePage_rendersCompanionKeepsHomeAcrossDrawerAndSurvivesRecreation() {
+    fun userHomePage_keepsCoreEntryPointsAcrossDrawerAndSurvivesRecreation() {
         composeTestRule.waitForIdle()
         dismissOnboardingIfVisible()
 
-        val originalPage = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
-            .controller.homePage
+        val initialViewModel = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
+        val originalPage = initialViewModel.controller.homePage
         val store = WorkspaceStore(composeTestRule.activity.applicationContext)
         val originalDocument = store.loadWorkspaceDocument()
 
         try {
             composeTestRule.runOnUiThread {
-                val viewModel = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
-                viewModel.homeWorkspace.createPage("API36 Home Test")
-                viewModel.homeWorkspace.addApp("test:cloud.kosch.missing")
-                viewModel.controller.switchHomePage(HomePage.WORKSPACE)
+                initialViewModel.homeWorkspace.createPage("API36 Home Test")
+                initialViewModel.homeWorkspace.addApp("test:cloud.kosch.missing")
+                initialViewModel.controller.switchHomePage(HomePage.WORKSPACE)
             }
             composeTestRule.waitForIdle()
 
-            assertTextPresent("API36 Home Test")
-            composeTestRule
-                .onNodeWithText("V7 HOME · frei platzierbar", useUnmergedTree = true)
-                .fetchSemanticsNode()
+            assertEquals(WorkspaceDocument.DEFAULT_PAGE_ID, initialViewModel.homeWorkspace.document.pages.first().id)
+            assertEquals("API36 Home Test", initialViewModel.homeWorkspace.activePage.title)
+            assertTrue(initialViewModel.homeWorkspace.isUserManagedPage())
             composeTestRule
                 .onNodeWithText("App fehlt", useUnmergedTree = true)
                 .fetchSemanticsNode()
             composeTestRule
-                .onNodeWithContentDescription("App, Ordner oder Seite hinzufügen", useUnmergedTree = true)
+                .onNodeWithContentDescription("Zum Homescreen hinzufügen", useUnmergedTree = true)
                 .fetchSemanticsNode()
-
-            val assistantNodes = composeTestRule
-                .onAllNodesWithContentDescription("KoSch Assistant einrichten", useUnmergedTree = true)
-                .fetchSemanticsNodes() + composeTestRule
-                .onAllNodesWithContentDescription("KoSch Assistant öffnen", useUnmergedTree = true)
-                .fetchSemanticsNodes()
-            assertTrue("Expected Assistant companion on unified Home", assistantNodes.isNotEmpty())
-
             composeTestRule
                 .onNodeWithContentDescription("Alle Apps", useUnmergedTree = true)
+                .fetchSemanticsNode()
+            composeTestRule
+                .onNodeWithContentDescription("KAL Menü", useUnmergedTree = true)
+                .fetchSemanticsNode()
+
+            // Click the merged button semantics rather than the unmerged icon descendant. This keeps the test tied to
+            // the same accessible action a user invokes and avoids API-36 dispatching the click to a non-clickable child.
+            composeTestRule
+                .onNodeWithContentDescription("Alle Apps")
                 .performClick()
             composeTestRule.waitForIdle()
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                initialViewModel.controller.drawerVisible
+            }
 
             val openDrawerViewModel = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
             assertEquals(HomePage.WORKSPACE, openDrawerViewModel.controller.homePage)
-            composeTestRule
-                .onNodeWithText("App-Raum", useUnmergedTree = true)
-                .fetchSemanticsNode()
+            assertTrue(openDrawerViewModel.controller.drawerVisible)
 
             composeTestRule.runOnUiThread {
-                ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
-                    .controller.closeDrawer()
+                openDrawerViewModel.controller.closeDrawer()
+            }
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                !openDrawerViewModel.controller.drawerVisible
             }
             composeTestRule.waitForIdle()
-            assertTextPresent("API36 Home Test")
+            composeTestRule.onNodeWithText("App fehlt", useUnmergedTree = true).fetchSemanticsNode()
 
             composeTestRule.activityRule.scenario.recreate()
             composeTestRule.waitForIdle()
 
-            assertTextPresent("API36 Home Test")
+            val recreated = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
+            assertEquals(WorkspaceDocument.DEFAULT_PAGE_ID, recreated.homeWorkspace.document.pages.first().id)
+            assertEquals("API36 Home Test", recreated.homeWorkspace.activePage.title)
+            assertTrue(recreated.homeWorkspace.isUserManagedPage())
             composeTestRule
                 .onNodeWithText("App fehlt", useUnmergedTree = true)
+                .fetchSemanticsNode()
+            composeTestRule
+                .onNodeWithContentDescription("Alle Apps", useUnmergedTree = true)
+                .fetchSemanticsNode()
+            composeTestRule
+                .onNodeWithContentDescription("Zum Homescreen hinzufügen", useUnmergedTree = true)
                 .fetchSemanticsNode()
         } finally {
             composeTestRule.runOnUiThread {
@@ -92,13 +103,6 @@ class UnifiedWorkspaceHomeInstrumentationTest {
             }
             composeTestRule.waitForIdle()
         }
-    }
-
-    private fun assertTextPresent(text: String) {
-        val nodes = composeTestRule
-            .onAllNodesWithText(text, useUnmergedTree = true)
-            .fetchSemanticsNodes()
-        assertTrue("Expected at least one node containing '$text'", nodes.isNotEmpty())
     }
 
     private fun dismissOnboardingIfVisible() {

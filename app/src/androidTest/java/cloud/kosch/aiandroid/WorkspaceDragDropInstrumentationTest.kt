@@ -50,16 +50,45 @@ class WorkspaceDragDropInstrumentationTest {
             }
             composeTestRule.waitForIdle()
 
-            composeTestRule.onNodeWithText("Anordnen", useUnmergedTree = true).performClick()
+            // Normal Home stays free of edit chrome. The supported discoverable path is KAL Menü -> Anpassen -> Home Studio.
+            composeTestRule
+                .onNodeWithContentDescription("KAL Menü", useUnmergedTree = true)
+                .performClick()
             composeTestRule.waitForIdle()
-            composeTestRule.onNodeWithText("Homescreen anordnen", useUnmergedTree = true).fetchSemanticsNode()
+            composeTestRule
+                .onNodeWithText("Anpassen", useUnmergedTree = true)
+                .performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule
+                .onNodeWithText("Home Studio öffnen", useUnmergedTree = true)
+                .performClick()
+
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule
+                    .onAllNodesWithText("Home Studio", useUnmergedTree = true)
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
+            composeTestRule.onNodeWithText(
+                "Apps · Widgets · Seiten · Raster · Drag & Drop",
+                substring = true,
+                useUnmergedTree = true,
+            ).fetchSemanticsNode()
+
+            val itemDescription = "App. Ziehen zum Verschieben. Tippen für Größe und Stil"
+            composeTestRule
+                .onNodeWithContentDescription(itemDescription, useUnmergedTree = true)
+                .performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithText("Stil", useUnmergedTree = true).fetchSemanticsNode()
 
             composeTestRule
-                .onNodeWithContentDescription("App. Ziehen zum Verschieben", useUnmergedTree = true)
+                .onNodeWithContentDescription(
+                    "App. Ziehen zum Verschieben. Ausgewählt. Größe und Stil verfügbar",
+                    useUnmergedTree = true,
+                )
                 .performTouchInput {
                     down(center)
-                    // Touch injection distances are physical pixels. Move in several realistic pointer steps
-                    // far enough to cross the full 12-column canvas on the API 36 Pixel 2 density.
                     repeat(8) { moveBy(Offset(160f, 0f)) }
                     up()
                 }

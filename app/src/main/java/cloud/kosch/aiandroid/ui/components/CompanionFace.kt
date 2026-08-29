@@ -49,7 +49,7 @@ import java.util.concurrent.ConcurrentHashMap
  * Existing Ask-Dock companion, now upgraded into the optional Assistant entry point.
  *
  * The original voice callback remains the fallback if this composable is ever rendered outside the
- * launcher Activity. Inside KoSch the Assistant reuses the Activity-owned LauncherViewModel, so no
+ * launcher Activity. Inside KAL the Assistant reuses the Activity-owned LauncherViewModel, so no
  * second launcher runtime or hidden background listener is created. Screen sharing is the sole
  * deliberate foreground-service exception and exists only after Android MediaProjection consent.
  */
@@ -411,7 +411,7 @@ fun CompanionFace(
         } else if (!selectCharacterVoice(engine)) {
             false
         } else {
-            val utteranceId = "kosch-assistant-${System.nanoTime()}"
+            val utteranceId = "kal-assistant-${System.nanoTime()}"
             assistant?.speechQueued(utteranceId, text)
             val result = runCatching {
                 engine.speak(
@@ -438,8 +438,8 @@ fun CompanionFace(
             launcherController?.postNotice("Diese TTS-Stimme konnte nicht aktiviert werden")
             false
         } else {
-            val sample = "Hallo. Ich bin dein KoSch Assistant. So klingt diese Stimme."
-            val utteranceId = "kosch-assistant-preview-${System.nanoTime()}"
+            val sample = "Hallo. Ich bin dein KAL Assistant. So klingt diese Stimme."
+            val utteranceId = "kal-assistant-preview-${System.nanoTime()}"
             assistant?.speechQueued(utteranceId, sample)
             val result = runCatching {
                 engine.speak(sample, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
@@ -477,7 +477,7 @@ fun CompanionFace(
             ttsEngine?.stop()
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_PROMPT, "Was möchtest du den KoSch Assistant fragen?")
+                putExtra(RecognizerIntent.EXTRA_PROMPT, "Was möchtest du den KAL Assistant fragen?")
             }
             runCatching { voiceLauncher.launch(intent) }
                 .onFailure {
@@ -494,9 +494,9 @@ fun CompanionFace(
         reducedMotion = effectiveReducedMotion,
         attentionSignal = assistant?.attentionSignal ?: AssistantAttentionSignal.Idle,
         contentDescription = if (assistant?.settings?.enabled == true) {
-            "KoSch Assistant öffnen"
+            "KAL Assistant öffnen"
         } else {
-            "KoSch Assistant einrichten"
+            "KAL Assistant einrichten"
         },
         onPointerAttention = { x, y, pressed -> assistant?.pointerAttention(x, y, pressed) },
         onActivate = { assistant?.attentionActivated() },

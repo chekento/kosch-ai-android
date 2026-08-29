@@ -155,7 +155,7 @@ class WorkspaceEngineModelsTest {
     }
 
     @Test
-    fun legacyMigration_preservesEverySceneAndUsesDeterministicStableIds() {
+    fun legacyMigration_preservesEverySceneBehindCleanUserHomeAndUsesStableIds() {
         val positions = SceneId.entries.associateWith { scene ->
             DefaultWorkspace.tiles(scene).associate { tile -> tile.id to tile.defaultPosition }
         }
@@ -164,9 +164,13 @@ class WorkspaceEngineModelsTest {
         val second = WorkspaceV7Migration.fromLegacyScenePositions(SceneId.WORK, positions)
 
         assertEquals(first, second)
-        assertEquals(SceneId.entries.size, first.pages.size)
+        assertEquals(SceneId.entries.size + 1, first.pages.size)
         assertEquals(SceneId.entries.size * 4, first.pages.sumOf { it.items.size })
-        assertEquals(WorkspaceStableIds.scenePage(SceneId.WORK), first.activePageId)
+        assertEquals(WorkspaceDocument.DEFAULT_PAGE_ID, first.activePageId)
+        assertEquals("Home", first.pages.first().title)
+        assertEquals(null, first.pages.first().sceneAdapter)
+        assertTrue(first.pages.first().items.isEmpty())
+        assertTrue(first.pages.any { it.id == WorkspaceStableIds.scenePage(SceneId.WORK) })
         assertEquals(first.pages.flatMap { it.items }.size, first.pages.flatMap { it.items }.map { it.id }.distinct().size)
     }
 

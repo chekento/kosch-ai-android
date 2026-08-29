@@ -112,6 +112,10 @@ import cloud.kosch.aiandroid.ai.AiProviderProfile
 import cloud.kosch.aiandroid.ai.AiProviderKind
 import cloud.kosch.aiandroid.ai.AiProviderRegistry
 import cloud.kosch.aiandroid.ai.SmartCollection
+import cloud.kosch.aiandroid.model.AdaptiveHeightClass
+import cloud.kosch.aiandroid.model.AdaptiveLauncherEnvironment
+import cloud.kosch.aiandroid.model.AdaptiveLauncherPlanner
+import cloud.kosch.aiandroid.model.AdaptiveWidthClass
 import cloud.kosch.aiandroid.model.ContextSnapshot
 import cloud.kosch.aiandroid.model.AppProfile
 import cloud.kosch.aiandroid.model.HomePage
@@ -215,16 +219,29 @@ fun LauncherRoot(
             ) {
                 val availableWidth = maxWidth
                 val availableHeight = maxHeight
-                val wide = availableWidth >= 840.dp ||
-                    (availableWidth >= 720.dp && availableWidth > availableHeight)
-                val spacing = if (availableHeight < 700.dp) 7.dp else 10.dp
+                val adaptivePlan = AdaptiveLauncherPlanner.plan(
+                    AdaptiveLauncherEnvironment(
+                        widthDp = availableWidth.value.roundToInt().coerceAtLeast(1),
+                        heightDp = availableHeight.value.roundToInt().coerceAtLeast(1),
+                        hasStylus = controller.stylusState.present,
+                    ),
+                )
+                val wide = adaptivePlan.useEdgePowerRail
+                val spacing = if (adaptivePlan.heightClass == AdaptiveHeightClass.COMPACT) 7.dp else 10.dp
+                val navigationWidth = when (adaptivePlan.widthClass) {
+                    AdaptiveWidthClass.LARGE,
+                    AdaptiveWidthClass.EXTRA_LARGE -> 360.dp
+                    AdaptiveWidthClass.EXPANDED -> 320.dp
+                    AdaptiveWidthClass.MEDIUM,
+                    AdaptiveWidthClass.COMPACT -> 292.dp
+                }
                 if (wide) {
                     Row(
                         modifier = Modifier.fillMaxSize(),
                         horizontalArrangement = Arrangement.spacedBy(16.dp),
                     ) {
                         Column(
-                            modifier = Modifier.width(if (availableWidth >= 1_000.dp) 340.dp else 292.dp),
+                            modifier = Modifier.width(navigationWidth),
                             verticalArrangement = Arrangement.spacedBy(spacing),
                         ) {
                             LauncherNavigation(
@@ -238,7 +255,7 @@ fun LauncherRoot(
                                 onCamera = controller::openCamera,
                                 onWidgets = controller::openWidgetBoard,
                                 onControls = controller::openControlCenter,
-                                onPen = (controller::openPenSpace).takeIf { controller.stylusState.present },
+                                onPen = (controller::openPenSpace).takeIf { adaptivePlan.prioritizePenSpaceEntry || controller.stylusState.present },
                                 onHelp = controller::openFaq,
                             )
                         }
@@ -296,7 +313,7 @@ fun LauncherRoot(
                             onCamera = controller::openCamera,
                             onWidgets = controller::openWidgetBoard,
                             onControls = controller::openControlCenter,
-                            onPen = (controller::openPenSpace).takeIf { controller.stylusState.present },
+                            onPen = (controller::openPenSpace).takeIf { adaptivePlan.prioritizePenSpaceEntry || controller.stylusState.present },
                             onHelp = controller::openFaq,
                         )
                         PersistentSmartDock(controller)
@@ -354,7 +371,7 @@ fun LauncherRoot(
         WidgetBoardSheet(controller, requestWidget, createWidgetView, deleteWidget)
     }
     if (controller.appActionsVisible) {
-        AppActionsSheet(controller)
+        ContextualAppPopupSheet(controller)
     }
     if (controller.folderSheetVisible) {
         FolderSheet(controller)
@@ -438,7 +455,7 @@ private fun LauncherHeader(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "KoSch AI",
+                    text = "KAL",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -1072,7 +1089,7 @@ private fun ProviderChooserSheet(controller: LauncherController) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("LOCAL CORE · AKTIV", color = Mint, style = MaterialTheme.typography.labelMedium)
                     Text(
-                        text = "Befehle, Suche, Kontext, Szenen und Datei-Analyse laufen ohne Modell, API oder Internetrecht. Generative Antworten können bewusst an eine lokale Open-Source-App oder Cloud-App übergeben werden.",
+                        text = "Befehle, Suche, Kontext, Szenen und Datei-Analyse laufen lokal ohne Modell oder API-Konto. Externe Apps oder Provider öffnen sich nur nach deiner Auswahl; ein Prompt wird von KAL hier nicht dauerhaft gespeichert.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

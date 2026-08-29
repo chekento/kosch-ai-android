@@ -215,12 +215,19 @@ object WorkspaceV7Migration {
         positions: Map<SceneId, Map<String, TilePosition>>,
         grid: WorkspaceGridSpec = WorkspaceGridSpec(),
     ): WorkspaceDocument {
-        val pages = SceneId.entries.mapIndexed { pageIndex, scene ->
+        // A launcher should land on the user's desktop, not on a migration/debug dashboard. Legacy scene pages remain
+        // available and untouched after the first clean portable Home page, so this is additive and lossless.
+        val cleanHome = WorkspacePage(
+            id = WorkspaceDocument.DEFAULT_PAGE_ID,
+            title = "Home",
+            order = 0,
+        )
+        val scenePages = SceneId.entries.mapIndexed { pageIndex, scene ->
             val legacyPositions = positions[scene].orEmpty()
             WorkspacePage(
                 id = WorkspaceStableIds.scenePage(scene),
                 title = scene.title,
-                order = pageIndex,
+                order = pageIndex + 1,
                 sceneAdapter = scene,
                 items = DefaultWorkspace.tiles(scene).map { tile ->
                     val position = legacyPositions[tile.id] ?: tile.defaultPosition
@@ -244,8 +251,8 @@ object WorkspaceV7Migration {
         }
         return WorkspaceDocument(
             grid = grid,
-            activePageId = WorkspaceStableIds.scenePage(activeScene),
-            pages = pages,
+            activePageId = cleanHome.id,
+            pages = listOf(cleanHome) + scenePages,
         ).normalized()
     }
 }

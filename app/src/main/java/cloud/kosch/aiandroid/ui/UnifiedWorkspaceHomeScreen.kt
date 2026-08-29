@@ -1,6 +1,5 @@
 package cloud.kosch.aiandroid.ui
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -19,39 +18,20 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.automirrored.rounded.ArrowForward
-import androidx.compose.material.icons.automirrored.rounded.Send
-import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoAwesome
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material.icons.rounded.Folder
-import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
-import androidx.compose.material.icons.rounded.KeyboardArrowLeft
-import androidx.compose.material.icons.rounded.KeyboardArrowRight
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
-import androidx.compose.material.icons.rounded.KeyboardVoice
-import androidx.compose.material.icons.rounded.MoreVert
-import androidx.compose.material.icons.rounded.Tune
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.AssistChip
+import androidx.compose.material.icons.rounded.Widgets
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
@@ -65,7 +45,6 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -73,49 +52,50 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.LauncherController
 import cloud.kosch.aiandroid.WorkspaceHomeController
+import cloud.kosch.aiandroid.ai.SmartAppDescriptor
 import cloud.kosch.aiandroid.ai.SmartCollection
+import cloud.kosch.aiandroid.ai.SmartDockRuntimePolicy
 import cloud.kosch.aiandroid.model.AppProfile
 import cloud.kosch.aiandroid.model.DefaultWorkspace
+import cloud.kosch.aiandroid.model.LabelMode
 import cloud.kosch.aiandroid.model.LaunchableApp
 import cloud.kosch.aiandroid.model.LauncherFolder
 import cloud.kosch.aiandroid.model.TileAction
 import cloud.kosch.aiandroid.model.WorkspaceItem
 import cloud.kosch.aiandroid.model.WorkspaceItemContent
-import cloud.kosch.aiandroid.model.WorkspacePage
+import cloud.kosch.aiandroid.model.WorkspaceObjectStyleResolver
+import cloud.kosch.aiandroid.model.WorkspacePageIndicatorPolicy
+import cloud.kosch.aiandroid.model.WorkspacePagePolicy
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
-import cloud.kosch.aiandroid.ui.theme.Ink
 import cloud.kosch.aiandroid.ui.theme.Mint
 import cloud.kosch.aiandroid.ui.theme.MutedMist
 import cloud.kosch.aiandroid.ui.theme.RaisedSurface
 import cloud.kosch.aiandroid.ui.theme.Sky
 import cloud.kosch.aiandroid.ui.theme.Violet
 import cloud.kosch.aiandroid.ui.theme.Warm
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.delay
 
 /**
- * First user-facing surface backed directly by WorkspaceDocument v7.
- *
- * Pointer drag/drop intentionally follows in the next interaction slice. Every placement operation here is
- * already available through explicit buttons so keyboard and accessibility users are not dependent on drag.
+ * KAL reference Home: the wallpaper and the user's content are the product surface. Editing, page management,
+ * diagnostics and AI routing deliberately live outside normal Home instead of occupying permanent dashboard chrome.
  */
 @Composable
 fun UnifiedWorkspaceHomeScreen(
@@ -126,13 +106,17 @@ fun UnifiedWorkspaceHomeScreen(
     requestContact: () -> Unit,
 ) {
     val snackbarHost = remember { SnackbarHostState() }
-    val askFocusRequester = remember { FocusRequester() }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    var askText by rememberSaveable { mutableStateOf("") }
-    var editMode by remember { mutableStateOf(false) }
+    val launcherSettings = LocalLauncherSettings.current
+    val dockSettings = launcherSettings.dock
+    val pageIndicatorEnabled = launcherSettings.home.showPageIndicator
+    val dockChromeHeight = maxOf(62f, 38f * dockSettings.iconScale + 24f).dp
+    val workspaceBottomPadding = when {
+        dockSettings.enabled -> dockChromeHeight + 42.dp
+        pageIndicatorEnabled -> 48.dp
+        else -> 24.dp
+    }
+    val pageIndicatorBottomPadding = if (dockSettings.enabled) dockChromeHeight + 18.dp else 18.dp
     var addVisible by remember { mutableStateOf(false) }
-    var pageDialog by remember { mutableStateOf<PageDialogMode?>(null) }
-    var itemEditorId by remember { mutableStateOf<String?>(null) }
     var folderPreviewId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(home.statusMessage) {
@@ -147,104 +131,76 @@ fun UnifiedWorkspaceHomeScreen(
             controller.consumeNotice()
         }
     }
-    LaunchedEffect(controller.commandFocusRequest) {
-        if (controller.commandFocusRequest > 0L) {
-            askFocusRequester.requestFocus()
-            keyboardController?.show()
-        }
-    }
-
-    val submitAsk: () -> Unit = {
-        val command = askText.trim()
-        if (command.isNotEmpty()) {
-            controller.submitCommand(command, requestVoiceInput, requestDocument, requestContact)
-            askText = ""
-            keyboardController?.hide()
-        }
-    }
 
     Scaffold(
         containerColor = Color.Transparent,
         snackbarHost = { SnackbarHost(snackbarHost) },
     ) { contentPadding ->
         Box(
-            Modifier
+            modifier = Modifier
                 .fillMaxSize()
-                .background(Ink)
                 .padding(contentPadding),
         ) {
-            NeuralGlassBackground(Modifier.fillMaxSize())
-            Column(
+            // Readability scrim only where chrome lives; the wallpaper remains visible through the working area.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0.0f to Color.Black.copy(alpha = 0.38f),
+                            0.22f to Color.Transparent,
+                            0.72f to Color.Transparent,
+                            1.0f to Color.Black.copy(alpha = 0.46f),
+                        ),
+                    ),
+            )
+
+            KalHomeClock(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(start = 22.dp, top = 18.dp),
+            )
+
+            ReferenceWorkspaceGrid(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                UnifiedHomeHeader(
-                    controller = controller,
+                    .padding(horizontal = 12.dp)
+                    .padding(top = 104.dp, bottom = workspaceBottomPadding),
+                controller = controller,
+                home = home,
+                onOpenFolder = { folderPreviewId = it },
+            )
+
+            if (pageIndicatorEnabled) {
+                CompactPageDots(
                     home = home,
-                    editMode = editMode,
-                    onEditModeChange = { editMode = it },
-                    onAdd = { addVisible = true },
-                    onPageManage = { pageDialog = PageDialogMode.MANAGE },
-                )
-                PageRail(home)
-                UnifiedGrid(
                     modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    controller = controller,
-                    home = home,
-                    editMode = editMode,
-                    onEditItem = { itemEditorId = it },
-                    onOpenFolder = { folderPreviewId = it },
-                    onAsk = {
-                        askFocusRequester.requestFocus()
-                        keyboardController?.show()
-                    },
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = pageIndicatorBottomPadding),
                 )
-                UnifiedHomeDock(
+            }
+
+            if (dockSettings.enabled) {
+                ReferenceHomeDock(
                     controller = controller,
-                    onOpenApps = { controller.openDrawer() },
-                    onAsk = {
-                        askFocusRequester.requestFocus()
-                        keyboardController?.show()
-                    },
-                )
-                UnifiedCommandDock(
-                    text = askText,
-                    onTextChange = { askText = it.take(MAX_COMMAND_LENGTH) },
-                    focusRequester = askFocusRequester,
-                    onSubmit = submitAsk,
-                    requestVoiceInput = requestVoiceInput,
+                    onAdd = { addVisible = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 14.dp, vertical = 14.dp),
                 )
             }
         }
     }
 
     if (addVisible) {
-        AddToHomeSheet(
+        ReferenceAddToHomeSheet(
             controller = controller,
             home = home,
             onDismiss = { addVisible = false },
         )
     }
-    pageDialog?.let { mode ->
-        PageManagementDialog(
-            mode = mode,
-            home = home,
-            onDismiss = { pageDialog = null },
-        )
-    }
-    itemEditorId?.let { itemId ->
-        WorkspaceItemEditor(
-            home = home,
-            itemId = itemId,
-            onDismiss = { itemEditorId = null },
-        )
-    }
     folderPreviewId?.let { folderId ->
-        InlineFolderSheet(
+        ReferenceFolderSheet(
             controller = controller,
             folderId = folderId,
             onDismiss = { folderPreviewId = null },
@@ -253,168 +209,92 @@ fun UnifiedWorkspaceHomeScreen(
 }
 
 @Composable
-private fun UnifiedHomeHeader(
-    controller: LauncherController,
-    home: WorkspaceHomeController,
-    editMode: Boolean,
-    onEditModeChange: (Boolean) -> Unit,
-    onAdd: () -> Unit,
-    onPageManage: () -> Unit,
-) {
-    Surface(
-        color = DeepSurface.copy(alpha = 0.94f),
-        shape = RoundedCornerShape(24.dp),
-        tonalElevation = 6.dp,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Surface(modifier = Modifier.size(42.dp), color = Mint.copy(alpha = 0.14f), shape = CircleShape) {
-                Box(contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.Home, contentDescription = null, tint = Mint)
-                }
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    home.activePage.title,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    if (home.isUserPage()) "V7 HOME · frei platzierbar" else "KOMPATIBILITÄTSSEITE · Szene ${home.activePage.sceneAdapter?.title}",
-                    color = if (home.isUserPage()) Mint else Sky,
-                    style = MaterialTheme.typography.labelSmall,
-                )
-            }
-            IconButton(
-                onClick = { onEditModeChange(!editMode) },
-                modifier = Modifier.clip(CircleShape).background(if (editMode) Sky.copy(alpha = 0.16f) else Color.Transparent),
-            ) {
-                Icon(Icons.Rounded.Edit, contentDescription = if (editMode) "Edit-Modus beenden" else "Homescreen bearbeiten")
-            }
-            IconButton(onClick = onAdd) {
-                Icon(Icons.Rounded.Add, contentDescription = "App, Ordner oder Seite hinzufügen")
-            }
-            IconButton(onClick = onPageManage) {
-                Icon(Icons.Rounded.MoreVert, contentDescription = "Home-Seiten verwalten")
-            }
-            IconButton(onClick = controller::openControlCenter) {
-                Icon(Icons.Rounded.Tune, contentDescription = "Kontrollzentrum")
-            }
+private fun KalHomeClock(modifier: Modifier = Modifier) {
+    var now by remember { mutableStateOf(LocalDateTime.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            val current = LocalDateTime.now()
+            now = current
+            delay((60_000L - (current.second * 1_000L + current.nano / 1_000_000L)).coerceAtLeast(1_000L))
         }
+    }
+    val locale = Locale.getDefault()
+    val time = remember(now.hour, now.minute, locale) {
+        now.format(DateTimeFormatter.ofPattern("HH:mm", locale))
+    }
+    val date = remember(now.toLocalDate(), locale) {
+        now.format(DateTimeFormatter.ofPattern("EEEE, d. MMMM", locale))
+    }
+    Column(modifier = modifier) {
+        Text(
+            text = time,
+            color = Color.White,
+            style = MaterialTheme.typography.displaySmall,
+            fontWeight = FontWeight.Light,
+        )
+        Text(
+            text = date,
+            color = Color.White.copy(alpha = 0.90f),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Medium,
+        )
     }
 }
 
 @Composable
-private fun PageRail(home: WorkspaceHomeController) {
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val pages = home.document.pages
-        val activeIndex = pages.indexOfFirst { it.id == home.document.activePageId }
-        IconButton(
-            enabled = activeIndex > 0,
-            onClick = { home.activatePage(pages[activeIndex - 1].id) },
-        ) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Vorherige Home-Seite")
-        }
-        pages.forEach { page ->
-            FilterChip(
-                selected = page.id == home.document.activePageId,
-                onClick = { home.activatePage(page.id) },
-                label = {
-                    Text(
-                        if (page.sceneAdapter == null) page.title else "${page.sceneAdapter.title} · Szene",
-                        maxLines = 1,
-                    )
-                },
-            )
-        }
-        IconButton(
-            enabled = activeIndex in 0 until pages.lastIndex,
-            onClick = { home.activatePage(pages[activeIndex + 1].id) },
-        ) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = "Nächste Home-Seite")
-        }
-    }
-}
-
-@Composable
-private fun UnifiedGrid(
+private fun ReferenceWorkspaceGrid(
     modifier: Modifier,
     controller: LauncherController,
     home: WorkspaceHomeController,
-    editMode: Boolean,
-    onEditItem: (String) -> Unit,
     onOpenFolder: (String) -> Unit,
-    onAsk: () -> Unit,
 ) {
     val page = home.activePage
-    BoxWithConstraints(
-        modifier = modifier
-            .clip(RoundedCornerShape(28.dp))
-            .background(
-                Brush.linearGradient(
-                    listOf(DeepSurface.copy(alpha = 0.91f), Color(0xFF08131C).copy(alpha = 0.96f)),
-                ),
-            )
-            .padding(6.dp),
-    ) {
+    val launcherSettings = LocalLauncherSettings.current
+    val scopedSettings = LocalScopedSettings.current
+    val styledItems = page.items.map { item ->
+        item to WorkspaceObjectStyleResolver.resolve(
+            document = scopedSettings,
+            pageId = page.id,
+            itemId = item.id,
+            globalIconScale = launcherSettings.home.iconScale,
+            globalShowLabels = launcherSettings.home.labelMode != LabelMode.NEVER,
+        )
+    }
+
+    BoxWithConstraints(modifier = modifier) {
         val cellWidth = maxWidth / home.document.grid.columns
         val cellHeight = maxHeight / home.document.grid.rows
 
-        if (page.items.isEmpty()) {
-            Column(
-                modifier = Modifier.align(Alignment.Center).padding(28.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Icon(Icons.Rounded.Add, contentDescription = null, tint = Mint, modifier = Modifier.size(36.dp))
-                Text("Diese Home-Seite ist noch leer", fontWeight = FontWeight.SemiBold)
-                Text("Tippe oben auf + und platziere Apps oder Ordner.", color = MutedMist)
-            }
-        }
-
-        page.items.forEach { item ->
+        styledItems.forEach { (item, objectStyle) ->
+            if (!objectStyle.visible) return@forEach
             val width = cellWidth * item.bounds.columnSpan
             val height = cellHeight * item.bounds.rowSpan
-            Box(
+            WorkspaceObjectStyleFrame(
+                style = objectStyle,
+                editing = false,
                 modifier = Modifier
                     .offset(x = cellWidth * item.bounds.column, y = cellHeight * item.bounds.row)
                     .size(width = width, height = height)
                     .padding(3.dp),
             ) {
                 when (val content = item.content) {
-                    is WorkspaceItemContent.ActionTile -> LegacyActionItem(
-                        item = item,
-                        content = content,
-                        controller = controller,
-                        onAsk = onAsk,
-                    )
-                    is WorkspaceItemContent.App -> AppHomeItem(
-                        item = item,
+                    is WorkspaceItemContent.ActionTile -> ReferenceLegacyActionItem(content, controller)
+                    is WorkspaceItemContent.App -> ReferenceAppItem(
                         app = controller.apps.firstOrNull { it.key == content.appKey },
-                        editMode = editMode,
                         onClick = {
-                            val app = controller.apps.firstOrNull { it.key == content.appKey }
-                            if (app != null) controller.launch(app) else onEditItem(item.id)
+                            controller.apps.firstOrNull { it.key == content.appKey }?.let(controller::launch)
                         },
-                        onEdit = { onEditItem(item.id) },
                     )
-                    is WorkspaceItemContent.Folder -> FolderHomeItem(
-                        item = item,
+                    is WorkspaceItemContent.Folder -> ReferenceFolderItem(
                         folder = controller.folders.firstOrNull { it.id == content.folderId },
-                        editMode = editMode,
                         onClick = { onOpenFolder(content.folderId) },
-                        onEdit = { onEditItem(item.id) },
                     )
-                    is WorkspaceItemContent.Widget -> MissingWidgetPlaceholder(item, editMode) { onEditItem(item.id) }
+                    is WorkspaceItemContent.Widget -> WorkspaceWidgetHomeItem(
+                        item = item,
+                        home = home,
+                        editMode = false,
+                        onEdit = {},
+                    )
                 }
             }
         }
@@ -422,25 +302,101 @@ private fun UnifiedGrid(
 }
 
 @Composable
-private fun LegacyActionItem(
-    item: WorkspaceItem,
-    content: WorkspaceItemContent.ActionTile,
-    controller: LauncherController,
-    onAsk: () -> Unit,
-) {
-    val tile = remember(content.scene, content.legacyTileId) {
-        DefaultWorkspace.tiles(content.scene).firstOrNull { it.id == content.legacyTileId }
-    }
-    Card(
+private fun ReferenceAppItem(app: LaunchableApp?, onClick: () -> Unit) {
+    val style = LocalWorkspaceObjectStyle.current
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .semantics(mergeDescendants = true) {
                 role = Role.Button
-                contentDescription = tile?.title ?: content.legacyTileId
+                contentDescription = app?.label ?: "Nicht verfügbare App"
             }
+            .clickable(enabled = app != null, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            if (app == null) {
+                Icon(Icons.Rounded.Apps, contentDescription = null, tint = Warm, modifier = Modifier.size(34.dp))
+                Text("App fehlt", color = Warm, style = MaterialTheme.typography.labelSmall)
+            } else {
+                Image(
+                    bitmap = app.icon,
+                    contentDescription = null,
+                    modifier = Modifier.size((46f * style.iconScale).dp),
+                )
+                if (style.showLabel) {
+                    Spacer(Modifier.height(5.dp))
+                    Text(
+                        app.label,
+                        modifier = Modifier.scale(style.labelScale),
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    if (app.profile != AppProfile.PERSONAL) {
+                        Text(app.profile.title, color = Sky, style = MaterialTheme.typography.labelSmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReferenceFolderItem(folder: LauncherFolder?, onClick: () -> Unit) {
+    val style = LocalWorkspaceObjectStyle.current
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .semantics(mergeDescendants = true) {
+                role = Role.Button
+                contentDescription = "Ordner ${folder?.title ?: "nicht verfügbar"}"
+            }
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Surface(
+                modifier = Modifier.size((48f * style.iconScale).dp),
+                color = DeepSurface.copy(alpha = 0.76f),
+                shape = RoundedCornerShape(15.dp),
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(Icons.Rounded.Folder, contentDescription = null, tint = Sky, modifier = Modifier.size(30.dp))
+                }
+            }
+            if (style.showLabel) {
+                Spacer(Modifier.height(5.dp))
+                Text(
+                    folder?.title ?: "Ordner fehlt",
+                    modifier = Modifier.scale(style.labelScale),
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReferenceLegacyActionItem(
+    content: WorkspaceItemContent.ActionTile,
+    controller: LauncherController,
+) {
+    val tile = remember(content.scene, content.legacyTileId) {
+        DefaultWorkspace.tiles(content.scene).firstOrNull { it.id == content.legacyTileId }
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
             .clickable {
                 when (content.action) {
-                    TileAction.ASK -> onAsk()
+                    TileAction.ASK -> controller.openProviderChooser()
                     TileAction.APPS -> controller.openDrawer()
                     TileAction.CONTEXT -> controller.showContextDetails()
                     TileAction.PROVIDERS -> controller.openProviderChooser()
@@ -450,179 +406,190 @@ private fun LegacyActionItem(
                     TileAction.TOOLS -> controller.openControlCenter()
                 }
             },
-        colors = CardDefaults.cardColors(containerColor = RaisedSurface.copy(alpha = 0.91f)),
-        border = BorderStroke(1.dp, Violet.copy(alpha = 0.30f)),
-        shape = RoundedCornerShape(20.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        Column(
-            Modifier.fillMaxSize().padding(14.dp),
-            verticalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text(tile?.glyph ?: "◇", color = Mint, style = MaterialTheme.typography.headlineSmall)
-            Column {
-                Text(tile?.title ?: content.legacyTileId, fontWeight = FontWeight.SemiBold)
-                Text(tile?.subtitle ?: "Legacy action", color = MutedMist, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
-}
-
-@Composable
-private fun AppHomeItem(
-    item: WorkspaceItem,
-    app: LaunchableApp?,
-    editMode: Boolean,
-    onClick: () -> Unit,
-    onEdit: () -> Unit,
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxSize()
-            .semantics(mergeDescendants = true) {
-                role = Role.Button
-                contentDescription = buildString {
-                    append(app?.label ?: "Nicht verfügbare App")
-                    if (editMode) append(". Tippen zum Verschieben oder Entfernen")
-                }
-            }
-            .clickable(onClick = if (editMode) onEdit else onClick),
-        colors = CardDefaults.cardColors(containerColor = RaisedSurface.copy(alpha = 0.94f)),
-        border = BorderStroke(1.dp, if (editMode) Sky.copy(alpha = 0.55f) else Mint.copy(alpha = 0.24f)),
-        shape = RoundedCornerShape(18.dp),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            if (app != null) {
-                Image(bitmap = app.icon, contentDescription = null, modifier = Modifier.size(42.dp))
-                Spacer(Modifier.height(5.dp))
-                Text(app.label, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium)
-                if (app.profile != AppProfile.PERSONAL) {
-                    Text(app.profile.title, color = Sky, style = MaterialTheme.typography.labelSmall)
-                }
-            } else {
-                Icon(Icons.Rounded.Apps, contentDescription = null, tint = Warm)
-                Text("App fehlt", color = Warm, style = MaterialTheme.typography.labelSmall)
-            }
-        }
-    }
-}
-
-@Composable
-private fun FolderHomeItem(
-    item: WorkspaceItem,
-    folder: LauncherFolder?,
-    editMode: Boolean,
-    onClick: () -> Unit,
-    onEdit: () -> Unit,
-) {
-    Card(
-        modifier = Modifier
-            .fillMaxSize()
-            .semantics(mergeDescendants = true) {
-                role = Role.Button
-                contentDescription = "Ordner ${folder?.title ?: "nicht verfügbar"}"
-            }
-            .clickable(onClick = if (editMode) onEdit else onClick),
-        colors = CardDefaults.cardColors(containerColor = Violet.copy(alpha = 0.16f)),
-        border = BorderStroke(1.dp, if (editMode) Sky.copy(alpha = 0.55f) else Violet.copy(alpha = 0.34f)),
-        shape = RoundedCornerShape(18.dp),
-    ) {
-        Column(
-            modifier = Modifier.fillMaxSize().padding(8.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Icon(Icons.Rounded.Folder, contentDescription = null, tint = Sky, modifier = Modifier.size(34.dp))
-            Spacer(Modifier.height(4.dp))
-            Text(folder?.title ?: "Ordner fehlt", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium)
-            folder?.let { Text("${it.appKeys.size} Apps", color = MutedMist, style = MaterialTheme.typography.labelSmall) }
-        }
-    }
-}
-
-@Composable
-private fun MissingWidgetPlaceholder(item: WorkspaceItem, editMode: Boolean, onEdit: () -> Unit) {
-    Surface(
-        modifier = Modifier.fillMaxSize().clickable(enabled = editMode, onClick = onEdit),
-        color = Warm.copy(alpha = 0.10f),
-        shape = RoundedCornerShape(18.dp),
-        border = BorderStroke(1.dp, Warm.copy(alpha = 0.30f)),
-    ) {
-        Box(contentAlignment = Alignment.Center) {
-            Text("Widget · Remap folgt", color = Warm, style = MaterialTheme.typography.labelSmall)
-        }
-    }
-}
-
-@Composable
-private fun UnifiedHomeDock(
-    controller: LauncherController,
-    onOpenApps: () -> Unit,
-    onAsk: () -> Unit,
-) {
-    Surface(color = DeepSurface.copy(alpha = 0.95f), shape = RoundedCornerShape(22.dp), tonalElevation = 5.dp) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(7.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = onOpenApps) {
-                Icon(Icons.Rounded.Apps, contentDescription = "Alle Apps")
-            }
-            val pinned = controller.pinnedAppKeys.mapNotNull { key -> controller.apps.firstOrNull { it.key == key } }
-            pinned.take(5).forEach { app ->
-                IconButton(onClick = { controller.launch(app) }) {
-                    Image(bitmap = app.icon, contentDescription = app.label, modifier = Modifier.size(34.dp))
-                }
-            }
-            Spacer(Modifier.weight(1f))
-            Button(onClick = onAsk) {
-                Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
-                Spacer(Modifier.width(6.dp))
-                Text("Ask")
-            }
-        }
-    }
-}
-
-@Composable
-private fun UnifiedCommandDock(
-    text: String,
-    onTextChange: (String) -> Unit,
-    focusRequester: FocusRequester,
-    onSubmit: () -> Unit,
-    requestVoiceInput: () -> Unit,
-) {
-    Surface(
-        shape = RoundedCornerShape(22.dp),
-        color = DeepSurface.copy(alpha = 0.95f),
-        tonalElevation = 4.dp,
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            OutlinedTextField(
-                value = text,
-                onValueChange = onTextChange,
-                modifier = Modifier.weight(1f).focusRequester(focusRequester),
-                label = { Text("⌘ Ask") },
-                placeholder = { Text("App öffnen, Szene wechseln oder KI wählen") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
-                keyboardActions = KeyboardActions(onSend = { onSubmit() }),
-                trailingIcon = {
-                    IconButton(onClick = requestVoiceInput) {
-                        Icon(Icons.Rounded.KeyboardVoice, contentDescription = "Spracheingabe")
-                    }
-                },
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(tile?.glyph ?: "◇", color = Mint, style = MaterialTheme.typography.headlineMedium)
+            Text(
+                tile?.title ?: content.legacyTileId,
+                color = Color.White,
+                style = MaterialTheme.typography.labelLarge,
+                maxLines = 1,
             )
-            IconButton(onClick = onSubmit, enabled = text.isNotBlank()) {
-                Icon(Icons.AutoMirrored.Rounded.Send, contentDescription = "Ausführen")
+        }
+    }
+}
+
+@Composable
+private fun CompactPageDots(home: WorkspaceHomeController, modifier: Modifier = Modifier) {
+    val pages = home.document.pages
+    if (pages.size <= 1) return
+    val activeIndex = pages.indexOfFirst { it.id == home.document.activePageId }.coerceAtLeast(0)
+    val slots = WorkspacePageIndicatorPolicy.slots(pages.size, activeIndex)
+
+    Row(
+        modifier = modifier.semantics { contentDescription = "KAL Seitenindikator" },
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        slots.forEach { pageIndex ->
+            if (pageIndex == null) {
+                Text(
+                    text = "…",
+                    color = Color.White.copy(alpha = 0.52f),
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            } else {
+                val page = pages[pageIndex]
+                val selected = page.id == home.document.activePageId
+                val system = WorkspacePagePolicy.isSystem(page)
+                val baseColor = if (system) Sky else Color.White
+                Surface(
+                    modifier = Modifier
+                        .size(if (selected) 9.dp else 7.dp)
+                        .semantics {
+                            role = Role.Button
+                            contentDescription = buildString {
+                                append(page.title)
+                                append(", Seite ${pageIndex + 1} von ${pages.size}")
+                                if (system) append(", KAL-Bereich") else append(", persönliche Seite")
+                            }
+                        }
+                        .clickable { home.activatePage(page.id) },
+                    shape = CircleShape,
+                    color = if (selected) baseColor else baseColor.copy(alpha = 0.38f),
+                ) {}
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReferenceHomeDock(
+    controller: LauncherController,
+    onAdd: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val launcherSettings = LocalLauncherSettings.current
+    val dockSettings = launcherSettings.dock
+    val visibleApps = controller.apps.filterNot { it.key in controller.hiddenAppKeys }
+    val byKey = visibleApps.associateBy(LaunchableApp::key)
+    val dockKeys = SmartDockRuntimePolicy.selectKeys(
+        apps = visibleApps.map { app ->
+            SmartAppDescriptor(
+                key = app.key,
+                label = app.label,
+                packageName = app.packageName,
+            )
+        },
+        pinnedKeys = controller.pinnedAppKeys,
+        recentPackages = controller.recentPackages,
+        usageSignals = controller.appUsageSignals,
+        scene = controller.activeScene,
+        settings = dockSettings,
+    )
+    val dockApps = dockKeys.mapNotNull(byKey::get)
+    val itemExtent = maxOf(48f, 38f * dockSettings.iconScale + 10f).dp
+
+    Surface(
+        modifier = modifier
+            .widthIn(max = 440.dp)
+            .semantics { contentDescription = "KAL Dock" },
+        color = DeepSurface.copy(alpha = dockSettings.backgroundOpacity),
+        shape = RoundedCornerShape(24.dp),
+        shadowElevation = 10.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            IconButton(onClick = controller::openDrawer) {
+                Icon(Icons.Rounded.Apps, contentDescription = "Alle Apps", tint = Color.White)
+            }
+
+            if (dockApps.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    dockApps.forEach { app ->
+                        ReferenceDockAppButton(
+                            app = app,
+                            badgeCount = SmartDockRuntimePolicy.visibleBadgeCount(
+                                rawCount = controller.notificationCounts[app.packageName] ?: 0,
+                                showBadgesOnDock = launcherSettings.notifications.showBadgesOnDock,
+                            ),
+                            iconScale = dockSettings.iconScale,
+                            itemExtent = itemExtent,
+                            onClick = { controller.launch(app) },
+                        )
+                    }
+                }
+            }
+
+            if (controller.stylusState.present) {
+                IconButton(onClick = controller::openPenSpace) {
+                    Icon(Icons.Rounded.Draw, contentDescription = "Pen Space", tint = Mint)
+                }
+            }
+            if (dockSettings.showAskButton) {
+                IconButton(onClick = controller::openProviderChooser) {
+                    Icon(Icons.Rounded.AutoAwesome, contentDescription = "Ask / KI", tint = Mint)
+                }
+            }
+            IconButton(onClick = onAdd) {
+                Icon(Icons.Rounded.Add, contentDescription = "Zum Homescreen hinzufügen", tint = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReferenceDockAppButton(
+    app: LaunchableApp,
+    badgeCount: Int,
+    iconScale: Float,
+    itemExtent: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(itemExtent)
+            .semantics {
+                contentDescription = if (badgeCount > 0) {
+                    "${app.label}, $badgeCount Benachrichtigungen"
+                } else {
+                    app.label
+                }
+            },
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Image(
+                bitmap = app.icon,
+                contentDescription = null,
+                modifier = Modifier.size((38f * iconScale).dp),
+            )
+            if (badgeCount > 0) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(if (badgeCount > 9) 20.dp else 16.dp),
+                    color = Mint,
+                    shape = CircleShape,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = if (badgeCount > 99) "99+" else badgeCount.toString(),
+                            color = DeepSurface,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
             }
         }
     }
@@ -630,12 +597,13 @@ private fun UnifiedCommandDock(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddToHomeSheet(
+private fun ReferenceAddToHomeSheet(
     controller: LauncherController,
     home: WorkspaceHomeController,
     onDismiss: () -> Unit,
 ) {
-    var tab by remember { mutableStateOf(AddTab.APPS) }
+    val context = LocalContext.current
+    var tab by remember { mutableStateOf(ReferenceAddTab.APPS) }
     var query by remember { mutableStateOf("") }
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -643,72 +611,104 @@ private fun AddToHomeSheet(
         containerColor = DeepSurface,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.88f).padding(horizontal = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.86f)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Zum Homescreen", style = MaterialTheme.typography.headlineSmall)
-                    Text("Platzierung erfolgt lokal im v7-Raster", color = MutedMist)
-                }
-                IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, contentDescription = "Schließen") }
-            }
+            Text("Zum Home hinzufügen", style = MaterialTheme.typography.headlineSmall)
+            Text("Apps, Ordner und Widgets bleiben frei platzierbar im Home Studio.", color = MutedMist)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(selected = tab == AddTab.APPS, onClick = { tab = AddTab.APPS }, label = { Text("Apps") })
-                FilterChip(selected = tab == AddTab.FOLDERS, onClick = { tab = AddTab.FOLDERS }, label = { Text("Ordner") })
-                AssistChip(onClick = { home.createPage() }, label = { Text("+ Seite") })
+                FilterChip(
+                    selected = tab == ReferenceAddTab.APPS,
+                    onClick = { tab = ReferenceAddTab.APPS },
+                    label = { Text("Apps") },
+                    leadingIcon = { Icon(Icons.Rounded.Apps, contentDescription = null) },
+                )
+                FilterChip(
+                    selected = tab == ReferenceAddTab.FOLDERS,
+                    onClick = { tab = ReferenceAddTab.FOLDERS },
+                    label = { Text("Ordner") },
+                    leadingIcon = { Icon(Icons.Rounded.Folder, contentDescription = null) },
+                )
+                FilterChip(
+                    selected = tab == ReferenceAddTab.WIDGETS,
+                    onClick = { tab = ReferenceAddTab.WIDGETS },
+                    label = { Text("Widgets") },
+                    leadingIcon = { Icon(Icons.Rounded.Widgets, contentDescription = null) },
+                )
             }
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it.take(80) },
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text("Suchen") },
-                singleLine = true,
-            )
+            if (tab != ReferenceAddTab.WIDGETS) {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it.take(80) },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Suchen") },
+                    singleLine = true,
+                )
+            }
             when (tab) {
-                AddTab.APPS -> {
+                ReferenceAddTab.APPS -> {
                     val visible = controller.apps
                         .filter { query.isBlank() || it.label.contains(query, ignoreCase = true) }
                         .sortedBy { it.label.lowercase(Locale.ROOT) }
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(visible, key = { it.key }) { app ->
-                            Surface(color = RaisedSurface, shape = RoundedCornerShape(16.dp)) {
+                            Surface(color = RaisedSurface, shape = RoundedCornerShape(18.dp)) {
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(10.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 ) {
-                                    Image(bitmap = app.icon, contentDescription = null, modifier = Modifier.size(42.dp))
-                                    Column(modifier = Modifier.weight(1f)) {
-                                        Text(app.label, fontWeight = FontWeight.SemiBold)
-                                        Text(app.profile.title, color = MutedMist, style = MaterialTheme.typography.labelSmall)
-                                    }
+                                    Image(bitmap = app.icon, contentDescription = null, modifier = Modifier.size(44.dp))
+                                    Text(app.label, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
                                     OutlinedButton(onClick = { home.addApp(app.key) }) { Text("Hinzufügen") }
                                 }
                             }
                         }
                     }
                 }
-                AddTab.FOLDERS -> {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                ReferenceAddTab.FOLDERS -> {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items(controller.folders, key = { it.id }) { folder ->
-                            Surface(color = RaisedSurface, shape = RoundedCornerShape(16.dp)) {
+                            Surface(color = RaisedSurface, shape = RoundedCornerShape(18.dp)) {
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(10.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(12.dp),
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                                 ) {
                                     Icon(Icons.Rounded.Folder, contentDescription = null, tint = Sky)
                                     Column(modifier = Modifier.weight(1f)) {
                                         Text(folder.title, fontWeight = FontWeight.SemiBold)
-                                        Text("${folder.appKeys.size} Apps", color = MutedMist, style = MaterialTheme.typography.labelSmall)
+                                        Text("${folder.appKeys.size} Apps", color = MutedMist, style = MaterialTheme.typography.bodySmall)
                                     }
                                     OutlinedButton(onClick = { home.addFolder(folder.id) }) { Text("Hinzufügen") }
                                 }
                             }
                         }
-                        if (controller.folders.isEmpty()) {
-                            item { Text("Noch keine Launcher-Ordner vorhanden.", color = MutedMist) }
+                    }
+                }
+                ReferenceAddTab.WIDGETS -> {
+                    Surface(color = RaisedSurface, shape = RoundedCornerShape(20.dp)) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(18.dp),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Text("Android-Widgets", style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                "Android übernimmt Auswahl und Konfiguration. KAL speichert nur die portable Platzierung; die Geräte-ID bleibt lokal.",
+                                color = MutedMist,
+                            )
+                            Button(
+                                onClick = {
+                                    launchWorkspaceWidgetPicker(context)
+                                    onDismiss()
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                            ) {
+                                Text("Widget auswählen")
+                            }
                         }
                     }
                 }
@@ -717,129 +717,9 @@ private fun AddToHomeSheet(
     }
 }
 
-@Composable
-private fun PageManagementDialog(
-    mode: PageDialogMode,
-    home: WorkspaceHomeController,
-    onDismiss: () -> Unit,
-) {
-    var title by remember(home.activePage.id) { mutableStateOf(home.activePage.title) }
-    val userPage = home.isUserPage()
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Home-Seite verwalten") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    if (userPage) "Freie v7-Seite · ${home.activePage.items.size} Elemente" else "Legacy-Szenenseite · geschützt während der Migration",
-                    color = MutedMist,
-                )
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it.take(160) },
-                    enabled = userPage,
-                    label = { Text("Seitentitel") },
-                    singleLine = true,
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { home.moveActivePage(-1) }) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null)
-                        Text("Links")
-                    }
-                    OutlinedButton(onClick = { home.moveActivePage(1) }) {
-                        Text("Rechts")
-                        Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null)
-                    }
-                }
-                if (home.canUndo) {
-                    OutlinedButton(onClick = home::undo, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Letzte Änderung rückgängig")
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                enabled = userPage && title.isNotBlank(),
-                onClick = {
-                    home.renameActivePage(title)
-                    onDismiss()
-                },
-            ) { Text("Speichern") }
-        },
-        dismissButton = {
-            Row {
-                if (userPage) {
-                    TextButton(
-                        onClick = {
-                            home.deleteActiveUserPage()
-                            onDismiss()
-                        },
-                    ) {
-                        Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = Warm)
-                        Text("Löschen", color = Warm)
-                    }
-                }
-                TextButton(onClick = onDismiss) { Text("Schließen") }
-            }
-        },
-    )
-}
-
-@Composable
-private fun WorkspaceItemEditor(
-    home: WorkspaceHomeController,
-    itemId: String,
-    onDismiss: () -> Unit,
-) {
-    val item = home.activePage.items.firstOrNull { it.id == itemId }
-    if (item == null) {
-        LaunchedEffect(itemId) { onDismiss() }
-        return
-    }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Element bearbeiten") },
-        text = {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Raster: ${item.bounds.column}, ${item.bounds.row} · ${item.bounds.columnSpan}×${item.bounds.rowSpan}", color = MutedMist)
-                IconButton(onClick = { home.moveItemBy(itemId, 0, -1) }) {
-                    Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = "Element nach oben verschieben")
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                    IconButton(onClick = { home.moveItemBy(itemId, -1, 0) }) {
-                        Icon(Icons.Rounded.KeyboardArrowLeft, contentDescription = "Element nach links verschieben")
-                    }
-                    IconButton(onClick = { home.moveItemBy(itemId, 1, 0) }) {
-                        Icon(Icons.Rounded.KeyboardArrowRight, contentDescription = "Element nach rechts verschieben")
-                    }
-                }
-                IconButton(onClick = { home.moveItemBy(itemId, 0, 1) }) {
-                    Icon(Icons.Rounded.KeyboardArrowDown, contentDescription = "Element nach unten verschieben")
-                }
-                Text("Kollisionen werden deterministisch auf den nächsten freien Bereich umgeleitet.", color = MutedMist, style = MaterialTheme.typography.bodySmall)
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    home.removeItem(itemId)
-                    onDismiss()
-                },
-            ) {
-                Icon(Icons.Rounded.DeleteOutline, contentDescription = null, tint = Warm)
-                Text("Vom Home entfernen", color = Warm)
-            }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Fertig") } },
-    )
-}
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun InlineFolderSheet(
+private fun ReferenceFolderSheet(
     controller: LauncherController,
     folderId: String,
     onDismiss: () -> Unit,
@@ -851,36 +731,37 @@ private fun InlineFolderSheet(
         containerColor = DeepSurface,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().fillMaxHeight(0.65f).padding(horizontal = 18.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.62f)
+                .padding(horizontal = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.Folder, contentDescription = null, tint = Sky)
-                Spacer(Modifier.width(8.dp))
-                Text(folder?.title ?: "Ordner nicht verfügbar", style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-                IconButton(onClick = onDismiss) { Icon(Icons.Rounded.Close, contentDescription = "Schließen") }
-            }
+            Text(folder?.title ?: "Ordner", style = MaterialTheme.typography.headlineSmall)
             val apps = folder?.appKeys.orEmpty().mapNotNull { key -> controller.apps.firstOrNull { it.key == key } }
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(apps, key = { it.key }) { app ->
                     Surface(
                         modifier = Modifier.fillMaxWidth().clickable { controller.launch(app) },
                         color = RaisedSurface,
-                        shape = RoundedCornerShape(15.dp),
+                        shape = RoundedCornerShape(17.dp),
                     ) {
-                        Row(Modifier.padding(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Image(bitmap = app.icon, contentDescription = null, modifier = Modifier.size(40.dp))
-                            Spacer(Modifier.width(10.dp))
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Image(bitmap = app.icon, contentDescription = null, modifier = Modifier.size(42.dp))
                             Text(app.label, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
-                if (apps.isEmpty()) item { Text("Keine aktuell verfügbaren Apps in diesem Ordner.", color = MutedMist) }
+                if (apps.isEmpty()) {
+                    item { Text("Keine aktuell verfügbaren Apps in diesem Ordner.", color = MutedMist) }
+                }
             }
         }
     }
 }
 
-private const val MAX_COMMAND_LENGTH = 4_096
-private enum class AddTab { APPS, FOLDERS }
-private enum class PageDialogMode { MANAGE }
+private enum class ReferenceAddTab { APPS, FOLDERS, WIDGETS }

@@ -7,9 +7,9 @@ import cloud.kosch.aiandroid.model.HomePage
 import cloud.kosch.aiandroid.model.SceneId
 import cloud.kosch.aiandroid.model.TilePosition
 import cloud.kosch.aiandroid.model.WorkspaceCellBounds
+import cloud.kosch.aiandroid.model.WorkspaceDocument
 import cloud.kosch.aiandroid.model.WorkspaceItem
 import cloud.kosch.aiandroid.model.WorkspaceItemContent
-import cloud.kosch.aiandroid.model.WorkspaceStableIds
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -61,17 +61,16 @@ class WorkspaceStoreInstrumentationTest {
             val stored = WorkspaceV7Persistence(preferences).loadStoredOrNull()
 
             assertNotNull(stored)
-            assertEquals(
-                WorkspaceStableIds.scenePage(store.loadScene()),
-                stored!!.activePageId,
-            )
+            assertEquals(WorkspaceDocument.DEFAULT_PAGE_ID, stored!!.activePageId)
+            assertEquals(WorkspaceDocument.DEFAULT_PAGE_ID, stored.pages.first().id)
+            assertTrue(stored.pages.any { it.sceneAdapter == store.loadScene() })
         } finally {
             restoreRawWorkspaceV7(originalRaw)
         }
     }
 
     @Test
-    fun saveScene_mirrorsActiveLegacySceneIntoV7() {
+    fun saveScene_updatesLegacyState_withoutHijackingPersonalHome() {
         val store = WorkspaceStore(context)
         val originalScene = store.loadScene()
         val originalRaw = rawWorkspaceV7()
@@ -82,10 +81,9 @@ class WorkspaceStoreInstrumentationTest {
 
             val reloaded = WorkspaceStore(context)
             assertEquals(SceneId.WORK, reloaded.loadScene())
-            assertEquals(
-                WorkspaceStableIds.scenePage(SceneId.WORK),
-                reloaded.loadWorkspaceDocument().activePageId,
-            )
+            val document = reloaded.loadWorkspaceDocument()
+            assertEquals(WorkspaceDocument.DEFAULT_PAGE_ID, document.activePageId)
+            assertTrue(document.pages.any { it.sceneAdapter == SceneId.WORK })
         } finally {
             store.saveScene(originalScene)
             restoreRawWorkspaceV7(originalRaw)
@@ -193,7 +191,9 @@ class WorkspaceStoreInstrumentationTest {
             val restored = WorkspaceStore(context)
             assertEquals(SceneId.SOCIAL, restored.loadScene())
             val document = restored.loadWorkspaceDocument()
-            assertEquals(WorkspaceStableIds.scenePage(SceneId.SOCIAL), document.activePageId)
+            assertEquals(WorkspaceDocument.DEFAULT_PAGE_ID, document.activePageId)
+            assertEquals(WorkspaceDocument.DEFAULT_PAGE_ID, document.pages.first().id)
+            assertTrue(document.pages.any { it.sceneAdapter == SceneId.SOCIAL })
             assertTrue(document.pages.flatMap { it.items }.any { it == custom })
             val ask = document.pages
                 .single { it.sceneAdapter == SceneId.AI }

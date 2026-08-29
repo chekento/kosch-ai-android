@@ -51,13 +51,53 @@ object AssistantAgentPolicy {
         val confirmationRequired = when (risk) {
             AssistantActionRisk.LOCAL_READ_ONLY -> false
             AssistantActionRisk.LOCAL_REVERSIBLE -> false
-            AssistantActionRisk.EXTERNAL_SIDE_EFFECT,
-            AssistantActionRisk.SENSITIVE_SIDE_EFFECT -> preferences.confirmationRequiredForExternalActions
+            AssistantActionRisk.EXTERNAL_SIDE_EFFECT -> preferences.confirmationRequiredForExternalActions
+            // Sensitive actions can never be downgraded to silent execution by a preference.
+            AssistantActionRisk.SENSITIVE_SIDE_EFFECT -> true
         }
         if (confirmationRequired && !explicitUserConfirmation) {
             return AssistantPolicyDecision.REQUIRE_ACTION_CONFIRMATION
         }
         return AssistantPolicyDecision.ALLOW
+    }
+}
+
+/**
+ * Central risk vocabulary for assistant-triggered launcher commands.
+ *
+ * This classifier describes the next action boundary, not the user's intent. Opening a dialer or composer is therefore
+ * an external navigation side effect even though KoSch itself does not place a call or send a message. Starting voice
+ * capture is sensitive because it crosses into an audio-observation session. Free prompts are also external because a
+ * later provider handoff may leave the launcher; the existing handoff gate remains an additional independent barrier.
+ */
+object AssistantCommandRiskClassifier {
+    fun risk(command: LauncherCommand): AssistantActionRisk = when (command) {
+        LauncherCommand.Empty,
+        LauncherCommand.OpenDrawer,
+        LauncherCommand.OpenFaq,
+        LauncherCommand.OpenAudit -> AssistantActionRisk.LOCAL_READ_ONLY
+
+        LauncherCommand.OpenControls,
+        LauncherCommand.OpenWidgets,
+        LauncherCommand.OpenPenSpace,
+        LauncherCommand.OpenBackup,
+        LauncherCommand.OpenProDesk,
+        LauncherCommand.OpenFiles,
+        LauncherCommand.OpenFileWorkspace,
+        is LauncherCommand.SwitchScene -> AssistantActionRisk.LOCAL_REVERSIBLE
+
+        LauncherCommand.StartVoice -> AssistantActionRisk.SENSITIVE_SIDE_EFFECT
+
+        LauncherCommand.PickContact,
+        is LauncherCommand.OpenPhone,
+        is LauncherCommand.OpenMessage,
+        LauncherCommand.OpenCalendar,
+        LauncherCommand.OpenAlarms,
+        LauncherCommand.OpenCamera,
+        LauncherCommand.CreateSystemNote,
+        is LauncherCommand.OpenSystemPanel,
+        is LauncherCommand.LaunchApp,
+        is LauncherCommand.RoutePrompt -> AssistantActionRisk.EXTERNAL_SIDE_EFFECT
     }
 }
 

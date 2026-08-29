@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+         INTERNET enables only the explicit KAL Provider Connections layer. Cloud Access remains logically OFF by
+         default and direct provider requests still require an explicitly connected provider plus foreground user
+         action. No analytics/advertising/background network SDK is introduced by this permission.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -21,6 +27,19 @@
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
+        </intent>
+        <!-- Scoped visibility only for established icon-pack contracts; no QUERY_ALL_PACKAGES. -->
+        <intent>
+            <action android:name="com.novalauncher.THEME" />
+        </intent>
+        <intent>
+            <action android:name="org.adw.launcher.THEMES" />
+        </intent>
+        <intent>
+            <action android:name="app.lawnchair.icons.THEMED_ICON" />
+        </intent>
+        <intent>
+            <action android:name="ch.deletescape.lawnchair.ICONPACK" />
         </intent>
     </queries>
 
@@ -50,10 +69,47 @@
             </intent-filter>
         </activity>
 
+        <!--
+             Official, user-initiated Android ingress for highlighted/shared text. This endpoint receives only the
+             text Android explicitly supplies after PROCESS_TEXT/ACTION_SEND; it has no additional permission and
+             still places the payload behind KAL's explicit disclosure-scope consent surface.
+        -->
         <activity
-            android:name=".SecurityNetworkActivity"
+            android:name=".AiTextIngressActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:label="In KAL analysieren"
+            android:screenOrientation="unspecified">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".WorkspaceWidgetPickerActivity"
             android:exported="false"
+            android:excludeFromRecents="true"
+            android:noHistory="false"
             android:screenOrientation="unspecified" />
+
+        <activity
+            android:name=".LauncherPinWidgetActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:screenOrientation="unspecified">
+            <intent-filter>
+                <action android:name="android.content.pm.action.CONFIRM_PIN_APPWIDGET" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
 
         <service
             android:name=".assistant.AssistantScreenShareService"
@@ -63,24 +119,18 @@
         <service
             android:name=".system.KoSchNotificationListenerService"
             android:exported="true"
-            android:label="KoSch Benachrichtigungspunkte"
+            android:label="KAL Benachrichtigungspunkte"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
 
-        <service
-            android:name=".security.KoSchConsentVpnService"
-            android:exported="true"
-            android:permission="android.permission.BIND_VPN_SERVICE">
-            <intent-filter>
-                <action android:name="android.net.VpnService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.net.VpnService.SUPPORTS_ALWAYS_ON"
-                android:value="false" />
-        </service>
+        <!--
+             Production contract: the N1 VPN consent prototype and its SecurityNetworkActivity are declared only in
+             src/debug/AndroidManifest.xml. A future production declaration requires a real eligible security/network
+             capability plus the corresponding Google Play VpnService disclosure and evidence gate.
+        -->
     </application>
 
 </manifest>
