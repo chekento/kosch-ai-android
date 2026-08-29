@@ -89,8 +89,6 @@ class WorkspaceDragDropInstrumentationTest {
                 )
                 .performTouchInput {
                     down(center)
-                    // Touch injection distances are physical pixels. Move in several realistic pointer steps
-                    // far enough to cross the full 12-column canvas on the API 36 Pixel 2 density.
                     repeat(8) { moveBy(Offset(160f, 0f)) }
                     up()
                 }
