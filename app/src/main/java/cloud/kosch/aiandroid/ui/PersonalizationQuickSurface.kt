@@ -1,6 +1,8 @@
 package cloud.kosch.aiandroid.ui
 
 import androidx.activity.ComponentActivity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -255,10 +257,16 @@ fun PersonalizationQuickSurface(
     }
 }
 
-private tailrec fun android.content.Context.findComponentActivity(): ComponentActivity? = when (this) {
-    is ComponentActivity -> this
-    is android.content.ContextWrapper -> baseContext.findComponentActivity()
-    else -> null
+private fun Context.findComponentActivity(): ComponentActivity? {
+    var current: Context? = this
+    while (current != null) {
+        when (current) {
+            is ComponentActivity -> return current
+            is ContextWrapper -> current = current.baseContext
+            else -> return null
+        }
+    }
+    return null
 }
 
 @Composable
