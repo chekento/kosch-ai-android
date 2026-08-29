@@ -21,7 +21,7 @@ class WorkspacePagePolicyTest {
     @Test
     fun userPage_isFullyManagedWhileSystemPageIsProtected() {
         val user = WorkspacePage("page:user:work", "Mein Work", 1)
-        val system = WorkspacePage("page:scene:work", "Work", 2, sceneAdapter = SceneId.WORK)
+        val system = WorkspacePage("page:scene:work", "Legacy Work", 2, sceneAdapter = SceneId.WORK)
 
         assertEquals(WorkspacePageKind.USER, WorkspacePagePolicy.kind(user))
         assertTrue(WorkspacePagePolicy.canEditItems(user))
@@ -36,15 +36,15 @@ class WorkspacePagePolicyTest {
     }
 
     @Test
-    fun organize_keepsHomeThenUsersThenSystemSpaces() {
+    fun organize_keepsHomeThenUsersThenSystemSpaces_andOnlyRefreshesSystemTitles() {
         val document = WorkspaceDocument(
             activePageId = "page:user:games",
             pages = listOf(
-                WorkspacePage("page:scene:ai", "AI", 0, sceneAdapter = SceneId.AI),
+                WorkspacePage("page:scene:ai", "Old AI", 0, sceneAdapter = SceneId.AI),
                 WorkspacePage("page:user:games", "Games", 1),
                 WorkspacePage(WorkspaceDocument.DEFAULT_PAGE_ID, "Home", 2),
-                WorkspacePage("page:scene:work", "Work", 3, sceneAdapter = SceneId.WORK),
-                WorkspacePage("page:user:media", "Media", 4),
+                WorkspacePage("page:scene:work", "Old Work", 3, sceneAdapter = SceneId.WORK),
+                WorkspacePage("page:user:media", "Mein Media", 4),
             ),
         )
 
@@ -62,6 +62,10 @@ class WorkspacePagePolicyTest {
         )
         assertEquals("page:user:games", organized.activePageId)
         assertEquals(organized.pages.indices.toList(), organized.pages.map { it.order })
+        assertEquals("Games", organized.pages.first { it.id == "page:user:games" }.title)
+        assertEquals("Mein Media", organized.pages.first { it.id == "page:user:media" }.title)
+        assertEquals(SceneId.AI.title, organized.pages.first { it.id == "page:scene:ai" }.title)
+        assertEquals(SceneId.WORK.title, organized.pages.first { it.id == "page:scene:work" }.title)
     }
 
     @Test
