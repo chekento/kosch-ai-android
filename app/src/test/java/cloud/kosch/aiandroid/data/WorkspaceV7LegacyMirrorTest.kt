@@ -3,6 +3,7 @@ package cloud.kosch.aiandroid.data
 import cloud.kosch.aiandroid.model.SceneId
 import cloud.kosch.aiandroid.model.TilePosition
 import cloud.kosch.aiandroid.model.WorkspaceCellBounds
+import cloud.kosch.aiandroid.model.WorkspaceDocument
 import cloud.kosch.aiandroid.model.WorkspaceItem
 import cloud.kosch.aiandroid.model.WorkspaceItemContent
 import cloud.kosch.aiandroid.model.WorkspacePage
@@ -27,7 +28,8 @@ class WorkspaceV7LegacyMirrorTest {
             positions = positions,
         )!!
 
-        assertEquals(WorkspaceStableIds.scenePage(SceneId.WORK), result.activePageId)
+        assertEquals(WorkspaceDocument.DEFAULT_PAGE_ID, result.activePageId)
+        assertTrue(result.pages.any { it.id == WorkspaceStableIds.scenePage(SceneId.WORK) })
         val ask = result.pages
             .single { it.sceneAdapter == SceneId.AI }
             .items
@@ -69,7 +71,7 @@ class WorkspaceV7LegacyMirrorTest {
             ),
         )
 
-        assertEquals(WorkspaceStableIds.scenePage(SceneId.STUDIO), updated.activePageId)
+        assertEquals(WorkspaceDocument.DEFAULT_PAGE_ID, updated.activePageId)
         assertTrue(updated.pages.flatMap { it.items }.any { it == custom })
         val ask = updated.pages
             .single { it.sceneAdapter == SceneId.AI }
