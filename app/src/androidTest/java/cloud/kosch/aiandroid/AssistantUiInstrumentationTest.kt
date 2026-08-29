@@ -27,14 +27,14 @@ class AssistantUiInstrumentationTest {
         openAssistant()
 
         composeTestRule
-            .onNodeWithText("KoSch Assistant", useUnmergedTree = true)
+            .onNodeWithText("KAL Assistant", useUnmergedTree = true)
             .fetchSemanticsNode()
 
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
 
         composeTestRule
-            .onNodeWithText("KoSch Assistant", useUnmergedTree = true)
+            .onNodeWithText("KAL Assistant", useUnmergedTree = true)
             .fetchSemanticsNode()
     }
 
@@ -93,15 +93,15 @@ class AssistantUiInstrumentationTest {
 
     private fun openAssistant() {
         val setupNodes = composeTestRule
-            .onAllNodesWithContentDescription("KoSch Assistant einrichten", useUnmergedTree = true)
+            .onAllNodesWithContentDescription("KAL Assistant einrichten", useUnmergedTree = true)
             .fetchSemanticsNodes()
         if (setupNodes.isNotEmpty()) {
             composeTestRule
-                .onNodeWithContentDescription("KoSch Assistant einrichten", useUnmergedTree = true)
+                .onNodeWithContentDescription("KAL Assistant einrichten", useUnmergedTree = true)
                 .performClick()
         } else {
             composeTestRule
-                .onNodeWithContentDescription("KoSch Assistant öffnen", useUnmergedTree = true)
+                .onNodeWithContentDescription("KAL Assistant öffnen", useUnmergedTree = true)
                 .performClick()
         }
         composeTestRule.waitForIdle()
