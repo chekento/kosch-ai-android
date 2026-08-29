@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.kosch.aiandroid.data.WorkspaceStore
 import cloud.kosch.aiandroid.model.HomePage
+import cloud.kosch.aiandroid.model.WorkspaceDocument
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -25,41 +26,33 @@ class UnifiedWorkspaceHomeInstrumentationTest {
         composeTestRule.waitForIdle()
         dismissOnboardingIfVisible()
 
-        val originalPage = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
-            .controller.homePage
+        val initialViewModel = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
+        val originalPage = initialViewModel.controller.homePage
         val store = WorkspaceStore(composeTestRule.activity.applicationContext)
         val originalDocument = store.loadWorkspaceDocument()
 
         try {
             composeTestRule.runOnUiThread {
-                val viewModel = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
-                viewModel.homeWorkspace.createPage("API36 Home Test")
-                viewModel.homeWorkspace.addApp("test:cloud.kosch.missing")
-                viewModel.controller.switchHomePage(HomePage.WORKSPACE)
+                initialViewModel.homeWorkspace.createPage("API36 Home Test")
+                initialViewModel.homeWorkspace.addApp("test:cloud.kosch.missing")
+                initialViewModel.controller.switchHomePage(HomePage.WORKSPACE)
             }
             composeTestRule.waitForIdle()
 
-            assertTextPresent("API36 Home Test")
-            composeTestRule
-                .onNodeWithText("V7 HOME · frei platzierbar", useUnmergedTree = true)
-                .fetchSemanticsNode()
+            assertEquals(WorkspaceDocument.DEFAULT_PAGE_ID, initialViewModel.homeWorkspace.document.pages.first().id)
+            assertEquals("API36 Home Test", initialViewModel.homeWorkspace.activePage.title)
+            assertTrue(initialViewModel.homeWorkspace.isUserManagedPage())
             composeTestRule
                 .onNodeWithText("App fehlt", useUnmergedTree = true)
                 .fetchSemanticsNode()
             composeTestRule
-                .onNodeWithContentDescription("App, Ordner, Widget oder Seite hinzufügen", useUnmergedTree = true)
+                .onNodeWithContentDescription("Zum Homescreen hinzufügen", useUnmergedTree = true)
                 .fetchSemanticsNode()
-
-            // PR #41 is intentionally independent from the separate Assistant runtime track.
-            // The durable Home contract is therefore the launcher-owned Apps + Ask/voice entry path.
             composeTestRule
                 .onNodeWithContentDescription("Alle Apps", useUnmergedTree = true)
                 .fetchSemanticsNode()
             composeTestRule
-                .onNodeWithText("⌘ Ask", useUnmergedTree = true)
-                .fetchSemanticsNode()
-            composeTestRule
-                .onNodeWithContentDescription("Spracheingabe", useUnmergedTree = true)
+                .onNodeWithContentDescription("KAL Menü", useUnmergedTree = true)
                 .fetchSemanticsNode()
 
             composeTestRule
@@ -74,24 +67,26 @@ class UnifiedWorkspaceHomeInstrumentationTest {
                 .fetchSemanticsNode()
 
             composeTestRule.runOnUiThread {
-                ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
-                    .controller.closeDrawer()
+                openDrawerViewModel.controller.closeDrawer()
             }
             composeTestRule.waitForIdle()
-            assertTextPresent("API36 Home Test")
+            composeTestRule.onNodeWithText("App fehlt", useUnmergedTree = true).fetchSemanticsNode()
 
             composeTestRule.activityRule.scenario.recreate()
             composeTestRule.waitForIdle()
 
-            assertTextPresent("API36 Home Test")
+            val recreated = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
+            assertEquals(WorkspaceDocument.DEFAULT_PAGE_ID, recreated.homeWorkspace.document.pages.first().id)
+            assertEquals("API36 Home Test", recreated.homeWorkspace.activePage.title)
+            assertTrue(recreated.homeWorkspace.isUserManagedPage())
             composeTestRule
                 .onNodeWithText("App fehlt", useUnmergedTree = true)
                 .fetchSemanticsNode()
             composeTestRule
-                .onNodeWithText("⌘ Ask", useUnmergedTree = true)
+                .onNodeWithContentDescription("Alle Apps", useUnmergedTree = true)
                 .fetchSemanticsNode()
             composeTestRule
-                .onNodeWithContentDescription("Spracheingabe", useUnmergedTree = true)
+                .onNodeWithContentDescription("Zum Homescreen hinzufügen", useUnmergedTree = true)
                 .fetchSemanticsNode()
         } finally {
             composeTestRule.runOnUiThread {
@@ -102,13 +97,6 @@ class UnifiedWorkspaceHomeInstrumentationTest {
             }
             composeTestRule.waitForIdle()
         }
-    }
-
-    private fun assertTextPresent(text: String) {
-        val nodes = composeTestRule
-            .onAllNodesWithText(text, useUnmergedTree = true)
-            .fetchSemanticsNodes()
-        assertTrue("Expected at least one node containing '$text'", nodes.isNotEmpty())
     }
 
     private fun dismissOnboardingIfVisible() {
