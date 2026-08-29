@@ -35,11 +35,35 @@ data class NewsItem(
 object NewsSourceCatalog {
     val sources: List<NewsSource> = listOf(
         NewsSource(
+            id = "openai-news",
+            title = "OpenAI",
+            category = NewsCategory.AI,
+            feedUrl = "https://openai.com/news/rss.xml",
+            homeUrl = "https://openai.com/news/",
+            enabledByDefault = true,
+        ),
+        NewsSource(
+            id = "google-news",
+            title = "Google",
+            category = NewsCategory.AI,
+            feedUrl = "https://blog.google/rss/",
+            homeUrl = "https://blog.google/",
+            enabledByDefault = true,
+        ),
+        NewsSource(
             id = "android-developers",
             title = "Android Developers",
             category = NewsCategory.ANDROID,
             feedUrl = "https://android-developers.googleblog.com/feeds/posts/default?alt=rss",
             homeUrl = "https://android-developers.googleblog.com/",
+            enabledByDefault = true,
+        ),
+        NewsSource(
+            id = "google-security",
+            title = "Google Security Blog",
+            category = NewsCategory.SECURITY,
+            feedUrl = "https://security.googleblog.com/feeds/posts/default?alt=rss",
+            homeUrl = "https://security.googleblog.com/",
             enabledByDefault = true,
         ),
         NewsSource(
