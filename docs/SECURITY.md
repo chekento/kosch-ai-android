@@ -1,152 +1,217 @@
 # Sicherheit und Datenschutz
 
-## M2.5-Dateninventar
+Stand: 29. August 2026 · aktueller Integrationsbranch `0.2.5-alpha01`
 
-KoSch verarbeitet lokal:
+Dieses Dokument beschreibt die **aktuelle Sicherheitsgrenze** von KAL. Historische M2.5-Texte, die noch von einem Paket ohne `INTERNET` oder ohne Screen-/Camera-Awareness ausgingen, sind für den aktuellen Integrationsstand nicht mehr maßgeblich. Die maschinenlesbare Capability-Wahrheit liegt in `ReleaseComplianceCatalog`; die Play-/Data-Safety-Sicht in `PLAY_DATA_SAFETY_MATRIX.md`.
 
-- Uhrzeit, Akkustand/Ladestatus, validierte Netzverfügbarkeit und aktive persönliche Audioausgänge;
-- installierte startbare Launcher-Activities, ihre über Android zugängliche Profilzugehörigkeit und von Apps veröffentlichte Shortcuts;
-- Szene, Home-Raum, Kartenpositionen, Dock-Pins, lokale Ordner, lokal verborgene App-Schlüssel, Widget-Host-IDs sowie höchstens 512 lokale App-Startsignale aus Schlüssel, Anzahl und letztem Zeitpunkt;
-- lokal gezeichnete Pen-Space-Vektorstriche mit Werkzeug, normalisiertem `x/y`, Druck und Neigung; begrenzt auf 100 Striche und 2.048 Punkte je Strich;
-- nach ausdrücklicher Android-Auswahl: URI-Metadaten und bei erkannten Textformaten höchstens 4.096 Zeichen Textpräfix;
-- nach Wahl eines Datei-Arbeitsraums: genau eine persistierte SAF-Tree-URI, Pfadnavigation und höchstens 500 sichtbare direkte Kind-Metadatensätze; keine Dateiinhalte für die Arbeitsraum-Zusammenfassung;
-- nach einmaliger Android-Kontaktauswahl: Anzeigename und eine gewählte Telefonnummer ausschließlich im flüchtigen Telefon-Sheet;
-- lokales Audit aus Zeitpunkt, festem Aktionstyp und Ergebnis, begrenzt auf 250 Ereignisse und 90 Tage;
-- bei manuellem Backup: ein versionierter Workspace-Snapshot und sein verschlüsselter Export-Envelope;
-- während eines offenen Android-Zieldialogs: höchstens 8 MiB Exportpayload in einer privaten No-Backup-Datei sowie ein zufälliger, einmal nutzbarer Saved-State-Token;
-- Text, den die Person in `⌘ Ask` eingibt oder aus der gestarteten Spracherkennungs-Activity übernimmt.
+## Grundprinzip
 
-Nach separatem Android-Opt-in werden für Notification Dots ausschließlich Paketnamen und Anzahlen aktiver, nicht laufender Meldungen verarbeitet. Nicht kopiert oder gespeichert werden Notification-Titel, Text, Personen, Extras, Aktionen oder RemoteViews.
+KAL ist **local-first, nicht network-free**. Der Launcher-Kern funktioniert ohne Konto, API-Key oder Cloud-Modell. Netzwerkzugriff für direkte AI-Provider ist optional, standardmäßig AUS und darf nur über die explizite Provider-/Privacy-Grenze erfolgen.
 
-Nicht gelesen werden Standort, gesamtes Adressbuch, Kalender, Anrufliste, SMS, Zwischenablage, Fotosammlung, permanenter Mikrofonstream oder Bildschirm. Aus einer gewählten Binärdatei werden keine vermeintlichen Textinhalte extrahiert. Namen, Vendor-/Product-ID und Seriennummer erkannter Eingabegeräte werden nicht im Workspace gespeichert.
+Wesentliche Invarianten:
 
-## Berechtigungsbudget
+- keine automatische Hintergrund-LLM-Kommunikation;
+- keine direkte Provider-Anfrage allein deshalb, weil Android `INTERNET` erlaubt;
+- ein direkter Provider muss ausdrücklich verbunden sein;
+- Cloud-/Privacy-Gates müssen aktiv sein;
+- Nutzerdaten verlassen KAL nur nach einer bestätigten Vordergrundaktion bzw. einer Assistentenaktion, die die vorgesehenen Bestätigungsregeln passiert hat;
+- Screen- und Camera-Awareness sind getrennte Opt-ins und werden durch eine Provider-Verbindung nicht automatisch freigegeben;
+- LLM-Ausgaben sind Daten, keine Autorität; sie dürfen keine Capability erzeugen oder erweitern.
 
-M2.5 deklariert als `uses-permission` nur `ACCESS_NETWORK_STATE`. Damit erkennt die Context Engine, ob ein validiertes Netz existiert. Stylus, einmalige Kontaktauswahl und SAF-Tree-Zugriff benötigen keine zusätzliche gefährliche Manifest-Berechtigung. Es gibt bewusst kein:
+## Aktuelles Permission-Budget
 
-- `INTERNET`;
-- `CALL_PHONE` oder Kontakte-/Anruflistenrecht;
-- `READ_MEDIA_*` oder `MANAGE_EXTERNAL_STORAGE`;
+Die Produktions-App deklariert bewusst:
+
+- `android.permission.INTERNET` – technische Voraussetzung für optionale Direct Provider Connections;
+- `android.permission.ACCESS_NETWORK_STATE`;
+- `android.permission.CAMERA` – für die separat opt-in geschützte Camera Awareness;
+- `android.permission.FOREGROUND_SERVICE`;
+- `android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION` – für sichtbare Screen-Awareness-Sessions nach MediaProjection-Consent.
+
+Nicht Teil des vorgesehenen Budgets sind insbesondere:
+
+- `RECORD_AUDIO`;
+- Standortrechte;
+- `READ_CONTACTS` / `WRITE_CONTACTS`;
+- Call-Log-Rechte;
+- SMS-Rechte;
+- `READ_PHONE_STATE`;
 - `QUERY_ALL_PACKAGES`;
-- Accessibility Service;
-- `ACCESS_HIDDEN_PROFILES`;
-- standardmäßig erteilten Benachrichtigungszugriff;
-- Standort-/Kalender-/Mikrofonrecht.
+- ein Accessibility Service zur Steuerung oder zum Scraping fremder Apps.
 
-Die App deklariert einen durch das System gebundenen Notification-Listener-Service, aber keine entsprechende Laufzeitberechtigung. Erst die Person kann ihn in Androids geschützter Einstellungsseite aktivieren; der Core funktioniert ohne ihn. Spracherkennung, Dateiauswahl, Telefon, Widgets und Systemeinstellungen werden als sichtbare Android-Aktivitäten gestartet. Der jeweilige System-/Zielprozess besitzt seine eigenen Datenschutzregeln.
+CI prüft sowohl den Quellmanifest-Vertrag als auch die tatsächlich paketierten Debug-/Release-APKs. Sensitive Permission-Erweiterungen müssen den Build brechen, statt still einzutreten.
 
-Die CI prüft dieses Budget zweimal: zuerst das Manifest im Quellbaum und nach dem Build zusätzlich die tatsächlich paketierte APK mit `aapt`. Ein transitiv oder durch Manifest-Merging hinzugefügtes `INTERNET`-Recht bricht den Build.
+## Direct Provider Connections
 
-## Telefon
+`KalCloudAccessPolicy` trennt Androids technische Netzwerkfähigkeit von der Produktfreigabe. Für einen direkten Netzwerkprovider gilt:
 
-KoSch verwendet `ACTION_DIAL`. Eine erkannte Nummer wird höchstens normalisiert und im System-Wähler vorbereitet. Der tatsächliche Anruf bleibt eine Benutzeraktion. `ACTION_PICK` wird auf den Phone-Datentyp begrenzt; auf Android 17 fordert KoSch den datenschutzfreundlichen System-Picker explizit an. Es gibt kein `READ_CONTACTS`; die gewählte Nummer wird nicht persistiert oder in das Audit geschrieben. KoSch übernimmt keine Default-Dialer-, `InCallService`- oder Notruffunktion.
+1. Providerprofil muss bekannt sein.
+2. Cloud Access / AI Provider Networking muss aktiviert sein.
+3. die breitere Privacy-/Network-Freigabe muss aktiviert sein.
+4. der Provider muss ausdrücklich verbunden sein.
+5. `BACKGROUND`-Requests werden abgelehnt.
+6. bei Nutzerinhalt muss die entsprechende Inhaltsfreigabe sichtbar behandelt werden.
 
-Nachrichten verwenden `ACTION_SENDTO` mit `smsto:`. KoSch liest weder SMS noch Nachrichteninhalt und versendet nichts selbst. Kalender, Wecker und Kamera werden ausschließlich geöffnet; KoSch fordert dafür kein Kalender-, Alarm-, Kamera- oder Medienrecht an. Inhalt, Empfänger und finale Aktion bleiben in der zuständigen App.
+Lokale Routen mit `networkBoundary = NONE` benötigen keine Cloudfreigabe.
 
-## Portables Backup und Restore
+### OpenRouter
 
-Der Workspace-Snapshot ist größenbegrenzt und versioniert. `PortableBackupCodec` verwendet PBKDF2-HMAC-SHA-256 mit 210.000 Iterationen, zufälligem 16-Byte-Salt und einen 256-Bit-Schlüssel für `AES/GCM/NoPadding` mit zufälliger 12-Byte-Nonce und 128-Bit-Tag. Formatversion und Iterationszahl sind GCM-AAD. Die Passphrase wird nicht gespeichert; verarbeitbare `CharArray`-/Byte-Puffer werden bestmöglich überschrieben.
+OpenRouter ist der erste direkt implementierte OAuth-/Inference-Pfad:
 
-Vor dem Restore werden Authentizität, Format, Version, Zeitgrenze, Payload-Größe, Listenlimits, Enum-Werte, Stringlängen, endliche normalisierte Positionen und Stiftwerte geprüft. Die Oberfläche zeigt einen Dry Run und verlangt eine zweite Bestätigung. Erst dann folgt ein synchroner, einzelner Preferences-Commit. Widget-Host-IDs, URI-Grants, Secrets, Notification-Daten und Audit sind ausgeschlossen. Eine zwischenzeitlich geschlossene Backup-Fläche invalidiert laufende Prepare-/Preview-Ergebnisse über einen Request-Token.
+- Authorization Code + PKCE/S256;
+- zufälliger Code Verifier und zufälliger Session-/Callback-Pfad;
+- einmaliger Callback-Listener ausschließlich auf `127.0.0.1` und einem zufälligen Port;
+- begrenzte Callback-, Request- und Response-Größen;
+- Netzwerk- und Read-Timeouts;
+- kein wiederverwendbares OAuth-Client-Secret im APK;
+- HTTPS für Key Exchange und Inference;
+- Provider-Request erst nach den KAL-Cloud-Gates;
+- OpenRouter-Request setzt `provider.data_collection = deny` und sendet keinen Prompt im Hintergrund.
 
-Backup-, Audit- und SVG-Exporte werden für den Zeitraum hinter Androids `CreateDocument`-Dialog atomar in `noBackupFilesDir` bereitgestellt. Der Saved State enthält nur einen validierten Token mit Exporttyp, nie den Payload. Die Datei wird einmal konsumiert, bei Abbruch verworfen oder nach 24 Stunden bereinigt; Token und Payload sind auf Typ, Name, Elternpfad und 8 MiB begrenzt.
+Ein lokaler fremder Prozess könnte einen Loopback-Callback höchstens vorzeitig stören; der zufällige Pfad und PKCE verhindern, dass daraus eine gültige KAL-Autorisierung oder ein verwendbarer Schlüssel entsteht. OAuth-/Loopback-Handling bleibt trotzdem Teil des unabhängigen Security-/Fuzzing-Gates vor öffentlichem Release.
 
-## Lokales Audit
+### Andere Provider / eigene Endpoints
 
-`LocalAuditLog` besitzt absichtlich kein Freitextfeld. Ein Event enthält nur Millisekunden-Zeitpunkt, `AuditAction` und `AuditOutcome`. So können Prompts, Kontaktwerte, Nummern, Dateinamen, Pfade und Benachrichtigungsinhalte nicht über eine frei beschreibbare Detailspalte einsickern. Die Liste ist auf 250 Einträge beziehungsweise 90 Tage begrenzt, kann als dreispaltige CSV über SAF exportiert und vollständig gelöscht werden. Sie ist vom Workspace-Backup getrennt.
+Providerprofile dürfen Capability und Reifegrad getrennt ausdrücken. `SUPPORTED` bedeutet nicht, dass jede Organisation ohne weitere Konfiguration sofort eingeloggt werden kann. OAuth-Client-/Tenant-Konfigurationen bleiben dort `CONFIGURATION_REQUIRED`, wo dies providerseitig nötig ist.
 
-## Dateien
+Remote-Endpunkte müssen HTTPS verwenden. Unverschlüsseltes HTTP ist nur für explizit erlaubte Loopback-Fälle vorgesehen. Eigene OpenAI-kompatible Endpoints sind nutzer-/organisationsgesteuert; Host, Modell und Authentisierung dürfen nicht still geraten werden.
 
-Die Einzeldatei-Route verwaltet höchstens eine langfristige read-only Freigabe. Eine neue Wahl ersetzt die alte; „Dateizugriff vergessen“ löst sie. Die Textanalyse ist auf bekannte Formate und 4.096 Zeichen begrenzt.
+## Credential Vault
 
-Der Datei-Arbeitsraum ist eine getrennte, explizite `ACTION_OPEN_DOCUMENT_TREE`-Freigabe mit READ und WRITE. KoSch besitzt nur einen Baum, prüft Provider/Tree-Grenze, listet höchstens 500 direkte Kinder und richtet sichtbare Aktionen nach den vom `DocumentsProvider` gemeldeten Flags aus. Namen sind auf 120 Zeichen begrenzt; Pfadseparatoren, Steuerzeichen, `.` und `..` werden abgelehnt.
+Provider-Secrets werden gerätelokal im `SecureCredentialVault` gehalten:
 
-- Ordner erstellen und Umbenennen: Vorschau plus Bestätigung;
-- Umbenennen: genau ein lokales Undo, solange der Provider die Rückbenennung zulässt;
-- Löschen: gesonderte destruktive Bestätigung, danach direkter Provider-Aufruf und **kein** vorgetäuschtes Undo;
-- Öffnen: sichtbare externe Android-App;
-- Zusammenfassung: nur Name, MIME-Kategorie, bekannte Größe und Änderungszeit; kein Inhaltsindex;
-- Vergessen/Wechsel: persistierte URI-Freigabe wird gelöst.
+- nicht exportierbarer AES-256-Schlüssel aus `AndroidKeyStore`;
+- `AES/GCM/NoPadding` mit zufälliger IV;
+- Associated Data bindet Ciphertext an Provider-ID und Credential-Typ;
+- getrennte Typen für API-Key, Access Token, Refresh Token, OAuth-generierten Key und ID Token;
+- portable KAL-Backups enthalten diese Werte nicht;
+- Disconnect/Delete entfernt die von KAL gehaltenen Provider-Credentials;
+- mutable Secret-Puffer werden nach Verwendung bestmöglich überschrieben.
 
-Provider-Mutation und anschließender Refresh sind getrennte Ergebnisse. Eine bestätigte Mutation wird auch dann als Erfolg auditiert, wenn die Oberfläche bereits geschlossen ist oder die neue Verzeichnisliste scheitert. Der Refreshfehler erhält ein eigenes Ereignis; er darf weder den Provider-Effekt zurückdatieren noch ein nicht vorhandenes Undo versprechen. Manuelles Refresh bleibt im aktuellen Verzeichnis.
+Android-App-Backup ist für KAL deaktiviert; gerätegebundene Credentials, Widget-Host-IDs, URI-Grants und Capture-Zustände gehören nicht in portable Daten.
 
-SAF-Provider können Cloudspeicher abbilden. „Lokal analysiert“ bedeutet daher, dass KoSch keine eigene Cloud/API nutzt; der ausgewählte Provider kann seine Daten nach eigenen Regeln laden. Move/Copy, Rekursion, Volltextsuche, Papierkorbgarantie und Malware-Scan sind nicht implementiert.
+## Screen Awareness
 
-## Lokale Personalisierung und Sichtbarkeit
+Screen Awareness ist standardmäßig AUS.
 
-`LocalUsageModel` speichert pro App-Schlüssel nur Startanzahl und letzten Startzeitpunkt, begrenzt auf 512 Einträge. Es liest weder Androids globalen Usage-Verlauf noch fremde App-Inhalte. Die Person kann alle Signale nach zweiter Bestätigung löschen.
+- Androids MediaProjection-Systemdialog bleibt Autorität.
+- Die Session läuft über einen sichtbaren Foreground Service vom Typ `mediaProjection`.
+- Der Service ist nicht exportiert.
+- Screen-Inhalt wird nicht automatisch durch eine AI- oder Provider-Verbindung freigegeben.
+- Eine externe/direkte AI-Verarbeitung benötigt zusätzlich die dafür vorgesehene Kontext-/Provider-Freigabe.
+- Es gibt keine versteckte dauerhafte Hintergrundbeobachtung.
 
-„App verbergen“ entfernt eine App nur aus normalen KoSch-Sammlungen, Dock und Ordneransichten. Die App bleibt in der expliziten Ansicht **Verborgen**, in Android-Einstellungen und gegebenenfalls in anderen Launchern sichtbar. Das ist Organisation, kein Schutz vor Dritten und keine Deaktivierung.
+## Camera Awareness
+
+Camera Awareness ist standardmäßig AUS.
+
+- Runtime-Camera-Permission und sichtbare CameraX-Session sind erforderlich.
+- KAL erfasst Kontext nur nach dem vorgesehenen Nutzer-Opt-in/-Request.
+- Kamera-Inhalt wird nicht automatisch persistiert oder an einen Provider gesendet.
+- Eine Provider-Verbindung ersetzt niemals den Camera-Consent.
+
+## Audio / Wake Word
+
+Der aktuelle Permission-Vertrag enthält bewusst **kein `RECORD_AUDIO`**. Sprachinteraktion darf daher nicht durch einen heimlichen permanenten Mikrofonstream entstehen. Solange ein späteres lokales Wake-Word-Modul noch nicht als eigene Capability mit sichtbarem Opt-in, Mikrofonindikator, Retention-Regeln, Tests und Store-Offenlegung umgesetzt ist, darf `RECORD_AUDIO` nicht still in das Paket gelangen.
 
 ## Notification Dots
 
-Der opt-in Listener hält nur ein flüchtiges `packageName → count`-Abbild. Laufende Meldungen und Gruppenzusammenfassungen werden ausgeschlossen; `NotificationListenerService.Ranking.canShowBadge()` respektiert die Badge-Entscheidung von Android und Kanal. Benachrichtigungsinhalte dürfen auch für spätere KI-Triage nicht implizit freigeschaltet werden.
+Notification-Zugriff ist ein separates Android-Special-Access-Opt-in. Die produktive Badge-Grenze verarbeitet nur paketbezogene Zähler/Metadaten im Prozesszustand. Titel, Text, Personen, Extras, Aktionen und RemoteViews werden nicht als Badge-Datenmodell übernommen und nicht im Hintergrund an AI-Provider weitergegeben.
 
-## Smartpen und Ink-Daten
+Eine spätere inhaltliche Notification-Zusammenfassung wäre eine neue sensitive Capability und müsste eigene Auswahl-, Vorschau-, Redaction-, Provider- und Retention-Gates besitzen.
 
-Aktuelle Stiftfähigkeiten, Druck, Neigung, Orientierung, Hover, Werkzeug und Tastenstatus leben im Prozesszustand. Persistiert wird nur die bewusst auf Pen Space erzeugte, begrenzte Vektorgrafik. Die Zeichenfläche akzeptiert ausschließlich Stylus-/Eraser-Werkzeuge; Fingerereignisse werden verworfen. Es gibt weder Cloud-Upload noch OCR, Handschriftprofil, biometrische Identifikation oder semantische Analyse der Striche.
+## Telefon, Nachrichten und Kontakte
 
-Die Persistenz nutzt normalisierte Koordinaten und Schema v6. Eingaben werden auf endliche Werte, Bereichsgrenzen, maximale Punktzahl und maximale Strichzahl reduziert. Der manuelle Workspace-Export übernimmt die Striche erst nach Passphrase-Eingabe; Vision-Modell oder Handschrift-Index benötigen weiterhin eine separate Vorschau, explizite Auswahl, Retention und vollständige Löschung.
+- Telefon nutzt `ACTION_DIAL`; KAL führt keinen versteckten Anruf aus.
+- Nachrichten nutzen `ACTION_SENDTO`/sichtbare Zieloberflächen; KAL sendet keine SMS selbst.
+- Kontakte werden über einmalige Android-Auswahl statt `READ_CONTACTS` eingebunden.
+- Telefonnummern gehören nicht automatisch in AI-Prompts oder Audit-Freitext.
+- KAL übernimmt keine Default-Dialer-, `InCallService`- oder Notruffunktion.
 
-Ab Android 14 kann KoSch `ACTION_CREATE_NOTE` an eine kompatible Notes-App senden und bei erkanntem Stift den Stylus-Modus anfordern. KoSch übernimmt keine Notes-Rolle, liest keine Zielnotiz und erhält deren Inhalt nicht zurück. Ohne kompatible Ziel-App fällt die Bedienung auf den lokalen Pen Space zurück.
+## Dateien und SAF
 
-## Profile und Private Space
+KAL arbeitet mit vom Nutzer ausgewählten Dateien bzw. SAF-Bäumen statt mit Vollspeicherrechten.
 
-Apps und Shortcuts werden mit ihrem Android-`UserHandle` abgefragt und gestartet. Lokale Schlüssel verwenden eine vom System gelieferte Benutzer-Seriennummer, damit gleiche Pakete verschiedener Profile nicht kollidieren. App-Info und Android-Deinstallationsanfrage tragen das ausgewählte Profilziel. KoSch zeigt Androids gebadgte Icons und umgeht gesperrte Profile nicht.
+- keine `MANAGE_EXTERNAL_STORAGE`-Anforderung;
+- Provider-/Tree-Grenzen werden respektiert;
+- destruktive Mutationen benötigen die vorgesehenen Bestätigungen;
+- ein erfolgreicher Provider-Effekt darf nicht durch einen nachfolgenden Refreshfehler fälschlich als fehlgeschlagen dargestellt werden;
+- Cloud-SAF-Provider können Daten nach ihren eigenen Regeln laden – „KAL lädt nicht selbst hoch“ bedeutet nicht, dass ein gewählter Dokumentprovider rein lokal arbeitet;
+- kein impliziter Malware-Scan und keine Garantie über Papierkorb-/Provider-Verhalten.
 
-Als aktive Standard-Start-App kann KoSch `UserManager.requestQuietModeEnabled` für ein zugängliches Arbeitsprofil anfordern. Android besitzt Richtlinien, Credential-Dialog und Zustandswechsel. KoSch speichert keine Arbeitsanmeldedaten, startet keine pausierte Work-App und behauptet bei fehlender HOME-Rolle keinen erfolgreichen Wechsel.
+## Portables Backup und Restore
 
-`ACCESS_HIDDEN_PROFILES` wird nicht deklariert. Android Private Space bleibt dem System-Launcher überlassen, bis KoSch einen getrennten Container, Hide/Show, Lock/Unlock, Authentifizierungsfluss und Tests gegen Label-, Badge-, Search- und Recency-Leaks vollständig implementiert hat.
+Portable Workspace-/Settings-Backups sind versioniert, validiert und von gerätegebundenen Secrets getrennt. Bestehende verschlüsselte Backup-Pfade nutzen PBKDF2-HMAC-SHA-256 und AES-256-GCM mit Authentizitätsprüfung. Restore-Flows benötigen Dry Run/Validierung und dürfen ungültige, übergroße oder manipulierte Daten nicht übernehmen.
 
-## Externe KI-Übergaben
+Aus portablen Backups ausgeschlossen bleiben insbesondere:
 
-Freitext verlässt KoSch erst nach Wahl eines konkreten Ziels und Tipp auf Öffnen/Teilen. Installierte Apps erhalten einen expliziten `ACTION_SEND`; andernfalls öffnet KoSch eine HTTPS- oder Open-Source-Projektseite. KoSch besitzt selbst keine Netzberechtigung und sendet keine Modellanfrage.
+- Provider-Secrets und OAuth-Tokens;
+- Capture-/MediaProjection-Grants;
+- persistierte URI-Grants;
+- Widget-Host-IDs bzw. andere gerätegebundene Bindings;
+- Notification-Inhalte;
+- lokale Audit-Daten, soweit der definierte Backupvertrag dies ausschließt.
 
-PocketPal, ChatterUI und Maid sind optionale Drittprojekte. Die Anzeige ihrer Lizenz und lokalen Fähigkeit ist keine Sicherheitszertifizierung. Installation, Modellquelle und Modelllizenz müssen separat geprüft werden.
+## Lokales Audit
 
-## Secret-Grenze
+Das Audit besitzt bewusst keinen freien Prompt-/Detailkanal. Es speichert begrenzte Aktions-/Ergebnis-Metadaten und ist vom portablen Workspace-Backup getrennt. Prompts, Telefonnummern, Kontaktwerte, Dateiinhalte und Provider-Secrets dürfen nicht über eine generische Detailspalte einsickern.
 
-Der ruhende `SecureCredentialVault` nutzt Android Keystore sowie AES-256/GCM. Schlüsselmaterial bleibt nicht exportierbar; Ciphertexte sind per Provider-ID als Associated Data gebunden. `allowBackup=false` verhindert App-Daten-Backup. Der Quellcode enthält keine Provider-Secrets.
+## Home, Settings und Automationen
 
-M2.5 fordert keine API-Schlüssel an und liest den Vault nicht aus. Vor einem aktiven API-Modul sind zwingend:
-
-1. getrenntes Netzwerkmodul/Build Flavor;
-2. Kontextvorschau mit Feld-für-Feld-Auswahl;
-3. TLS-only plus enge Host-Allowlist oder expliziter Loopback-Modus;
-4. Redaction von Logs, Crashreports und Clipboard;
-5. Secret-Löschen, Rotation und optional Geräteauthentifizierung;
-6. Abbruch, Timeout, Backoff, Kosten-/Rate-Limit und Offline-Verhalten;
-7. Audit-Metadaten ohne Promptinhalt als Default;
-8. Tests für Prompt Injection und bösartige Toolausgaben.
-
-## Sicherheitsklassen für künftige Aktionen
+Launcher-Änderungen folgen einer Capability-Grenze:
 
 | Klasse | Beispiele | Regel |
 |---|---|---|
-| A – lesend/reversibel | App suchen, Szene vorschlagen | direkte lokale Ausführung möglich |
-| B – externe Ansicht | Dialer, Datei in App, Einstellungen | Ziel und Daten sichtbar, dann Android-UI |
-| C – schreibend/reversibel | Layout, Regel, Dateiname | Vorschau, Bestätigung, Undo |
-| D – Kommunikation/Kosten | Nachricht, Kauf, Buchung, API-Kosten | Kontextvorschau + erneute Bestätigung |
-| E – destruktiv/privilegiert | Löschen, Kontowechsel, Geräteverwaltung | gesonderte Capability; kein autonomer Standard |
+| A – lesend/reversibel | App suchen, lokalen Vorschlag erzeugen | direkte lokale Ausführung möglich |
+| B – externe Ansicht | Dialer, Datei öffnen, Einstellungen | sichtbares Ziel / Android-UI |
+| C – schreibend/reversibel | Layout, Theme, Dateiname | Vorschau, Bestätigung und Undo, wo technisch ehrlich |
+| D – Kommunikation/Kosten/Provider | Nachricht, kostenpflichtige API-Anfrage | Kontext-/Zielvorschau + explizite Bestätigung |
+| E – destruktiv/privilegiert | Löschen, Geräte-/Rollenwechsel | separate Capability, kein autonomer Default |
 
-LLM-Ausgaben sind Daten, keine Autorität. Sie dürfen keine Capability direkt erzeugen oder erweitern.
+Temporärer Kontext darf persistente Nutzerentscheidungen nicht still überschreiben. Globale, Page- und Object-Settings müssen ihre Vererbung explizit behalten.
 
-## Bekannte M2.5-Risiken
+## N1 VPN-Prototyp
 
-- keine instrumentierten Geräte-/OEM-Tests;
-- Smartpen-Erkennung und Ink-Latenz sind noch nicht gegen ein USI-/S-Pen-/Pixel-Pen-Gerätelabor validiert;
-- eigene `PressureInkView` resampled lange Striche und exportiert SVG, nutzt aber noch keine gemessene Historical-/Coalesced-Event-Latenzabnahme;
-- Widget-Größenpresets, Reihenfolge und Undo sind implementiert; freie Platzierung, Stacks und geräteübergreifendes Provider-Restore-Mapping bleiben unvollständig;
-- Dateianalyse ist heuristisch und erkennt keine Schadsoftware;
-- externe Share-Ziele können Text anders behandeln als erwartet;
-- Voice hängt vom installierten Android-Spracherkenner ab und ist nicht garantiert offline;
-- Vault-Sicherheitscode ist vorbereitet, aber noch nicht durch End-to-End-Key-Rotation oder Hardware-Attestation validiert;
-- keine Security-Audit- oder Penetration-Test-Freigabe;
-- Backup-Kryptografie ist unit-getestet, aber noch nicht unabhängig auditiert oder über Prozess-Tod/OEM-Dateiprovider instrumentiert getestet;
-- Notification-Dot-Semantik ist noch nicht gegen alle Work-/Private-Profile-Zustände und OEM-Service-Killer geprüft;
-- SAF-Create/Rename/Delete sind nicht gegen eine repräsentative lokale/Cloud/OEM-Provider-Matrix instrumentiert getestet; Provider können abweichende Semantik besitzen;
-- lokales App-Ranking ist transparent und löschbar, aber noch nicht in einer Langzeitstudie auf Fehlpriorisierung, Fairness oder Work-Profile-Leaks geprüft;
-- App-Verbergen ist keine Android-Sicherheitsfunktion;
-- ViewModel und Pending-Export-Token sind unit-/quellseitig abgesichert, aber vollständiger Prozess-Tod bleibt auf realen Geräten zu instrumentieren.
+`KoSchConsentVpnService` und `SecurityNetworkActivity` sind Entwicklungskomponenten und **debug-only**. Im aktuellen N1-Zustand findet keine reale Traffic-Verarbeitung statt.
 
-Der Launcher ist daher Alpha-Software und sollte zunächst auf Emulator/Zweitgerät getestet werden.
+Release-Gate:
+
+- Release-APK darf weder den N1-`VpnService` noch die N1-Security-Activity enthalten;
+- gewöhnliche HTTPS-Providerverbindungen rechtfertigen keinen Produktions-`VpnService`;
+- ein späteres echtes VPN-/Firewall-Produktfeature wäre eine eigene regulatorische, Play-, Security- und Teststufe.
+
+## Externe AI-App-Handoffs
+
+Ein Android-Handoff und eine Direct Provider Connection sind zwei unterschiedliche Datenwege:
+
+- **App-Handoff:** KAL übergibt nach Nutzeraktion Text/Kontext an eine ausgewählte Ziel-App; die weitere Verarbeitung liegt bei dieser App.
+- **Direct Provider:** KAL selbst überträgt nach den Provider-/Cloud-Gates Inhalt über HTTPS an den verbundenen Provider.
+
+UI, Privacy Policy und Play Data Safety dürfen diese Wege nicht vermischen. Ein Fehler eines Share-/App-Intents darf nicht heimlich zu einer direkten Provider- oder Browser-Übertragung mit sensiblen Daten führen.
+
+## Release- und Play-Gate
+
+Vor jedem öffentlichen Release:
+
+1. Quellmanifest und gemergtes Release-Manifest prüfen.
+2. Paketierte Permissions mit `aapt` verifizieren.
+3. bestätigen, dass N1-VPN-Komponenten im Release fehlen.
+4. `ReleaseComplianceCatalog`, `PLAY_DATA_SAFETY_MATRIX.md`, öffentliche Privacy Policy und Play Console Data Safety gegeneinander abgleichen.
+5. frische Installation testen: Cloud Access AUS, keine Provider-Credentials, keine Screen-/Camera-Session.
+6. Connect → Request → Disconnect inklusive Offline-, Timeout-, Abbruch- und Prozess-Tod-Fällen testen.
+7. sicherstellen, dass portable Backups keine Credentials oder Capture-Grants enthalten.
+8. Dependency-/SBOM-Scan sowie unabhängigen Security-/Privacy-Review durchführen.
+9. OAuth-/Loopback-, SAF-/Restore- und Parser-Grenzen fuzz-/negativtesten.
+10. erst danach Release-Signing/AAB/Upgrade-/Rollback- und Play-Policy-Abnahme durchführen.
+
+## Marketing-sichere Aussage
+
+Zulässig ist beispielsweise:
+
+> KAL arbeitet local-first. Der Launcher-Kern benötigt keinen Cloud-Provider. Optionale direkte AI-Provider-Verbindungen sind standardmäßig deaktiviert und werden erst nach ausdrücklicher Verbindung, Cloud-/Privacy-Freigabe und bestätigter Vordergrundaktion genutzt. Screen und Camera Awareness bleiben separate Opt-ins.
+
+Nicht zulässig ist für den aktuellen Stand die pauschale Aussage:
+
+> Alles bleibt immer auf dem Gerät.
+
+Sobald der Nutzer bewusst einen externen AI-Handoff oder einen direkt verbundenen Provider verwendet, können ausgewählte Daten das Gerät verlassen.
