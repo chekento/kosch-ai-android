@@ -100,7 +100,7 @@ fun PersonalizationQuickSurface(
                 Icon(Icons.Rounded.Palette, contentDescription = null, tint = Sky)
                 Column(Modifier.weight(1f)) {
                     Text("Schnell personalisieren", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Text("Gesten & Icons · mit Übernehmen aktiv", color = MutedMist)
+                    Text("Wichtige Gesten & Icons", color = MutedMist)
                 }
                 TextButton(onClick = onDismiss) { Text("Fertig") }
             }
@@ -109,7 +109,7 @@ fun PersonalizationQuickSurface(
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text("Launcher-Gesten", fontWeight = FontWeight.SemiBold)
+                            Text("Alltagsgesten", fontWeight = FontWeight.SemiBold)
                             Text(
                                 "Nur freie Launcher-Flächen reagieren. Widgets, Buttons und Drag & Drop haben Vorrang.",
                                 color = MutedMist,
@@ -148,12 +148,12 @@ fun PersonalizationQuickSurface(
                         )
                     }
                     Text(
-                        "Links/rechts blättert standardmäßig durch die Seiten. Wählst du bewusst „Keine Aktion“, bleibt diese Richtung wirklich deaktiviert.",
+                        "Links/rechts blättert standardmäßig durch die Seiten. Ein bewusstes „Keine Aktion“ bleibt wirklich deaktiviert.",
                         color = MutedMist,
                         style = MaterialTheme.typography.labelSmall,
                     )
                     Text(
-                        "Stift-Tasten, Gerätesperre und freie Custom-Targets erscheinen hier erst, wenn ihr Android-Ausführungspfad vollständig verifiziert ist.",
+                        "Zwei-Finger-, Pinch-, Rand-, Stift- und weitere Spezialgesten findest du im vollständigen Settings Center.",
                         color = MutedMist,
                         style = MaterialTheme.typography.labelSmall,
                     )
@@ -216,7 +216,7 @@ fun PersonalizationQuickSurface(
             }
 
             Text(
-                "Tipp: Für Raster, Dock, Ordner, Widgets, KI, Datenschutz und Barrierefreiheit bleibt der vollständige Settings Center zuständig.",
+                "Tipp: Raster, Dock, Ordner, Widgets, KI, Datenschutz und Barrierefreiheit bleiben im Settings Center übersichtlich nach Bereichen getrennt.",
                 color = Mint,
                 style = MaterialTheme.typography.labelSmall,
             )
@@ -317,13 +317,7 @@ private val QUICK_GESTURES = listOf(
     GestureTrigger.SWIPE_DOWN,
     GestureTrigger.SWIPE_LEFT,
     GestureTrigger.SWIPE_RIGHT,
-    GestureTrigger.DOUBLE_TAP,
     GestureTrigger.LONG_PRESS,
-    GestureTrigger.TWO_FINGER_TAP,
-    GestureTrigger.PINCH_IN,
-    GestureTrigger.PINCH_OUT,
-    GestureTrigger.EDGE_LEFT,
-    GestureTrigger.EDGE_RIGHT,
 )
 
 private val SAFE_GESTURE_ACTIONS = listOf(
