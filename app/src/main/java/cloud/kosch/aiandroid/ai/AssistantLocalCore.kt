@@ -28,26 +28,28 @@ class AssistantLocalCore(
 
         val normalized = raw.normalized()
         if (normalized in greetingPhrases) {
-            return AssistantLocalReply("Hallo. Ich bin dein optionaler KAL Assistant. Launcher-Befehle kann ich lokal ausführen; freie KI-Fragen beantworte ich über einen bereits von dir freigegebenen Provider oder übergebe sie bewusst an den AI Hub.")
+            return AssistantLocalReply(
+                "Hallo. Ich bin dein KAL Assistant. Apps, Launcher-Einstellungen und Darstellung kann ich lokal bedienen. Für allgemeine Wissensfragen nutze ich dein eingerichtetes KI-Modell.",
+            )
         }
         if (normalized in thanksPhrases) {
             return AssistantLocalReply("Gern.")
         }
         if (normalized in privacyPhrases) {
             return AssistantLocalReply(
-                "Dieser Chat bleibt in der aktuellen Sitzung. Der Local Core braucht kein Internet. Ein externer Provider wird nur verwendet, wenn du ihn verbunden und Cloud Access ausdrücklich freigegeben hast.",
+                "Der Chat bleibt in dieser laufenden Sitzung. Lokale Launcher-Befehle brauchen kein Internet. Ein externes KI-Modell wird nur genutzt, wenn du es vorher eingerichtet und Netzwerkzugriff freigegeben hast.",
             )
         }
         if (normalized in helpPhrases) {
             return AssistantLocalReply(
-                "Ich kann Apps, Szenen, Kamera, Kalender, Dateien, Widgets, Einstellungen und weitere Launcher-Funktionen lokal anstoßen. Freie KI-Fragen können über einen bereits freigegebenen Provider direkt im Chat beantwortet werden; sonst bleibt die bewusste Anbieterübergabe verfügbar.",
+                "Du kannst mir normale Anweisungen geben: Apps öffnen, Launcher-Bereiche aufrufen oder Darstellung, Dock, Icons und weitere unterstützte Einstellungen ändern. Freie Wissensfragen beantworte ich direkt im Chat, sobald ein KI-Modell eingerichtet ist.",
             )
         }
 
         return when (val command = commandPlanner.plan(raw)) {
             LauncherCommand.Empty -> AssistantLocalReply("Sag oder schreib mir, was ich für dich tun soll.")
             is LauncherCommand.RoutePrompt -> AssistantLocalReply(
-                text = "Für diese freie KI-Anfrage ist gerade kein direkt verwendbarer Provider vollständig freigegeben. Ich kann den Text unverändert im AI Hub weitergeben.",
+                text = "Für allgemeine Wissensfragen brauche ich einmalig ein KI-Modell. Deine Frage bleibt hier im Chat; lokale Launcher-Anweisungen funktionieren trotzdem sofort.",
                 handoffPrompt = command.prompt,
                 visualState = AssistantVisualState.OFFLINE,
                 actionRisk = AssistantCommandRiskClassifier.risk(command),
@@ -83,7 +85,7 @@ class AssistantLocalCore(
         is LauncherCommand.OpenSystemPanel -> "Ich öffne ${command.panel.title}."
         is LauncherCommand.SwitchScene -> "Ich wechsle zu ${command.scene.title}."
         is LauncherCommand.LaunchApp -> "Ich suche und öffne ${command.query}."
-        is LauncherCommand.RoutePrompt -> "Ich bereite die bewusste KI-Übergabe vor."
+        is LauncherCommand.RoutePrompt -> "Ich halte die Frage für dein KI-Modell bereit."
         LauncherCommand.Empty -> ""
     }
 
