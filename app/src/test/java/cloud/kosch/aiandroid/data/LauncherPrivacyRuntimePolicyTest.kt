@@ -10,7 +10,7 @@ import org.junit.Test
 class LauncherPrivacyRuntimePolicyTest {
     @After
     fun tearDown() {
-        LauncherPrivacyRuntimePolicy.resetForTest()
+        LauncherPrivacyRuntimePolicy.configure(PrivacySettings())
     }
 
     @Test
@@ -40,7 +40,7 @@ class LauncherPrivacyRuntimePolicyTest {
 
     @Test
     fun `fresh defaults keep local bounded features enabled`() {
-        LauncherPrivacyRuntimePolicy.resetForTest()
+        LauncherPrivacyRuntimePolicy.configure(PrivacySettings())
 
         assertTrue(LauncherPrivacyRuntimePolicy.localUsageLearningEnabled)
         assertTrue(LauncherPrivacyRuntimePolicy.auditEnabled)
