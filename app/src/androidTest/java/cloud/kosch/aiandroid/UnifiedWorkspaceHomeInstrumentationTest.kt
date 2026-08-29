@@ -58,16 +58,25 @@ class UnifiedWorkspaceHomeInstrumentationTest {
             composeTestRule
                 .onNodeWithContentDescription("Alle Apps", useUnmergedTree = true)
                 .performClick()
-            composeTestRule.waitForIdle()
+
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                initialViewModel.controller.drawerVisible
+            }
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                composeTestRule
+                    .onAllNodesWithText("App-Raum", useUnmergedTree = true)
+                    .fetchSemanticsNodes()
+                    .isNotEmpty()
+            }
 
             val openDrawerViewModel = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
             assertEquals(HomePage.WORKSPACE, openDrawerViewModel.controller.homePage)
-            composeTestRule
-                .onNodeWithText("App-Raum", useUnmergedTree = true)
-                .fetchSemanticsNode()
 
             composeTestRule.runOnUiThread {
                 openDrawerViewModel.controller.closeDrawer()
+            }
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                !openDrawerViewModel.controller.drawerVisible
             }
             composeTestRule.waitForIdle()
             composeTestRule.onNodeWithText("App fehlt", useUnmergedTree = true).fetchSemanticsNode()
