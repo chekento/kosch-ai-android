@@ -1,12 +1,12 @@
 package cloud.kosch.aiandroid
 
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.swipeLeft
-import androidx.compose.ui.test.swipeRight
+import androidx.compose.ui.test.swipe
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.kosch.aiandroid.data.LauncherSettingsStore
@@ -41,8 +41,6 @@ class WorkspaceSwipeNavigationInstrumentationTest {
                 viewModel.settings.applyGestures(GestureSettings())
                 viewModel.homeWorkspace.createPage("Swipe A")
                 firstId = viewModel.homeWorkspace.activePage.id
-                // Create another page so the navigation contract is exercised even on a clean workspace.
-                // Existing personal pages may still sit between these two pages after policy normalization.
                 viewModel.homeWorkspace.createPage("Swipe B")
                 viewModel.homeWorkspace.activatePage(firstId)
                 viewModel.controller.switchHomePage(HomePage.WORKSPACE)
@@ -57,13 +55,37 @@ class WorkspaceSwipeNavigationInstrumentationTest {
             }
             val adjacentTitle = viewModel.homeWorkspace.document.pages.first { it.id == adjacentId }.title
 
-            composeTestRule.onRoot(useUnmergedTree = true).performTouchInput { swipeLeft() }
+            // Keep the gesture well away from edge-trigger regions. API 36's generic swipeLeft()/swipeRight()
+            // helpers can begin close enough to an edge on some managed-device densities to exercise EDGE_* instead.
+            composeTestRule.onRoot(useUnmergedTree = true).performTouchInput {
+                val width = visibleSize.width.toFloat()
+                val height = visibleSize.height.toFloat()
+                swipe(
+                    start = Offset(width * 0.75f, height * 0.50f),
+                    end = Offset(width * 0.25f, height * 0.50f),
+                    durationMillis = 300L,
+                )
+            }
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                viewModel.homeWorkspace.document.activePageId == adjacentId
+            }
             composeTestRule.waitForIdle()
 
             assertEquals(adjacentId, viewModel.homeWorkspace.document.activePageId)
             assertEquals(adjacentTitle, viewModel.homeWorkspace.activePage.title)
 
-            composeTestRule.onRoot(useUnmergedTree = true).performTouchInput { swipeRight() }
+            composeTestRule.onRoot(useUnmergedTree = true).performTouchInput {
+                val width = visibleSize.width.toFloat()
+                val height = visibleSize.height.toFloat()
+                swipe(
+                    start = Offset(width * 0.25f, height * 0.50f),
+                    end = Offset(width * 0.75f, height * 0.50f),
+                    durationMillis = 300L,
+                )
+            }
+            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
+                viewModel.homeWorkspace.document.activePageId == firstId
+            }
             composeTestRule.waitForIdle()
 
             assertEquals(firstId, viewModel.homeWorkspace.document.activePageId)
