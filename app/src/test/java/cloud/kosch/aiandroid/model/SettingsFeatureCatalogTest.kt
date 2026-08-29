@@ -102,6 +102,17 @@ class SettingsFeatureCatalogTest {
         assertTrue(live.any { it.id == "appearance.material_you" })
         assertTrue(live.none { it.id == "assistant.recorder" })
         assertTrue(live.none { it.id == "ai.cost_budget" })
+        assertTrue(live.none { it.id == "assistant.wake_word" })
+        assertTrue(live.none { it.id == "assistant.presence" })
+    }
+
+    @Test
+    fun stagedAssistantChoices_remainCoreReadyUntilTheirRuntimeActuallyExists() {
+        val byId = SettingsFeatureCatalog.all.associateBy(SettingsFeatureDefinition::id)
+        assertEquals(SettingMaturity.CORE_READY, byId.getValue("assistant.wake_word").maturity)
+        assertEquals(SettingMaturity.CORE_READY, byId.getValue("assistant.presence").maturity)
+        assertEquals(SettingMaturity.LIVE, byId.getValue("assistant.screen_awareness").maturity)
+        assertEquals(SettingMaturity.LIVE, byId.getValue("assistant.camera_awareness").maturity)
     }
 
     @Test
