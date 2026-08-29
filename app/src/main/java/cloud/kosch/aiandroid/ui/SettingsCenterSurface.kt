@@ -230,16 +230,14 @@ private fun SettingsNavigationPane(
             if (descriptors.isEmpty()) {
                 item { Text("Keine passende Einstellung gefunden.", color = MutedMist, modifier = Modifier.padding(16.dp)) }
             }
+        }
 
-            if (hasHidden && query.isBlank()) {
-                item {
-                    TextButton(
-                        onClick = { showAll = !showAll },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text(if (showAll) "Weniger anzeigen" else "Weitere Einstellungen")
-                    }
-                }
+        if (hasHidden && query.isBlank()) {
+            TextButton(
+                onClick = { showAll = !showAll },
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Text(if (showAll) "Weniger anzeigen" else "Weitere Einstellungen")
             }
         }
     }
