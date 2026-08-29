@@ -91,14 +91,23 @@ object LauncherGestureClassifier {
     }
 }
 
-/** A binding lookup never invents a fallback action for an unbound trigger. */
+/**
+ * Resolves user gesture bindings while keeping ordinary horizontal page swipes usable out of the box.
+ *
+ * An explicit binding always wins, including GestureAction.NONE. Only an entirely unbound SWIPE_LEFT / SWIPE_RIGHT
+ * receives the launcher baseline page-navigation action. This means existing custom gesture profiles remain
+ * authoritative and users can explicitly disable either direction without the fallback reappearing.
+ */
 object LauncherGestureBindingResolver {
     fun actionFor(settings: GestureSettings, trigger: GestureTrigger): GestureAction {
         if (!settings.enabled) return GestureAction.NONE
-        return settings.normalized().bindings
-            .firstOrNull { it.trigger == trigger }
-            ?.action
-            ?: GestureAction.NONE
+        val explicit = settings.normalized().bindings.firstOrNull { it.trigger == trigger }
+        if (explicit != null) return explicit.action
+        return when (trigger) {
+            GestureTrigger.SWIPE_LEFT -> GestureAction.NEXT_PAGE
+            GestureTrigger.SWIPE_RIGHT -> GestureAction.PREVIOUS_PAGE
+            else -> GestureAction.NONE
+        }
     }
 
     fun customTargetFor(settings: GestureSettings, trigger: GestureTrigger): String? {
