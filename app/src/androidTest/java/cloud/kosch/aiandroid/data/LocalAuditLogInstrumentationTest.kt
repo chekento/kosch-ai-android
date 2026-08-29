@@ -10,6 +10,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -24,14 +25,14 @@ class LocalAuditLogInstrumentationTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         auditPreferences().edit().clear().commit()
-        LauncherPrivacyRuntimePolicy.resetForTest()
+        LauncherPrivacyRuntimePolicy.configure(PrivacySettings())
         log = LocalAuditLog(context)
     }
 
     @After
     fun tearDown() {
         auditPreferences().edit().clear().commit()
-        LauncherPrivacyRuntimePolicy.resetForTest()
+        LauncherPrivacyRuntimePolicy.configure(PrivacySettings())
     }
 
     @Test
@@ -41,7 +42,7 @@ class LocalAuditLogInstrumentationTest {
         log.append(AuditAction.APP_LAUNCH, AuditOutcome.SUCCESS)
 
         assertTrue(log.events().isEmpty())
-        assertEquals(null, auditPreferences().getString(KEY_EVENTS, null))
+        assertNull(auditPreferences().getString(KEY_EVENTS, null))
     }
 
     @Test
