@@ -6,10 +6,10 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.kosch.aiandroid.model.SceneId
 import cloud.kosch.aiandroid.model.TileAction
 import cloud.kosch.aiandroid.model.WorkspaceCellBounds
+import cloud.kosch.aiandroid.model.WorkspaceDocument
 import cloud.kosch.aiandroid.model.WorkspaceItem
 import cloud.kosch.aiandroid.model.WorkspaceItemContent
 import cloud.kosch.aiandroid.model.WorkspacePage
-import cloud.kosch.aiandroid.model.WorkspaceStableIds
 import cloud.kosch.aiandroid.model.WorkspaceV7Migration
 import org.json.JSONObject
 import org.junit.After
@@ -86,7 +86,20 @@ class WorkspaceV7InstrumentationTest {
 
     @Test
     fun codec_rejectsEmbeddedDeviceWidgetId_andFutureSchema() {
-        val document = WorkspaceV7Migration.fromLegacyScenePositions(SceneId.AI, emptyMap())
+        val migrated = WorkspaceV7Migration.fromLegacyScenePositions(SceneId.AI, emptyMap())
+        val document = migrated.copy(
+            pages = migrated.pages.map { page ->
+                if (page.id != migrated.activePageId) page else page.copy(
+                    items = listOf(
+                        WorkspaceItem(
+                            id = "item:tamper-widget",
+                            bounds = WorkspaceCellBounds(0, 0, 2, 2),
+                            content = WorkspaceItemContent.Widget("cloud.kosch.widget/.Provider"),
+                        ),
+                    ),
+                )
+            },
+        ).normalized()
         val root = WorkspaceDocumentCodec.toJson(document)
         val firstItem = root
             .getJSONArray("pages")
@@ -122,7 +135,9 @@ class WorkspaceV7InstrumentationTest {
 
         assertNull(persistence.loadStoredOrNull())
         val fallback = persistence.loadOrLegacyFallback(SceneId.WORK, emptyMap())
-        assertEquals(WorkspaceStableIds.scenePage(SceneId.WORK), fallback.activePageId)
+        assertEquals(WorkspaceDocument.DEFAULT_PAGE_ID, fallback.activePageId)
+        assertEquals(WorkspaceDocument.DEFAULT_PAGE_ID, fallback.pages.first().id)
+        assertTrue(fallback.pages.any { it.sceneAdapter == SceneId.WORK })
         assertFalse(persistence.migrateIfAbsent(SceneId.AI, emptyMap()))
         assertEquals(
             corruptFuture,
