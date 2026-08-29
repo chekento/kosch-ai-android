@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * Lifecycle-owned bridge between the AI Hub and KAL's direct OpenRouter connector.
+ * Lifecycle-owned bridge between KAL UI surfaces and the direct OpenRouter connector.
  *
  * It performs no work on its own: model discovery and chat are triggered only by explicit UI actions. Network I/O
  * runs off the main thread, while every request still passes through [OpenRouterApiClient] and therefore through
@@ -117,22 +117,52 @@ class OpenRouterDirectController(
     }
 
     fun send(prompt: String) {
-        if (sending || loadingModels) return
+        sendInternal(
+            prompt = prompt,
+            onSuccess = { response = it },
+            onFailure = {},
+        )
+    }
+
+    /**
+     * Starts one Assistant reply only when the same explicit provider gates used by the AI Hub are already satisfied.
+     * Returning false means no network request was started and the Assistant must retain its safe provider-handoff UI.
+     */
+    fun sendForAssistant(
+        prompt: String,
+        onSuccess: (OpenRouterChatResponse) -> Unit,
+        onFailure: (String) -> Unit,
+    ): Boolean = sendInternal(
+        prompt = prompt,
+        onSuccess = onSuccess,
+        onFailure = onFailure,
+    )
+
+    private fun sendInternal(
+        prompt: String,
+        onSuccess: (OpenRouterChatResponse) -> Unit,
+        onFailure: (String) -> Unit,
+    ): Boolean {
+        if (sending || loadingModels) return false
         val normalizedPrompt = prompt.trim()
         if (normalizedPrompt.isBlank()) {
             notice = "Bitte zuerst einen Prompt eingeben"
-            return
-        }
-        val modelId = selectedModelId.trim()
-        if (modelId.isBlank()) {
-            notice = "Bitte zuerst ein OpenRouter-Modell auswählen oder eine Modell-ID eingeben"
-            return
+            return false
         }
 
         refreshState()
         if (!connected) {
             notice = "OpenRouter ist nicht verbunden"
-            return
+            return false
+        }
+        if (!cloudExecutionEnabled) {
+            notice = "Cloud Access ist für verbundene Provider nicht freigegeben"
+            return false
+        }
+        val modelId = selectedModelId.trim()
+        if (modelId.isBlank()) {
+            notice = "Bitte zuerst ein OpenRouter-Modell auswählen oder eine Modell-ID eingeben"
+            return false
         }
 
         val (ai, privacy) = settingsProvider()
@@ -155,12 +185,20 @@ class OpenRouterDirectController(
                     notice = result.value.costUsd?.let { cost ->
                         "OpenRouter-Antwort erhalten · gemeldete Kosten: $cost USD"
                     } ?: "OpenRouter-Antwort erhalten"
+                    onSuccess(result.value)
                 }
-                is OpenRouterApiResult.Blocked -> notice = result.reason
-                is OpenRouterApiResult.Failed -> notice = result.reason
+                is OpenRouterApiResult.Blocked -> {
+                    notice = result.reason
+                    onFailure(result.reason)
+                }
+                is OpenRouterApiResult.Failed -> {
+                    notice = result.reason
+                    onFailure(result.reason)
+                }
             }
             refreshState()
         }
+        return true
     }
 
     fun clearResponse() {
