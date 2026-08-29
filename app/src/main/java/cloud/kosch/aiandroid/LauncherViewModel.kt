@@ -13,6 +13,7 @@ import cloud.kosch.aiandroid.ai.AiHubOrigin
 import cloud.kosch.aiandroid.ai.AiHubRoutingContext
 import cloud.kosch.aiandroid.ai.PenAiContextPlanner
 import cloud.kosch.aiandroid.ai.UniversalSearchSourcesFactory
+import cloud.kosch.aiandroid.assistant.AssistantProviderReadiness
 import cloud.kosch.aiandroid.data.WorkspaceWidgetHostRecovery
 import cloud.kosch.aiandroid.model.AdaptiveInputRuntimeState
 import cloud.kosch.aiandroid.model.HomePage
@@ -118,6 +119,16 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
                 prompt = prompt,
                 onSuccess = { reply -> assistant.consumeGenerativeResponse(reply.text) },
                 onFailure = { reason -> assistant.consumeGenerativeFailure(reason, prompt) },
+            )
+        }
+        // Read-only status bridge. refreshState only reads the secure connection marker and current settings; it does
+        // not perform a network request or change Cloud Access/model selection.
+        assistant.setGenerativeReadinessProvider {
+            directProvider.refreshState()
+            AssistantProviderReadiness.describe(
+                connected = directProvider.connected,
+                cloudExecutionEnabled = directProvider.cloudExecutionEnabled,
+                selectedModelId = directProvider.selectedModelId,
             )
         }
     }
