@@ -251,9 +251,11 @@ class WorkspacePageEditorTest {
     @Test
     fun userPageLimit_isExplicitlyBounded() {
         var document = base()
-        repeat(WorkspacePageEditor.MAX_USER_PAGES) { index ->
+        assertEquals(1, document.pages.count { it.sceneAdapter == null })
+        repeat(WorkspacePageEditor.MAX_USER_PAGES - 1) { index ->
             document = WorkspacePageEditor.createUserPage(document, "page:user:$index", "Home ${index + 1}")
         }
+        assertEquals(WorkspacePageEditor.MAX_USER_PAGES, document.pages.count { it.sceneAdapter == null })
         assertThrows(IllegalArgumentException::class.java) {
             WorkspacePageEditor.createUserPage(document, "page:user:overflow", "Overflow")
         }
