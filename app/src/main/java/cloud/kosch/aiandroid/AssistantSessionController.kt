@@ -35,6 +35,7 @@ class AssistantSessionController(context: Context) {
     private var visualStateAfterSpeech = AssistantVisualState.IDLE
     private var lastVisualReadyRequestId = -1L
     private var lastVisualFailureGeneration = -1L
+    private var generativeRequester: ((String) -> Boolean)? = null
 
     var settings by mutableStateOf(store.load())
         private set
@@ -61,6 +62,14 @@ class AssistantSessionController(context: Context) {
         }
     }
 
+    /**
+     * ViewModel-owned bridge to an explicitly configured provider. The requester must return false when no network
+     * request was actually started so the safe handoff path remains visible. Nothing here can enable Cloud Access.
+     */
+    fun setGenerativeRequester(requester: ((String) -> Boolean)?) {
+        generativeRequester = requester
+    }
+
     fun open() {
         sheetVisible = true
     }
@@ -84,7 +93,7 @@ class AssistantSessionController(context: Context) {
         if (enabled && messages.isEmpty()) {
             append(
                 AssistantMessageRole.ASSISTANT,
-                "Bereit. Launcher-Befehle laufen lokal; freie KI-Anfragen gebe ich nur nach deiner Auswahl weiter.",
+                "Bereit. Launcher-Befehle laufen lokal. Ein bereits freigegebener KI-Provider kann hier direkt antworten; sonst bleibt die bewusste Anbieterübergabe verfügbar.",
             )
         }
     }
@@ -128,6 +137,7 @@ class AssistantSessionController(context: Context) {
     }
 
     fun close() {
+        generativeRequester = null
         AssistantVisualContextRuntime.setEventListener(null)
         AssistantVisualContextRuntime.discard()
         mainHandler.removeCallbacksAndMessages(null)
@@ -223,8 +233,15 @@ class AssistantSessionController(context: Context) {
         }
 
         val reply = localCore.reply(input)
+        val providerPrompt = reply.handoffPrompt?.takeIf(String::isNotBlank)
+        if (providerPrompt != null && generativeRequester?.invoke(providerPrompt) == true) {
+            handoffPrompt = null
+            visualState = AssistantVisualState.THINKING
+            return
+        }
+
         append(AssistantMessageRole.ASSISTANT, reply.text)
-        handoffPrompt = reply.handoffPrompt
+        handoffPrompt = providerPrompt
 
         when (reply.command) {
             null -> visualState = reply.visualState
@@ -248,8 +265,30 @@ class AssistantSessionController(context: Context) {
             reply.text.isNotBlank()
         ) {
             requestSpeech(reply.text)
-            // The TTS listener switches to SPEAKING only when Android reports actual playback.
         }
+    }
+
+    fun consumeGenerativeResponse(text: String) {
+        if (!settings.enabled) return
+        val normalized = text.trim().take(MAX_MESSAGE_LENGTH)
+        if (normalized.isBlank()) {
+            consumeGenerativeFailure("Der verbundene Provider hat keine Textantwort geliefert", null)
+            return
+        }
+        append(AssistantMessageRole.ASSISTANT, normalized)
+        handoffPrompt = null
+        visualState = AssistantVisualState.IDLE
+    }
+
+    fun consumeGenerativeFailure(reason: String, fallbackPrompt: String?) {
+        if (!settings.enabled) return
+        val safeReason = reason.trim().take(320).ifBlank { "Die Provider-Anfrage ist fehlgeschlagen" }
+        append(
+            AssistantMessageRole.ASSISTANT,
+            "$safeReason. Du kannst die Anfrage im AI Hub prüfen oder erneut senden.",
+        )
+        handoffPrompt = fallbackPrompt?.trim()?.take(MAX_MESSAGE_LENGTH)?.takeIf(String::isNotBlank)
+        visualState = AssistantVisualState.ERROR
     }
 
     fun visualContextReady(metadata: AssistantVisualContextRuntime.Metadata) {
