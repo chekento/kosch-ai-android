@@ -3,6 +3,7 @@ package cloud.kosch.aiandroid.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -20,11 +21,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apps
+import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Widgets
@@ -64,7 +67,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.LauncherController
 import cloud.kosch.aiandroid.WorkspaceHomeController
+import cloud.kosch.aiandroid.ai.SmartAppDescriptor
 import cloud.kosch.aiandroid.ai.SmartCollection
+import cloud.kosch.aiandroid.ai.SmartDockRuntimePolicy
 import cloud.kosch.aiandroid.model.AppProfile
 import cloud.kosch.aiandroid.model.DefaultWorkspace
 import cloud.kosch.aiandroid.model.LabelMode
@@ -101,6 +106,16 @@ fun UnifiedWorkspaceHomeScreen(
     requestContact: () -> Unit,
 ) {
     val snackbarHost = remember { SnackbarHostState() }
+    val launcherSettings = LocalLauncherSettings.current
+    val dockSettings = launcherSettings.dock
+    val pageIndicatorEnabled = launcherSettings.home.showPageIndicator
+    val dockChromeHeight = maxOf(62f, 38f * dockSettings.iconScale + 24f).dp
+    val workspaceBottomPadding = when {
+        dockSettings.enabled -> dockChromeHeight + 42.dp
+        pageIndicatorEnabled -> 48.dp
+        else -> 24.dp
+    }
+    val pageIndicatorBottomPadding = if (dockSettings.enabled) dockChromeHeight + 18.dp else 18.dp
     var addVisible by remember { mutableStateOf(false) }
     var folderPreviewId by remember { mutableStateOf<String?>(null) }
 
@@ -150,26 +165,30 @@ fun UnifiedWorkspaceHomeScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 12.dp)
-                    .padding(top = 104.dp, bottom = 112.dp),
+                    .padding(top = 104.dp, bottom = workspaceBottomPadding),
                 controller = controller,
                 home = home,
                 onOpenFolder = { folderPreviewId = it },
             )
 
-            CompactPageDots(
-                home = home,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 82.dp),
-            )
+            if (pageIndicatorEnabled) {
+                CompactPageDots(
+                    home = home,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = pageIndicatorBottomPadding),
+                )
+            }
 
-            ReferenceHomeDock(
-                controller = controller,
-                onAdd = { addVisible = true },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(horizontal = 14.dp, vertical = 14.dp),
-            )
+            if (dockSettings.enabled) {
+                ReferenceHomeDock(
+                    controller = controller,
+                    onAdd = { addVisible = true },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(horizontal = 14.dp, vertical = 14.dp),
+                )
+            }
         }
     }
 
@@ -409,7 +428,7 @@ private fun CompactPageDots(home: WorkspaceHomeController, modifier: Modifier = 
     val slots = WorkspacePageIndicatorPolicy.slots(pages.size, activeIndex)
 
     Row(
-        modifier = modifier,
+        modifier = modifier.semantics { contentDescription = "KAL Seitenindikator" },
         horizontalArrangement = Arrangement.spacedBy(7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -451,9 +470,32 @@ private fun ReferenceHomeDock(
     onAdd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val launcherSettings = LocalLauncherSettings.current
+    val dockSettings = launcherSettings.dock
+    val visibleApps = controller.apps.filterNot { it.key in controller.hiddenAppKeys }
+    val byKey = visibleApps.associateBy(LaunchableApp::key)
+    val dockKeys = SmartDockRuntimePolicy.selectKeys(
+        apps = visibleApps.map { app ->
+            SmartAppDescriptor(
+                key = app.key,
+                label = app.label,
+                packageName = app.packageName,
+            )
+        },
+        pinnedKeys = controller.pinnedAppKeys,
+        recentPackages = controller.recentPackages,
+        usageSignals = controller.appUsageSignals,
+        scene = controller.activeScene,
+        settings = dockSettings,
+    )
+    val dockApps = dockKeys.mapNotNull(byKey::get)
+    val itemExtent = maxOf(48f, 38f * dockSettings.iconScale + 10f).dp
+
     Surface(
-        modifier = modifier.widthIn(max = 440.dp),
-        color = DeepSurface.copy(alpha = 0.76f),
+        modifier = modifier
+            .widthIn(max = 440.dp)
+            .semantics { contentDescription = "KAL Dock" },
+        color = DeepSurface.copy(alpha = dockSettings.backgroundOpacity),
         shape = RoundedCornerShape(24.dp),
         shadowElevation = 10.dp,
     ) {
@@ -465,21 +507,89 @@ private fun ReferenceHomeDock(
             IconButton(onClick = controller::openDrawer) {
                 Icon(Icons.Rounded.Apps, contentDescription = "Alle Apps", tint = Color.White)
             }
-            val pinned = controller.pinnedAppKeys
-                .mapNotNull { key -> controller.apps.firstOrNull { it.key == key } }
-                .take(5)
-            pinned.forEach { app ->
-                IconButton(onClick = { controller.launch(app) }) {
-                    Image(bitmap = app.icon, contentDescription = app.label, modifier = Modifier.size(38.dp))
+
+            if (dockApps.isNotEmpty()) {
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    dockApps.forEach { app ->
+                        ReferenceDockAppButton(
+                            app = app,
+                            badgeCount = SmartDockRuntimePolicy.visibleBadgeCount(
+                                rawCount = controller.notificationCounts[app.packageName] ?: 0,
+                                showBadgesOnDock = launcherSettings.notifications.showBadgesOnDock,
+                            ),
+                            iconScale = dockSettings.iconScale,
+                            itemExtent = itemExtent,
+                            onClick = { controller.launch(app) },
+                        )
+                    }
                 }
             }
+
             if (controller.stylusState.present) {
                 IconButton(onClick = controller::openPenSpace) {
                     Icon(Icons.Rounded.Draw, contentDescription = "Pen Space", tint = Mint)
                 }
             }
+            if (dockSettings.showAskButton) {
+                IconButton(onClick = controller::openProviderChooser) {
+                    Icon(Icons.Rounded.AutoAwesome, contentDescription = "Ask / KI", tint = Mint)
+                }
+            }
             IconButton(onClick = onAdd) {
                 Icon(Icons.Rounded.Add, contentDescription = "Zum Homescreen hinzufügen", tint = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ReferenceDockAppButton(
+    app: LaunchableApp,
+    badgeCount: Int,
+    iconScale: Float,
+    itemExtent: androidx.compose.ui.unit.Dp,
+    onClick: () -> Unit,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(itemExtent)
+            .semantics {
+                contentDescription = if (badgeCount > 0) {
+                    "${app.label}, $badgeCount Benachrichtigungen"
+                } else {
+                    app.label
+                }
+            },
+    ) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Image(
+                bitmap = app.icon,
+                contentDescription = null,
+                modifier = Modifier.size((38f * iconScale).dp),
+            )
+            if (badgeCount > 0) {
+                Surface(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(if (badgeCount > 9) 20.dp else 16.dp),
+                    color = Mint,
+                    shape = CircleShape,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(
+                            text = if (badgeCount > 99) "99+" else badgeCount.toString(),
+                            color = DeepSurface,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
             }
         }
     }
