@@ -60,13 +60,11 @@ class UnifiedWorkspaceHomeInstrumentationTest {
                 .performClick()
 
             composeTestRule.waitUntil(timeoutMillis = 5_000L) {
-                initialViewModel.controller.drawerVisible
-            }
-            composeTestRule.waitUntil(timeoutMillis = 5_000L) {
-                composeTestRule
-                    .onAllNodesWithText("App-Raum", useUnmergedTree = true)
-                    .fetchSemanticsNodes()
-                    .isNotEmpty()
+                initialViewModel.controller.drawerVisible &&
+                    composeTestRule
+                        .onAllNodesWithText("App-Raum", useUnmergedTree = true)
+                        .fetchSemanticsNodes()
+                        .isNotEmpty()
             }
 
             val openDrawerViewModel = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
