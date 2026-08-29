@@ -24,7 +24,7 @@ class WorkspaceSwipeNavigationInstrumentationTest {
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun freeHomeSurface_swipesBetweenPersonalPagesInBothDirections() {
+    fun freeHomeSurface_swipesBetweenAdjacentPersonalPagesInBothDirections() {
         composeTestRule.waitForIdle()
         dismissOnboardingIfVisible()
 
@@ -37,13 +37,13 @@ class WorkspaceSwipeNavigationInstrumentationTest {
 
         try {
             lateinit var firstId: String
-            lateinit var secondId: String
             composeTestRule.runOnUiThread {
                 viewModel.settings.applyGestures(GestureSettings())
                 viewModel.homeWorkspace.createPage("Swipe A")
                 firstId = viewModel.homeWorkspace.activePage.id
+                // Create another page so the navigation contract is exercised even on a clean workspace.
+                // Existing personal pages may still sit between these two pages after policy normalization.
                 viewModel.homeWorkspace.createPage("Swipe B")
-                secondId = viewModel.homeWorkspace.activePage.id
                 viewModel.homeWorkspace.activatePage(firstId)
                 viewModel.controller.switchHomePage(HomePage.WORKSPACE)
             }
@@ -52,11 +52,16 @@ class WorkspaceSwipeNavigationInstrumentationTest {
             assertEquals(firstId, viewModel.homeWorkspace.document.activePageId)
             assertEquals("Swipe A", viewModel.homeWorkspace.activePage.title)
 
+            val adjacentId = checkNotNull(viewModel.homeWorkspace.adjacentUserPageId(+1)) {
+                "Swipe A must have a personal page to its right"
+            }
+            val adjacentTitle = viewModel.homeWorkspace.document.pages.first { it.id == adjacentId }.title
+
             composeTestRule.onRoot(useUnmergedTree = true).performTouchInput { swipeLeft() }
             composeTestRule.waitForIdle()
 
-            assertEquals(secondId, viewModel.homeWorkspace.document.activePageId)
-            assertEquals("Swipe B", viewModel.homeWorkspace.activePage.title)
+            assertEquals(adjacentId, viewModel.homeWorkspace.document.activePageId)
+            assertEquals(adjacentTitle, viewModel.homeWorkspace.activePage.title)
 
             composeTestRule.onRoot(useUnmergedTree = true).performTouchInput { swipeRight() }
             composeTestRule.waitForIdle()
