@@ -83,18 +83,18 @@ class AssistantLauncherControlPlanner {
 
         if (containsAny(normalized, "app namen", "app-namen", "beschriftungen", "labels", "icon labels")) {
             when {
-                containsAny(normalized, "immer", "always", "an", "ein") ->
-                    return AssistantLauncherControlAction.SetHomeLabels(LabelMode.ALWAYS)
-                containsAny(normalized, "nie", "never", "aus", "off") ->
+                hasAnyToken(normalized, "nie", "never", "aus", "off") ->
                     return AssistantLauncherControlAction.SetHomeLabels(LabelMode.NEVER)
                 containsAny(normalized, "smart", "automatisch", "automatic") ->
                     return AssistantLauncherControlAction.SetHomeLabels(LabelMode.SMART)
+                hasAnyToken(normalized, "immer", "always", "an", "ein") ->
+                    return AssistantLauncherControlAction.SetHomeLabels(LabelMode.ALWAYS)
             }
         }
 
         if (containsAny(normalized, "icons", "symbole", "app symbole", "app-symbole")) {
             when {
-                containsAny(normalized, "großer", "groesser", "größer", "mehr", "bigger") ->
+                containsAny(normalized, "grosser", "groesser", "mehr", "bigger") ->
                     return AssistantLauncherControlAction.AdjustHomeIconScale(+0.10f)
                 containsAny(normalized, "kleiner", "weniger", "smaller") ->
                     return AssistantLauncherControlAction.AdjustHomeIconScale(-0.10f)
@@ -103,11 +103,11 @@ class AssistantLauncherControlPlanner {
 
         if (containsAny(normalized, "assistent", "assistant", "avatar")) {
             when {
-                containsAny(normalized, "links", "left") ->
+                hasAnyToken(normalized, "links", "left") ->
                     return AssistantLauncherControlAction.SetAssistantAnchor(AssistantAnchor.LEFT)
-                containsAny(normalized, "mitte", "zentriert", "center", "centre") ->
+                hasAnyToken(normalized, "mitte", "zentriert", "center", "centre") ->
                     return AssistantLauncherControlAction.SetAssistantAnchor(AssistantAnchor.CENTER)
-                containsAny(normalized, "rechts", "right") ->
+                hasAnyToken(normalized, "rechts", "right") ->
                     return AssistantLauncherControlAction.SetAssistantAnchor(AssistantAnchor.RIGHT)
             }
             if (opensSettings(normalized)) return AssistantLauncherControlAction.OpenSettings(SettingsSection.ASSISTANT)
@@ -136,7 +136,6 @@ class AssistantLauncherControlPlanner {
         "darstellung",
         "modus",
         "oberflache",
-        "oberfläche",
         "farbschema",
     )
 
@@ -149,11 +148,16 @@ class AssistantLauncherControlPlanner {
     }
 
     private fun parseOnOff(value: String): Boolean? = when {
-        containsAny(value, " ausschalten", " abschalten", " deaktivieren", " aus", " off", " verstecken") ||
-            value.endsWith("aus") || value.endsWith("off") -> false
-        containsAny(value, " einschalten", " aktivieren", " an", " on", " zeigen", " einblenden") ||
-            value.endsWith("an") || value.endsWith("on") -> true
+        containsAny(value, " ausschalten", " abschalten", " deaktivieren", " verstecken") ||
+            hasAnyToken(value, "aus", "off") -> false
+        containsAny(value, " einschalten", " aktivieren", " zeigen", " einblenden") ||
+            hasAnyToken(value, "an", "on") -> true
         else -> null
+    }
+
+    private fun hasAnyToken(value: String, vararg tokens: String): Boolean {
+        val words = value.split(' ', '-').filter(String::isNotBlank).toSet()
+        return tokens.any(words::contains)
     }
 
     private fun containsAny(value: String, vararg needles: String): Boolean = needles.any(value::contains)
@@ -161,20 +165,18 @@ class AssistantLauncherControlPlanner {
     private fun String.normalized(): String = Normalizer
         .normalize(lowercase(Locale.GERMAN), Normalizer.Form.NFD)
         .replace("\\p{M}+".toRegex(), "")
-        .replace("[^a-z0-9äöüß -]".toRegex(), " ")
+        .replace("[^a-z0-9ß -]".toRegex(), " ")
         .replace("\\s+".toRegex(), " ")
         .trim()
 
     private companion object {
         val undoPhrases = setOf(
             "ruckgangig",
-            "rückgängig",
             "mach das ruckgangig",
-            "mach das rückgängig",
             "letzte anderung ruckgangig",
             "undo",
             "undo settings",
         )
-        val DOCK_LIMIT_REGEX = Regex("(?:dock|schnellzugriff).*?(?:auf|mit)?\\s*(\\d{1,2})\\s*(?:apps|icons|symbole|platze|plätze|slots)?")
+        val DOCK_LIMIT_REGEX = Regex("(?:dock|schnellzugriff).*?(?:auf|mit)?\\s*(\\d{1,2})\\s*(?:apps|icons|symbole|platze|slots)?")
     }
 }
