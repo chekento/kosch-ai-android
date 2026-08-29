@@ -12,7 +12,7 @@ import org.junit.Test
 class LocalUsageModelTest {
     @After
     fun tearDown() {
-        LauncherPrivacyRuntimePolicy.resetForTest()
+        LauncherPrivacyRuntimePolicy.configure(PrivacySettings())
     }
 
     @Test
