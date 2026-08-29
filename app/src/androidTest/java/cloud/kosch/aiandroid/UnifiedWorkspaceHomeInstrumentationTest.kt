@@ -55,11 +55,12 @@ class UnifiedWorkspaceHomeInstrumentationTest {
                 .onNodeWithContentDescription("KAL Menü", useUnmergedTree = true)
                 .fetchSemanticsNode()
 
-            // Exercise the real Home button. The product contract is that the tap opens the drawer state;
-            // Material3 sheet composition/animation timing is deliberately not part of that contract.
+            // Click the merged button semantics rather than the unmerged icon descendant. This keeps the test tied to
+            // the same accessible action a user invokes and avoids API-36 dispatching the click to a non-clickable child.
             composeTestRule
-                .onNodeWithContentDescription("Alle Apps", useUnmergedTree = true)
+                .onNodeWithContentDescription("Alle Apps")
                 .performClick()
+            composeTestRule.waitForIdle()
             composeTestRule.waitUntil(timeoutMillis = 5_000L) {
                 initialViewModel.controller.drawerVisible
             }
