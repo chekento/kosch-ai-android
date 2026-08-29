@@ -17,7 +17,14 @@ class WorkspaceV7Persistence(private val preferences: SharedPreferences) {
         activeScene: SceneId,
         legacyPositions: Map<SceneId, Map<String, TilePosition>>,
     ): WorkspaceDocument {
-        loadStoredOrNull()?.let { return it }
+        loadStoredOrNull()?.let { stored ->
+            val upgraded = WorkspaceHomeUpgrade.ensureCleanHome(stored)
+            if (upgraded != stored) {
+                // This migration is additive only: one empty Home page is prepended and all stored scene content stays.
+                save(upgraded)
+            }
+            return upgraded
+        }
         return WorkspaceV7Migration.fromLegacyScenePositions(activeScene, legacyPositions)
     }
 

@@ -17,7 +17,7 @@ enum class AssistantViseme(val code: String) {
     NN("nn"),
     RR("rr"),
     AA("aa"),
-    E("e"),
+    E("ee"),
     IH("ih"),
     OH("oh"),
     OU("ou"),

@@ -143,6 +143,24 @@ class SystemActionGateway(context: Context) {
         Intent(Intent.ACTION_VIEW, Uri.parse("https://play.google.com/store/apps/details?id=$packageName")),
     )
 
+    fun openWeb(url: String): Result<Unit> = start(
+        Intent(Intent.ACTION_VIEW, Uri.parse(url)),
+    )
+
+    /** Opens Android's current default browser without assuming a vendor package or a homepage URL. */
+    fun openDefaultBrowser(): Result<Unit> = start(
+        Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_APP_BROWSER),
+    )
+
+    /** Explicit Android share handoff. Whether the receiving app routes text into AI is owned by that app. */
+    fun shareTextWithPackage(packageName: String, text: String): Result<Unit> = start(
+        Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+            setPackage(packageName)
+        },
+    )
+
     fun requestUninstall(packageName: String, user: UserHandle): Result<Unit> = start(
         Intent(Intent.ACTION_DELETE, Uri.fromParts("package", packageName, null))
             .putExtra(Intent.EXTRA_USER, user),

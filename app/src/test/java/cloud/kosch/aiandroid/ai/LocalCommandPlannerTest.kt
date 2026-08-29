@@ -28,10 +28,42 @@ class LocalCommandPlannerTest {
     }
 
     @Test
+    fun `wake word and politeness wrappers do not weaken deterministic routing`() {
+        assertEquals(LauncherCommand.OpenCamera, planner.plan("Computer, öffne Kamera bitte!"))
+        assertEquals(LauncherCommand.OpenControls, planner.plan("Hey KoSch, zeige Kontrollzentrum please"))
+        assertEquals(
+            LauncherCommand.OpenSystemPanel(SystemPanel.WIFI),
+            planner.plan("KoSch: öffne WLAN bitte"),
+        )
+    }
+
+    @Test
+    fun `explicit app syntax supports power users`() {
+        assertEquals(LauncherCommand.LaunchApp("Signal"), planner.plan("app: Signal"))
+        assertEquals(LauncherCommand.LaunchApp("Obsidian"), planner.plan("app Obsidian"))
+    }
+
+    @Test
+    fun `explicit ask syntax strips only the routing prefix`() {
+        assertEquals(
+            LauncherCommand.RoutePrompt("Vergleiche lokale LLMs"),
+            planner.plan("KI Vergleiche lokale LLMs"),
+        )
+        assertEquals(
+            LauncherCommand.RoutePrompt("summarize this safely"),
+            planner.plan("ask summarize this safely"),
+        )
+    }
+
+    @Test
     fun `scene command resolves without cloud model`() {
         assertEquals(
             LauncherCommand.SwitchScene(SceneId.STUDIO),
             planner.plan("Wechsle zu Studio"),
+        )
+        assertEquals(
+            LauncherCommand.SwitchScene(SceneId.STUDIO),
+            planner.plan("Studio Modus"),
         )
     }
 
@@ -62,6 +94,10 @@ class LocalCommandPlannerTest {
             LauncherCommand.OpenSystemPanel(SystemPanel.HOME_SELECTION),
             planner.plan("Launcher Auswahl"),
         )
+        assertEquals(
+            LauncherCommand.OpenSystemPanel(SystemPanel.HOME_SELECTION),
+            planner.plan("Öffne Home App"),
+        )
     }
 
     @Test
@@ -72,11 +108,13 @@ class LocalCommandPlannerTest {
     @Test
     fun `pen command opens the local pen workspace`() {
         assertEquals(LauncherCommand.OpenPenSpace, planner.plan("Pen Space"))
+        assertEquals(LauncherCommand.OpenPenSpace, planner.plan("Öffne Canvas"))
     }
 
     @Test
     fun `professional commands remain deterministic and local`() {
         assertEquals(LauncherCommand.OpenProDesk, planner.plan("Pro Desk"))
+        assertEquals(LauncherCommand.OpenProDesk, planner.plan("Power Desk"))
         assertEquals(LauncherCommand.OpenBackup, planner.plan("Workspace sichern"))
         assertEquals(LauncherCommand.OpenAudit, planner.plan("Sicherheitsverlauf"))
         assertEquals(LauncherCommand.PickContact, planner.plan("Kontakt auswählen"))
@@ -88,6 +126,7 @@ class LocalCommandPlannerTest {
         assertEquals(LauncherCommand.OpenSystemPanel(SystemPanel.ACCESSIBILITY), planner.plan("Barrierefreiheit"))
         assertEquals(LauncherCommand.OpenSystemPanel(SystemPanel.DEFAULT_APPS), planner.plan("Standard Apps"))
         assertEquals(LauncherCommand.OpenSystemPanel(SystemPanel.STORAGE), planner.plan("Speicher"))
+        assertEquals(LauncherCommand.OpenSystemPanel(SystemPanel.PRIVACY), planner.plan("Öffne Datenschutz"))
     }
 
     @Test

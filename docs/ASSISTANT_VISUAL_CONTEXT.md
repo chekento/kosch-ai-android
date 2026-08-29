@@ -1,19 +1,20 @@
 # KoSch Assistant — Stage H Visual Context
 
-Status: implemented capture boundary; generative vision inference remains deliberately separate.
+Status: implemented one-shot capture boundary; generative vision inference remains deliberately separate.
 
 ## Goal
 
-Stage G proved that Screen Awareness and Camera Awareness can run with visible Android consent and without persisting or uploading frames. Stage H adds the next explicit boundary: the Assistant may request **one current frame** for a user question such as “Was siehst du?” without turning the observation session into continuous AI analysis.
+Stage G proved that Screen Awareness and Camera Awareness can run with visible Android consent and without persisting or continuously uploading frames. Stage H adds the next explicit boundary: the Assistant may request **one current frame** for a user question such as “Was siehst du?” without turning the observation session into continuous AI analysis.
 
-## Four distinct states
+## Five distinct states
 
 1. **Awareness off** — no Screen/Camera capture.
 2. **Awareness live** — MediaProjection or visible CameraX session is flowing, but ordinary frames are immediately closed.
 3. **Visual context requested** — exactly one matching live frame may be claimed and compressed.
 4. **Visual context ready** — one bounded JPEG is held briefly in process memory, but has not been transferred to a model.
+5. **Context transferred for inference** — future state; not implemented by the current Stage H runtime.
 
-A later inference layer must create a fifth, separately visible step: **context transferred for inference**.
+The fifth state must remain separately visible and separately authorized.
 
 ## Explicit request semantics
 
@@ -72,11 +73,11 @@ When ready, chat reports:
 
 Capture failure or source shutdown is also reported.
 
-## Security boundary
+## Security and networking boundary
 
-Stage H still does **not** add:
+Stage H itself does **not introduce**:
 
-- `INTERNET`,
+- a new network permission,
 - `RECORD_AUDIO`,
 - persistent screenshot storage,
 - video recording,
@@ -85,20 +86,25 @@ Stage H still does **not** add:
 - bypass of MediaProjection consent,
 - Accessibility-based screenshot scraping.
 
-The existing CI permission budget remains authoritative.
+The **full current application package does contain `INTERNET` and `ACCESS_NETWORK_STATE`** because KAL now includes the separate optional Provider Connections layer. Their presence does not authorize Visual Context transfer. Cloud Access remains OFF by default, provider connection is explicit, and Stage H currently has no code path that attaches its JPEG to a provider request.
 
-## Next step — Stage H.2
+Screen/Camera consent, Visual Context readiness and provider/network authorization are therefore independent gates.
 
-Build an explicit inference bridge that consumes a `Snapshot` only after a visible model/provider decision.
+The reviewed production permission budget remains authoritative and CI inspects both source and packaged artifacts.
+
+## Next step — explicit inference bridge
+
+Build an inference bridge that consumes a snapshot only after a visible local-model/provider decision.
 
 Required rules:
 
 1. Inference owns a consumed snapshot and must discard it after the request finishes.
-2. Local multimodal inference should be supported without adding network permission to the offline launcher variant.
+2. Local multimodal inference should remain possible in a future explicitly offline variant without network permission.
 3. External vision providers require a separately visible transfer path; a text-only provider handoff must never imply the image was attached.
 4. The UI must distinguish `CONTEXT READY` from `SENT TO MODEL` / `LOCAL INFERENCE`.
 5. Redaction/crop controls should be available before any external transfer.
 6. Secure/blocked Android surfaces remain blocked; no bypass attempts.
+7. A connected provider must never convert an active Awareness session into continuous streaming.
 
 ## Recorder relationship
 

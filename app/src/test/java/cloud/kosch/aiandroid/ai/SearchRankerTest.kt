@@ -10,12 +10,16 @@ class SearchRankerTest {
         SearchDocument("calendar", "Kalender", listOf("Termine", "Agenda")),
         SearchDocument("calculator", "Taschenrechner", listOf("Rechnen")),
         SearchDocument("mail", "E-Mail", listOf("Postfach")),
+        SearchDocument("google-calendar", "Google Calendar", listOf("Meetings", "Agenda")),
+        SearchDocument("telegram-cyrillic", "Телеграм", listOf("Сообщения")),
+        SearchDocument("settings-greek", "Ρυθμίσεις", listOf("Σύστημα")),
     )
 
     @Test
-    fun `exact title outranks package substring`() {
-        val result = SearchRanker.rank("Kamera", documents)
-        assertEquals("camera", result.first().id)
+    fun `exact title outranks package substring and explains why`() {
+        val result = SearchRanker.rankDetailed("Kamera", documents)
+        assertEquals("camera", result.first().document.id)
+        assertEquals(SearchMatchReason.EXACT, result.first().reason)
     }
 
     @Test
@@ -33,11 +37,91 @@ class SearchRankerTest {
     @Test
     fun `keywords are searchable`() {
         val result = SearchRanker.rank("agenda", documents)
-        assertEquals("calendar", result.first().id)
+        assertTrue(result.first().id in setOf("calendar", "google-calendar"))
+    }
+
+    @Test
+    fun `multi token prefixes strongly match professional app names`() {
+        val result = SearchRanker.rankDetailed("goo cal", documents)
+        assertEquals("google-calendar", result.first().document.id)
+        assertEquals(SearchMatchReason.TOKEN_PREFIX, result.first().reason)
+    }
+
+    @Test
+    fun `acronym finds multi word app without cloud intelligence`() {
+        val result = SearchRanker.rankDetailed("gc", documents)
+        assertEquals("google-calendar", result.first().document.id)
+        assertEquals(SearchMatchReason.ACRONYM, result.first().reason)
+    }
+
+    @Test
+    fun `single edit typo recovery stays bounded`() {
+        val result = SearchRanker.rankDetailed("kalendr", documents)
+        assertEquals("calendar", result.first().document.id)
+        assertEquals(SearchMatchReason.TYPO, result.first().reason)
+    }
+
+    @Test
+    fun `cyrillic title is discoverable from latin query locally`() {
+        val result = SearchRanker.rankDetailed("telegram", documents)
+        assertEquals("telegram-cyrillic", result.first().document.id)
+        assertEquals(SearchMatchReason.TRANSLITERATED, result.first().reason)
+    }
+
+    @Test
+    fun `latin title can be discovered from cyrillic query locally`() {
+        val result = SearchRanker.rankDetailed(
+            "камера",
+            listOf(SearchDocument("camera-latin", "Kamera")),
+        )
+        assertEquals("camera-latin", result.first().document.id)
+        assertEquals(SearchMatchReason.TRANSLITERATED, result.first().reason)
+    }
+
+    @Test
+    fun `greek title is discoverable from romanized query`() {
+        val result = SearchRanker.rankDetailed("rythmiseis", documents)
+        assertEquals("settings-greek", result.first().document.id)
+        assertEquals(SearchMatchReason.TRANSLITERATED, result.first().reason)
+    }
+
+    @Test
+    fun `original script exact match still outranks transliterated fallback`() {
+        val result = SearchRanker.rankDetailed(
+            "Телеграм",
+            listOf(
+                SearchDocument("native", "Телеграм"),
+                SearchDocument("latin", "Telegram"),
+            ),
+        )
+        assertEquals("native", result.first().document.id)
+        assertEquals(SearchMatchReason.EXACT, result.first().reason)
     }
 
     @Test
     fun `unrelated short query returns no guesses`() {
         assertTrue(SearchRanker.rank("zz", documents).isEmpty())
+    }
+
+    @Test
+    fun `smart collections understand german professional labels locally`() {
+        assertTrue(
+            LocalAppClassifier.belongsTo(
+                SmartCollection.WORK,
+                label = "Projekt Kalender",
+                packageName = "cloud.kosch.planner",
+                recentPackages = emptyList(),
+                providerPackages = emptySet(),
+            ),
+        )
+        assertTrue(
+            LocalAppClassifier.belongsTo(
+                SmartCollection.TOOLS,
+                label = "Datei Werkzeug",
+                packageName = "cloud.kosch.files",
+                recentPackages = emptyList(),
+                providerPackages = emptySet(),
+            ),
+        )
     }
 }

@@ -93,18 +93,24 @@ fun AssistantInteractiveAvatar(
                 },
             ),
     ) {
-        // assistantId is already carried through this public boundary so final character packs can
-        // switch without changing call sites. Until those calibrated packs land, the procedural
-        // fallback remains intentionally shared and safe.
-        @Suppress("UNUSED_VARIABLE")
-        val selectedAssistantId = assistantId
-        AssistantAvatarFallback(
-            state = state,
-            speechSignal = speechSignal,
-            reducedMotion = reducedMotion,
-            attentionSignal = attentionSignal,
-            modifier = Modifier.fillMaxSize(),
-        )
+        if (AssistantProceduralCharacterResolver.resolve(assistantId) != null) {
+            AssistantCharacterProceduralFallback(
+                assistantId = assistantId,
+                state = state,
+                speechSignal = speechSignal,
+                reducedMotion = reducedMotion,
+                attentionSignal = attentionSignal,
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            AssistantAvatarFallback(
+                state = state,
+                speechSignal = speechSignal,
+                reducedMotion = reducedMotion,
+                attentionSignal = attentionSignal,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
     }
 }
 
