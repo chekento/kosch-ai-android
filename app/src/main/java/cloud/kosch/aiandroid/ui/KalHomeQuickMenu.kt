@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Newspaper
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
@@ -27,10 +28,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 
-/** One quiet launcher entry replaces the former vertical stack of four permanent Home buttons. */
+/** One quiet launcher entry keeps professional tools available without cluttering Home. */
 @Composable
 fun KalHomeQuickMenu(
     onSearch: () -> Unit,
+    onNews: () -> Unit,
     onAiHub: () -> Unit,
     onPersonalize: () -> Unit,
     onSettings: () -> Unit,
@@ -66,6 +68,14 @@ fun KalHomeQuickMenu(
                 onClick = {
                     expanded = false
                     onSearch()
+                },
+            )
+            DropdownMenuItem(
+                text = { Text("News", style = MaterialTheme.typography.bodyLarge) },
+                leadingIcon = { Icon(Icons.Rounded.Newspaper, contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    onNews()
                 },
             )
             DropdownMenuItem(
