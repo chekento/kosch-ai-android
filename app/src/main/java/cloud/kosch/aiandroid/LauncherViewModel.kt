@@ -33,6 +33,9 @@ import kotlinx.coroutines.launch
  * assignments. Custom actions are typed/validated and contain no arbitrary Android Intent extras.
  */
 class LauncherViewModel(application: Application) : AndroidViewModel(application) {
+    // Settings initialize the process-local privacy gates before LauncherController can load/rank usage signals or
+    // read the local audit. A persisted OFF switch therefore applies from the first launcher frame after process start.
+    val settings = LauncherSettingsController(application)
     val controller = LauncherController(application).also(LauncherController::start)
     private val adaptiveInputMonitor = AdaptiveInputDeviceMonitor(
         context = application,
@@ -47,7 +50,6 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
 
     val homeWorkspace = WorkspaceHomeController(application)
     val widgetStacks = WidgetStackController(application).also { it.repair(controller.widgetIds) }
-    val settings = LauncherSettingsController(application)
     val directProvider = OpenRouterDirectController(
         context = application,
         scope = viewModelScope,
