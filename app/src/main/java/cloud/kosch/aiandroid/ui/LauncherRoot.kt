@@ -455,7 +455,7 @@ private fun LauncherHeader(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "KoSch AI",
+                    text = "KAL",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -1089,7 +1089,7 @@ private fun ProviderChooserSheet(controller: LauncherController) {
                 Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("LOCAL CORE · AKTIV", color = Mint, style = MaterialTheme.typography.labelMedium)
                     Text(
-                        text = "Befehle, Suche, Kontext, Szenen und Datei-Analyse laufen ohne Modell, API oder Internetrecht. Generative Antworten können bewusst an eine lokale Open-Source-App oder Cloud-App übergeben werden.",
+                        text = "Befehle, Suche, Kontext, Szenen und Datei-Analyse laufen lokal ohne Modell oder API-Konto. Externe Apps oder Provider öffnen sich nur nach deiner Auswahl; ein Prompt wird von KAL hier nicht dauerhaft gespeichert.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
