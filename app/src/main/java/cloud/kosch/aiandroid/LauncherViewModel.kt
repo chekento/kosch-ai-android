@@ -47,6 +47,11 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val homeWorkspace = WorkspaceHomeController(application)
     val widgetStacks = WidgetStackController(application).also { it.repair(controller.widgetIds) }
     val settings = LauncherSettingsController(application)
+    val directProvider = OpenRouterDirectController(
+        context = application,
+        scope = viewModelScope,
+        settingsProvider = { settings.document.ai to settings.document.privacy },
+    )
     val scopedSettings = ScopedSettingsController(application).also {
         // Startup/process-death reconciliation removes only overrides whose portable page/item owner no longer exists.
         it.reconcile(homeWorkspace.document)
@@ -104,6 +109,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     ) {
         universalSearch.close()
         settings.close()
+        directProvider.refreshState()
         aiHub.open(
             initialPrompt = initialPrompt,
             context = currentAiHubContext(requestedOrigin),
