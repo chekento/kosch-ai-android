@@ -49,6 +49,7 @@ import cloud.kosch.aiandroid.model.GestureBinding
 import cloud.kosch.aiandroid.model.GestureSettings
 import cloud.kosch.aiandroid.model.GestureTrigger
 import cloud.kosch.aiandroid.model.HapticProfile
+import cloud.kosch.aiandroid.system.LauncherGestureBindingResolver
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 import cloud.kosch.aiandroid.ui.theme.Mint
 import cloud.kosch.aiandroid.ui.theme.MutedMist
@@ -146,6 +147,11 @@ fun PersonalizationQuickSurface(
                             },
                         )
                     }
+                    Text(
+                        "Links/rechts blättert standardmäßig durch die Seiten. Wählst du bewusst „Keine Aktion“, bleibt diese Richtung wirklich deaktiviert.",
+                        color = MutedMist,
+                        style = MaterialTheme.typography.labelSmall,
+                    )
                     Text(
                         "Stift-Tasten, Gerätesperre und freie Custom-Targets erscheinen hier erst, wenn ihr Android-Ausführungspfad vollständig verifiziert ist.",
                         color = MutedMist,
@@ -256,11 +262,14 @@ private fun GestureBindingRow(
 }
 
 private fun GestureSettings.actionFor(trigger: GestureTrigger): GestureAction =
-    bindings.firstOrNull { it.trigger == trigger }?.action ?: GestureAction.NONE
+    LauncherGestureBindingResolver.actionFor(this, trigger)
 
 private fun GestureSettings.withBinding(trigger: GestureTrigger, action: GestureAction): GestureSettings {
     val next = bindings.filterNot { it.trigger == trigger }.toMutableList()
-    if (action != GestureAction.NONE) next += GestureBinding(trigger = trigger, action = action)
+    val persistExplicitNone = trigger == GestureTrigger.SWIPE_LEFT || trigger == GestureTrigger.SWIPE_RIGHT
+    if (action != GestureAction.NONE || persistExplicitNone) {
+        next += GestureBinding(trigger = trigger, action = action)
+    }
     return copy(bindings = next).normalized()
 }
 
