@@ -94,7 +94,7 @@ class AssistantLauncherControlPlanner {
 
         if (containsAny(normalized, "icons", "symbole", "app symbole", "app-symbole")) {
             when {
-                containsAny(normalized, "grosser", "groesser", "mehr", "bigger") ->
+                containsAny(normalized, "großer", "grosser", "groesser", "mehr", "bigger") ->
                     return AssistantLauncherControlAction.AdjustHomeIconScale(+0.10f)
                 containsAny(normalized, "kleiner", "weniger", "smaller") ->
                     return AssistantLauncherControlAction.AdjustHomeIconScale(-0.10f)
