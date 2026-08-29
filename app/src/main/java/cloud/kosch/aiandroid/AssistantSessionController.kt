@@ -36,6 +36,7 @@ class AssistantSessionController(context: Context) {
     private var lastVisualReadyRequestId = -1L
     private var lastVisualFailureGeneration = -1L
     private var generativeRequester: ((String) -> Boolean)? = null
+    private var pendingGenerativeSpeech: ((String) -> Boolean)? = null
 
     var settings by mutableStateOf(store.load())
         private set
@@ -86,6 +87,7 @@ class AssistantSessionController(context: Context) {
         awaitingVoice = false
         clearSpeechSignal()
         if (!enabled) {
+            pendingGenerativeSpeech = null
             attentionSignal = AssistantAttentionSignal.Idle
             AssistantVisualContextRuntime.discard()
         }
@@ -105,7 +107,10 @@ class AssistantSessionController(context: Context) {
 
     fun setSpeechOutputEnabled(enabled: Boolean) {
         updateSettings(settings.copy(speechOutputEnabled = enabled))
-        if (!enabled && speechSignal.active) speechInterrupted()
+        if (!enabled) {
+            pendingGenerativeSpeech = null
+            if (speechSignal.active) speechInterrupted()
+        }
     }
 
     fun setReducedMotion(enabled: Boolean) {
@@ -130,6 +135,7 @@ class AssistantSessionController(context: Context) {
     fun clearSession() {
         messages = emptyList()
         handoffPrompt = null
+        pendingGenerativeSpeech = null
         clearSpeechSignal()
         attentionSignal = AssistantAttentionSignal.Idle
         AssistantVisualContextRuntime.discard()
@@ -138,6 +144,7 @@ class AssistantSessionController(context: Context) {
 
     fun close() {
         generativeRequester = null
+        pendingGenerativeSpeech = null
         AssistantVisualContextRuntime.setEventListener(null)
         AssistantVisualContextRuntime.discard()
         mainHandler.removeCallbacksAndMessages(null)
@@ -234,10 +241,14 @@ class AssistantSessionController(context: Context) {
 
         val reply = localCore.reply(input)
         val providerPrompt = reply.handoffPrompt?.takeIf(String::isNotBlank)
-        if (providerPrompt != null && generativeRequester?.invoke(providerPrompt) == true) {
-            handoffPrompt = null
-            visualState = AssistantVisualState.THINKING
-            return
+        if (providerPrompt != null) {
+            val started = generativeRequester?.invoke(providerPrompt) == true
+            if (started) {
+                pendingGenerativeSpeech = if (settings.speechOutputEnabled) requestSpeech else null
+                handoffPrompt = null
+                visualState = AssistantVisualState.THINKING
+                return
+            }
         }
 
         append(AssistantMessageRole.ASSISTANT, reply.text)
@@ -269,7 +280,10 @@ class AssistantSessionController(context: Context) {
     }
 
     fun consumeGenerativeResponse(text: String) {
-        if (!settings.enabled) return
+        if (!settings.enabled) {
+            pendingGenerativeSpeech = null
+            return
+        }
         val normalized = text.trim().take(MAX_MESSAGE_LENGTH)
         if (normalized.isBlank()) {
             consumeGenerativeFailure("Der verbundene Provider hat keine Textantwort geliefert", null)
@@ -278,9 +292,13 @@ class AssistantSessionController(context: Context) {
         append(AssistantMessageRole.ASSISTANT, normalized)
         handoffPrompt = null
         visualState = AssistantVisualState.IDLE
+        val speech = pendingGenerativeSpeech
+        pendingGenerativeSpeech = null
+        if (settings.speechOutputEnabled) speech?.invoke(normalized)
     }
 
     fun consumeGenerativeFailure(reason: String, fallbackPrompt: String?) {
+        pendingGenerativeSpeech = null
         if (!settings.enabled) return
         val safeReason = reason.trim().take(320).ifBlank { "Die Provider-Anfrage ist fehlgeschlagen" }
         append(
