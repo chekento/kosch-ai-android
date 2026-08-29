@@ -1,12 +1,16 @@
 package cloud.kosch.aiandroid
 
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -54,6 +58,37 @@ class AssistantUiInstrumentationTest {
         composeTestRule
             .onNodeWithText("Name des Assistenten", useUnmergedTree = true)
             .fetchSemanticsNode()
+    }
+
+    @Test
+    fun assistantControlCenter_marksWakeWordAndPresenceAsPreparedNotLive() {
+        composeTestRule.waitForIdle()
+        dismissOnboardingIfVisible()
+        openAssistant()
+
+        composeTestRule
+            .onNodeWithText("Steuerung", useUnmergedTree = true)
+            .performClick()
+        composeTestRule.waitForIdle()
+
+        val scroll = composeTestRule.onNodeWithTag(
+            "assistant-control-center-scroll",
+            useUnmergedTree = true,
+        )
+        scroll.performScrollToNode(hasText("Presence Mode · vorbereitet"))
+        composeTestRule
+            .onNodeWithText("Presence Mode · vorbereitet", useUnmergedTree = true)
+            .fetchSemanticsNode()
+
+        scroll.performScrollToNode(hasText("Wake Word · vorbereitet"))
+        composeTestRule
+            .onNodeWithText("Wake Word · vorbereitet", useUnmergedTree = true)
+            .fetchSemanticsNode()
+
+        val stagedStatus = composeTestRule
+            .onAllNodesWithText("Detektor nicht aktiv", substring = true, useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        assertTrue("Wake-word UI must state that its detector is not active", stagedStatus.isNotEmpty())
     }
 
     private fun openAssistant() {
