@@ -26,7 +26,6 @@ import androidx.compose.material.icons.rounded.Remove
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material.icons.rounded.Tune
-import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
@@ -39,6 +38,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,8 +61,6 @@ import cloud.kosch.aiandroid.model.HapticProfile
 import cloud.kosch.aiandroid.model.MotionProfile
 import cloud.kosch.aiandroid.model.PageTransition
 import cloud.kosch.aiandroid.model.SettingMaturity
-import cloud.kosch.aiandroid.model.SettingPortability
-import cloud.kosch.aiandroid.model.SettingScope
 import cloud.kosch.aiandroid.model.SettingsFeatureCatalog
 import cloud.kosch.aiandroid.model.SettingsFeatureDefinition
 import cloud.kosch.aiandroid.model.SettingsSection
@@ -76,12 +74,9 @@ import cloud.kosch.aiandroid.ui.theme.Sky
 import cloud.kosch.aiandroid.ui.theme.Warm
 
 /**
- * Navigable Settings Center backed by the product-wide SettingsFeatureCatalog.
- *
- * The catalog is deliberately larger than the live editors: search and section coverage therefore expose future
- * capabilities without pretending that they already work. LIVE/CORE/PLANNED/EXPERIMENTAL remain explicit.
- * Assistant behavior is not duplicated here; Session/Agent/Voice runtimes remain authoritative and the portable
- * launcher document only owns presentation choices such as anchor, scale, opacity and animation preferences.
+ * Calm, searchable settings surface. The first level intentionally shows common categories only; less frequent and
+ * expert areas stay one explicit step away or are found immediately through search. Runtime truth remains sourced from
+ * SettingsFeatureCatalog and the authoritative controllers rather than being duplicated as decorative UI state.
  */
 @Composable
 fun SettingsCenterSurface(
@@ -177,6 +172,11 @@ private fun SettingsNavigationPane(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    var showAll by rememberSaveable { mutableStateOf(false) }
+    val revealAll = query.isNotBlank() || showAll || (selected != null && selected !in PRIMARY_SETTINGS_SECTIONS)
+    val listed = if (revealAll) descriptors else descriptors.filter { it.section in PRIMARY_SETTINGS_SECTIONS }
+    val hasHidden = query.isBlank() && descriptors.any { it.section !in PRIMARY_SETTINGS_SECTIONS }
+
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -189,17 +189,14 @@ private fun SettingsNavigationPane(
                 }
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text("Settings Center", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                Text(
-                    "${SettingsSection.entries.size} Bereiche · ${SettingsFeatureCatalog.all.size} erfasste Optionen",
-                    color = MutedMist,
-                    style = MaterialTheme.typography.labelMedium,
-                )
+                Text("Einstellungen", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                Text("Finde schnell, was du ändern möchtest.", color = MutedMist, style = MaterialTheme.typography.labelMedium)
             }
             IconButton(onClick = onDismiss) {
                 Icon(Icons.Rounded.Close, contentDescription = "Settings Center schließen")
             }
         }
+
         OutlinedTextField(
             value = query,
             onValueChange = onQueryChange,
@@ -207,26 +204,42 @@ private fun SettingsNavigationPane(
             singleLine = true,
             leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
             label = { Text("Einstellungen durchsuchen") },
-            placeholder = { Text("Raster, Wake Word, Foldable, Backup …") },
+            placeholder = { Text("z. B. Raster, Assistent, Backup") },
         )
-        Surface(color = Sky.copy(alpha = 0.08f), shape = RoundedCornerShape(16.dp)) {
-            Text(
-                "Scope: Global → Seite → Objekt · Gerät und Session sind separat. Overrides bekommen „Standard erben“; Geräte-IDs, Grants und Secrets bleiben nie portable Layoutdaten.",
-                modifier = Modifier.padding(12.dp),
-                color = Sky,
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
+
         LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-            items(descriptors, key = { it.section.name }) { descriptor ->
+            if (query.isBlank()) {
+                item {
+                    Text(
+                        if (revealAll) "Alle Bereiche" else "Häufig verwendet",
+                        color = MutedMist,
+                        style = MaterialTheme.typography.labelLarge,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+                    )
+                }
+            }
+
+            items(listed, key = { it.section.name }) { descriptor ->
                 SettingsSectionRow(
                     descriptor = descriptor,
                     selected = descriptor.section == selected,
                     onClick = { onSelect(descriptor) },
                 )
             }
+
             if (descriptors.isEmpty()) {
                 item { Text("Keine passende Einstellung gefunden.", color = MutedMist, modifier = Modifier.padding(16.dp)) }
+            }
+
+            if (hasHidden && query.isBlank()) {
+                item {
+                    TextButton(
+                        onClick = { showAll = !showAll },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(if (showAll) "Weniger anzeigen" else "Weitere Einstellungen")
+                    }
+                }
             }
         }
     }
@@ -252,7 +265,7 @@ private fun SettingsSectionRow(
             Column(modifier = Modifier.weight(1f)) {
                 Text(descriptor.section.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    "${descriptor.summary} · ${descriptor.features.size}",
+                    descriptor.summary,
                     color = MutedMist,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 2,
@@ -285,7 +298,7 @@ private fun SettingsDetailPane(
                 }
                 Column(modifier = Modifier.weight(1f)) {
                     Text(descriptor.section.title, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.SemiBold)
-                    Text("${descriptor.summary} · ${descriptor.features.size} erfasst", color = MutedMist)
+                    Text(descriptor.summary, color = MutedMist)
                 }
                 if (settings.canUndo) {
                     IconButton(onClick = { settings.undo(home) }) {
@@ -328,7 +341,7 @@ private fun ColumnScope.HomeSettingsEditor(settings: LauncherSettingsController,
     var draft by remember(current) { mutableStateOf(current) }
     LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            LiveTag("LIVE · verlustfreier Workspace-Reflow")
+            LiveTag("Sicheres Raster mit verlustfreiem Reflow")
             NumericSetting("Rasterspalten", draft.gridColumns, 4, 24) { draft = draft.copy(gridColumns = it) }
             NumericSetting("Rasterzeilen", draft.gridRows, 4, 32) { draft = draft.copy(gridRows = it) }
             ToggleSetting("Layout sperren", draft.lockLayout) { draft = draft.copy(lockLayout = it) }
@@ -338,7 +351,7 @@ private fun ColumnScope.HomeSettingsEditor(settings: LauncherSettingsController,
         item {
             Surface(color = Sky.copy(alpha = 0.08f), shape = RoundedCornerShape(14.dp)) {
                 Text(
-                    "Rasteränderungen werden erst bei „Übernehmen“ gespeichert. Passt eine Seite nicht verlustfrei in das neue Raster, bleibt der bisherige Homescreen vollständig erhalten.",
+                    "Rasteränderungen werden erst bei „Übernehmen“ gespeichert. Passt eine Seite nicht verlustfrei in das neue Raster, bleibt der bisherige Homescreen erhalten.",
                     modifier = Modifier.padding(12.dp),
                     color = Sky,
                     style = MaterialTheme.typography.bodySmall,
@@ -487,7 +500,7 @@ private fun ColumnScope.AppearanceSettingsEditor(settings: LauncherSettingsContr
     var draft by remember(current) { mutableStateOf(current) }
     LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            LiveTag("LIVE CORE · Material You + persistente Visual Tokens")
+            LiveTag("Darstellung wird sicher in deinen Launcher-Einstellungen gespeichert")
             ToggleSetting("Material-You-Akzente", draft.useMaterialYouAccents) { draft = draft.copy(useMaterialYouAccents = it) }
             Text("Motion", color = Mint, style = MaterialTheme.typography.labelLarge)
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.fillMaxWidth()) {
@@ -518,16 +531,16 @@ private fun ColumnScope.AssistantSettingsEditor(
     var draft by remember(current) { mutableStateOf(current) }
     LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
-            LiveTag("PORTABEL · Darstellung; Runtime-Rechte bleiben im Assistant Control Center")
+            LiveTag("Darstellung hier · Verhalten im Assistant Control Center")
             Surface(color = if (assistant.settings.enabled) Mint.copy(alpha = 0.10f) else RaisedSurface, shape = RoundedCornerShape(14.dp)) {
                 Column(modifier = Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        if (assistant.settings.enabled) "Assistant Runtime: AKTIV" else "Assistant Runtime: AUS",
+                        if (assistant.settings.enabled) "Assistent aktiv" else "Assistent aus",
                         color = if (assistant.settings.enabled) Mint else MutedMist,
                         fontWeight = FontWeight.SemiBold,
                     )
                     Text(
-                        "Character, Rufname, Wake Word, Voice-Zuordnung, Screen/Camera Awareness und Agent-Rechte werden nur in der echten Assistant-Runtime geändert. Dadurch gibt es keinen zweiten widersprüchlichen Settings-Zustand.",
+                        "Charakter, Rufname, Wake Word, Stimme, Screen/Camera Awareness und Agent-Rechte verwaltest du zentral im Assistant Control Center.",
                         color = MutedMist,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -560,9 +573,7 @@ private fun ColumnScope.AssistantSettingsEditor(
                 onDiscard = { draft = current },
             )
         }
-        item {
-            Text("Weitere Assistant-Funktionen", color = Mint, style = MaterialTheme.typography.labelLarge)
-        }
+        item { Text("Weitere Assistant-Funktionen", color = Mint, style = MaterialTheme.typography.labelLarge) }
         items(features.filterNot { it.id in assistantPresentationIds }) { feature ->
             FeatureCoverageRow(feature)
         }
@@ -604,7 +615,7 @@ private fun ColumnScope.PrivacySettingsEditor(settings: LauncherSettingsControll
             NumericSetting("Audit-Aufbewahrung (Tage)", draft.auditRetentionDays, 1, 365) {
                 draft = draft.copy(auditRetentionDays = it)
             }
-            LockedSetting("Notification-Zugriff", "wird nur über den Android-Systemdialog erteilt")
+            LockedSetting("Notification-Zugriff", "Wird nur über den Android-Systemdialog erteilt")
         }
         item { ApplyDiscardRow(dirty = draft != current, onApply = { settings.applyPrivacy(draft) }, onDiscard = { draft = current }) }
     }
@@ -617,15 +628,15 @@ private fun ColumnScope.BackupSettingsEditor(settings: LauncherSettingsControlle
     LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item {
             EditableTag()
-            ToggleSetting("Launcher-Settings einschließen", draft.includeLauncherSettings) { draft = draft.copy(includeLauncherSettings = it) }
+            ToggleSetting("Launcher-Einstellungen einschließen", draft.includeLauncherSettings) { draft = draft.copy(includeLauncherSettings = it) }
             ToggleSetting("Workspace-Layout einschließen", draft.includeWorkspaceLayout) { draft = draft.copy(includeWorkspaceLayout = it) }
             ToggleSetting("Themes einschließen", draft.includeThemes) { draft = draft.copy(includeThemes = it) }
             ToggleSetting("Assistant-Präferenzen einschließen", draft.includeAssistantPreferences) {
                 draft = draft.copy(includeAssistantPreferences = it)
             }
             ToggleSetting("Usage Learning einschließen", draft.includeUsageLearning) { draft = draft.copy(includeUsageLearning = it) }
-            LockedSetting("Secrets", "werden immer ausgeschlossen")
-            LockedSetting("Widget Host IDs / Grants / Geräte-Voice-IDs", "bleiben immer gerätegebunden")
+            LockedSetting("Secrets", "Werden immer ausgeschlossen")
+            LockedSetting("Widget Host IDs, Freigaben und Geräte-Voice-IDs", "Bleiben immer auf diesem Gerät")
         }
         item { ApplyDiscardRow(dirty = draft != current, onApply = { settings.applyBackup(draft) }, onDiscard = { draft = current }) }
     }
@@ -647,7 +658,7 @@ private fun ColumnScope.SystemSettingsEditor(settings: LauncherSettingsControlle
             ToggleSetting("System-Schriftgröße folgen", draft.followSystemFontScale) { draft = draft.copy(followSystemFontScale = it) }
             Surface(color = Sky.copy(alpha = 0.08f), shape = RoundedCornerShape(14.dp)) {
                 Text(
-                    "Desktop-/External-Display-/Foldable-Planung wird separat aus der live verfügbaren Fensterfläche und Eingabeart abgeleitet; keine Geräte-Modelllisten.",
+                    "KAL passt sich an Fenstergröße, Foldables, externe Displays und verfügbare Eingabegeräte an.",
                     modifier = Modifier.padding(12.dp),
                     color = Sky,
                     style = MaterialTheme.typography.bodySmall,
@@ -692,7 +703,12 @@ private fun presentationChanged(
 
 @Composable
 private fun ColumnScope.SettingsCoverageList(features: List<SettingsFeatureDefinition>) {
-    Text("Feature-/Settings-Matrix", color = Mint, style = MaterialTheme.typography.labelLarge)
+    Text("Optionen in diesem Bereich", color = Mint, style = MaterialTheme.typography.labelLarge)
+    Text(
+        "Der Status zeigt transparent, was bereits nutzbar ist und was noch vorbereitet wird.",
+        color = MutedMist,
+        style = MaterialTheme.typography.bodySmall,
+    )
     LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         items(features, key = { it.id }) { feature -> FeatureCoverageRow(feature) }
     }
@@ -701,27 +717,17 @@ private fun ColumnScope.SettingsCoverageList(features: List<SettingsFeatureDefin
 @Composable
 private fun FeatureCoverageRow(feature: SettingsFeatureDefinition) {
     Surface(color = RaisedSurface, shape = RoundedCornerShape(15.dp)) {
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 11.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 13.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(feature.title, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)
-                Text(
-                    maturityLabel(feature.maturity),
-                    color = maturityColor(feature.maturity),
-                    style = MaterialTheme.typography.labelSmall,
-                )
-            }
-            Text(feature.id, color = MutedMist, style = MaterialTheme.typography.labelSmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                feature.scopes.sortedBy { it.ordinal }.forEach { scope ->
-                    AssistChip(onClick = {}, enabled = false, label = { Text(scopeLabel(scope)) })
-                }
-                if (feature.portability != SettingPortability.PORTABLE) {
-                    AssistChip(onClick = {}, enabled = false, label = { Text(portabilityLabel(feature.portability)) })
-                }
-            }
+            Text(feature.title, modifier = Modifier.weight(1f), fontWeight = FontWeight.Medium)
+            Text(
+                maturityLabel(feature.maturity),
+                color = maturityColor(feature.maturity),
+                style = MaterialTheme.typography.labelSmall,
+            )
         }
     }
 }
@@ -737,7 +743,7 @@ private fun LiveTag(text: String) {
 private fun EditableTag() {
     Surface(color = Sky.copy(alpha = 0.10f), shape = RoundedCornerShape(12.dp)) {
         Text(
-            "EDITIERBAR · persistent · Runtime-Reifegrad bleibt in der Feature-Matrix maßgeblich",
+            "Änderungen werden erst mit „Übernehmen“ gespeichert.",
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 7.dp),
             color = Sky,
             style = MaterialTheme.typography.labelMedium,
@@ -812,31 +818,56 @@ private data class SettingsSectionDescriptor(
 
 private object SettingsCenterCatalog {
     private val summaries = mapOf(
-        SettingsSection.HOME to "Raster, Abstände und Homescreen-Verhalten",
-        SettingsSection.PAGES to "Seiten, Räume, Profile und Übergänge",
-        SettingsSection.APPS to "App Drawer, Sortierung, Icons und eigene Verknüpfungen",
-        SettingsSection.DOCK to "Schnellzugriff und adaptive Vorschläge",
-        SettingsSection.FOLDERS to "Manuelle und intelligente App-/Action-Gruppen",
-        SettingsSection.WIDGETS to "Widgets, Größen, Stacks und Recovery",
-        SettingsSection.APPEARANCE to "Motion, Tiefe, Material You und Iconografie",
-        SettingsSection.THEMES to "Theme Wahl, Creator, Import, Export und Rollback",
-        SettingsSection.ASSISTANT to "Charakter, Agent, Voice, Animation und Awareness",
-        SettingsSection.AI to "Lokale und externe Modelle kontrollieren",
-        SettingsSection.API to "Provider, Endpoints und Vault-Referenzen",
-        SettingsSection.VOICE to "STT, TTS und Audioverhalten",
-        SettingsSection.GESTURES to "Gesten und Eingaben auf Aktionen mappen",
-        SettingsSection.SEARCH to "Suche, Ranking und Command Palette",
-        SettingsSection.NOTIFICATIONS to "Badges, Systemzugriff und Privacy",
-        SettingsSection.PEN to "Smartpen, Pen Space und AI-Gesten",
-        SettingsSection.AUTOMATION to "Kontextvorschläge, Regeln und Dry Runs",
-        SettingsSection.ACCESSIBILITY to "Bedienbarkeit als echte Designvariante",
-        SettingsSection.PRIVACY to "Lokale Daten, Netzwerk, Sensoren und Security Controls",
-        SettingsSection.BACKUP to "Teil-Backup, Restore, Diff und Migration",
-        SettingsSection.SYSTEM to "Android, Geräte, Profile, Displays und Eingabegeräte",
-        SettingsSection.ADVANCED to "Performance, Diagnose, Safe Mode und Experimente",
+        SettingsSection.HOME to "Raster und Homescreen-Verhalten",
+        SettingsSection.PAGES to "Seiten, Räume und Übergänge",
+        SettingsSection.APPS to "App Drawer, Sortierung und Icons",
+        SettingsSection.DOCK to "Schnellzugriff und Vorschläge",
+        SettingsSection.FOLDERS to "Ordner und intelligente Gruppen",
+        SettingsSection.WIDGETS to "Widgets, Größen und Stacks",
+        SettingsSection.APPEARANCE to "Farben, Motion und Darstellung",
+        SettingsSection.THEMES to "Themes auswählen, importieren und exportieren",
+        SettingsSection.ASSISTANT to "Charakter, Darstellung und Assistant Control Center",
+        SettingsSection.AI to "Lokale und externe KI-Modelle",
+        SettingsSection.API to "Provider und Verbindungen",
+        SettingsSection.VOICE to "Spracheingabe und Sprachausgabe",
+        SettingsSection.GESTURES to "Gesten und Eingaben",
+        SettingsSection.SEARCH to "Suche und Command Palette",
+        SettingsSection.NOTIFICATIONS to "Benachrichtigungen und Badges",
+        SettingsSection.PEN to "Smartpen und Pen Space",
+        SettingsSection.AUTOMATION to "Kontextvorschläge und Automationen",
+        SettingsSection.ACCESSIBILITY to "Barrierefreiheit und Bedienhilfen",
+        SettingsSection.PRIVACY to "Lokale Daten, Netzwerk und Sicherheit",
+        SettingsSection.BACKUP to "Backup, Restore und Migration",
+        SettingsSection.SYSTEM to "Android und Systemintegration",
+        SettingsSection.ADVANCED to "Diagnose und experimentelle Funktionen",
     )
 
-    val sections: List<SettingsSectionDescriptor> = SettingsSection.entries.map { section ->
+    private val order = listOf(
+        SettingsSection.HOME,
+        SettingsSection.APPEARANCE,
+        SettingsSection.APPS,
+        SettingsSection.PAGES,
+        SettingsSection.DOCK,
+        SettingsSection.FOLDERS,
+        SettingsSection.WIDGETS,
+        SettingsSection.ASSISTANT,
+        SettingsSection.AI,
+        SettingsSection.SEARCH,
+        SettingsSection.PRIVACY,
+        SettingsSection.ACCESSIBILITY,
+        SettingsSection.GESTURES,
+        SettingsSection.NOTIFICATIONS,
+        SettingsSection.VOICE,
+        SettingsSection.PEN,
+        SettingsSection.AUTOMATION,
+        SettingsSection.BACKUP,
+        SettingsSection.THEMES,
+        SettingsSection.API,
+        SettingsSection.SYSTEM,
+        SettingsSection.ADVANCED,
+    )
+
+    val sections: List<SettingsSectionDescriptor> = order.map { section ->
         SettingsSectionDescriptor(
             section = section,
             summary = summaries.getValue(section),
@@ -844,6 +875,21 @@ private object SettingsCenterCatalog {
         )
     }
 }
+
+private val PRIMARY_SETTINGS_SECTIONS = setOf(
+    SettingsSection.HOME,
+    SettingsSection.APPEARANCE,
+    SettingsSection.APPS,
+    SettingsSection.PAGES,
+    SettingsSection.DOCK,
+    SettingsSection.FOLDERS,
+    SettingsSection.WIDGETS,
+    SettingsSection.ASSISTANT,
+    SettingsSection.AI,
+    SettingsSection.SEARCH,
+    SettingsSection.PRIVACY,
+    SettingsSection.ACCESSIBILITY,
+)
 
 private val assistantPresentationIds = setOf(
     "assistant.anchor",
@@ -858,10 +904,10 @@ private val assistantPresentationIds = setOf(
 )
 
 private fun maturityLabel(maturity: SettingMaturity): String = when (maturity) {
-    SettingMaturity.LIVE -> "LIVE"
-    SettingMaturity.CORE_READY -> "CORE"
-    SettingMaturity.PLANNED -> "GEPLANT"
-    SettingMaturity.EXPERIMENTAL -> "EXPERIMENT"
+    SettingMaturity.LIVE -> "Verfügbar"
+    SettingMaturity.CORE_READY -> "Grundfunktion"
+    SettingMaturity.PLANNED -> "In Vorbereitung"
+    SettingMaturity.EXPERIMENTAL -> "Experimentell"
 }
 
 private fun maturityColor(maturity: SettingMaturity) = when (maturity) {
@@ -869,19 +915,4 @@ private fun maturityColor(maturity: SettingMaturity) = when (maturity) {
     SettingMaturity.CORE_READY -> Sky
     SettingMaturity.PLANNED -> MutedMist
     SettingMaturity.EXPERIMENTAL -> Warm
-}
-
-private fun scopeLabel(scope: SettingScope): String = when (scope) {
-    SettingScope.GLOBAL -> "Global"
-    SettingScope.PAGE -> "Seite"
-    SettingScope.OBJECT -> "Objekt"
-    SettingScope.DEVICE -> "Gerät"
-    SettingScope.SESSION -> "Session"
-}
-
-private fun portabilityLabel(portability: SettingPortability): String = when (portability) {
-    SettingPortability.PORTABLE -> "Portabel"
-    SettingPortability.DEVICE_LOCAL -> "Nur Gerät"
-    SettingPortability.SESSION_ONLY -> "Nur Session"
-    SettingPortability.SENSITIVE_REFERENCE -> "Vault-Referenz"
 }
