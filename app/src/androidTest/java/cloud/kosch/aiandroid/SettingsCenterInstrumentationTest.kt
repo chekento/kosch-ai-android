@@ -50,6 +50,9 @@ class SettingsCenterInstrumentationTest {
                 .fetchSemanticsNodes()
                 .isEmpty(),
         ) { "Advanced diagnostics must not dominate the initial Settings Center view." }
+        // API 36 requires the text field to own focus before semantics text input is dispatched.
+        search.performClick()
+        composeTestRule.waitForIdle()
         search.performTextInput("Erweitert")
         composeTestRule.waitForIdle()
         composeTestRule
