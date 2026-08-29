@@ -17,6 +17,7 @@ import cloud.kosch.aiandroid.data.WorkspaceWidgetHostRecovery
 import cloud.kosch.aiandroid.model.AdaptiveInputRuntimeState
 import cloud.kosch.aiandroid.model.HomePage
 import cloud.kosch.aiandroid.model.SceneId
+import cloud.kosch.aiandroid.model.SettingsSection
 import cloud.kosch.aiandroid.system.AdaptiveInputDeviceMonitor
 import cloud.kosch.aiandroid.system.UniversalSearchShortcutRepository
 import kotlinx.coroutines.flow.collect
@@ -61,6 +62,9 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val aiHub = AiHubController(application).also { hub ->
         // Even old/direct aiHub.open() call sites receive the same abstract context; explicit origins may override it.
         hub.setDefaultRoutingContextProvider { currentAiHubContext(AiHubOrigin.HOME) }
+        // Direct network execution remains ViewModel-owned; the Hub only receives the already gated runtime.
+        hub.setDirectProviderController(directProvider)
+        hub.setProviderSettingsOpener { settings.open(SettingsSection.API) }
     }
     private val universalSearchShortcuts = UniversalSearchShortcutRepository(application)
     val universalSearch = UniversalSearchController {
