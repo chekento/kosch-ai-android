@@ -30,6 +30,8 @@ class OpenRouterDirectController(
     private val settingsProvider: () -> Pair<AiSettings, PrivacySettings>,
     private val api: OpenRouterApiClient = OpenRouterApiClient(context.applicationContext),
 ) {
+    private val preferences = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+
     var connected by mutableStateOf(false)
         private set
     var cloudExecutionEnabled by mutableStateOf(false)
@@ -40,7 +42,7 @@ class OpenRouterDirectController(
         private set
     var models by mutableStateOf<List<OpenRouterModelDescriptor>>(emptyList())
         private set
-    var selectedModelId by mutableStateOf("")
+    var selectedModelId by mutableStateOf(loadPersistedModelId())
         private set
     var response by mutableStateOf<OpenRouterChatResponse?>(null)
         private set
@@ -58,20 +60,19 @@ class OpenRouterDirectController(
             KalCloudAccessMode.CONNECTED_PROVIDERS_ONLY
         if (!connected) {
             models = emptyList()
-            selectedModelId = ""
             response = null
         }
     }
 
     fun updateModelId(value: String) {
-        selectedModelId = value.trim().take(MAX_MODEL_ID_CHARS)
+        setSelectedModel(value)
         response = null
     }
 
     fun chooseModel(modelId: String) {
         val normalized = modelId.trim().take(MAX_MODEL_ID_CHARS)
         if (normalized.isNotBlank()) {
-            selectedModelId = normalized
+            setSelectedModel(normalized)
             response = null
         }
     }
@@ -100,8 +101,8 @@ class OpenRouterDirectController(
                         .take(MAX_UI_MODELS)
                         .toList()
                     models = compatible
-                    if (selectedModelId.isBlank() || compatible.none { it.id == selectedModelId }) {
-                        selectedModelId = compatible.firstOrNull()?.id.orEmpty()
+                    if (selectedModelId.isBlank()) {
+                        compatible.firstOrNull()?.id?.let(::chooseModel)
                     }
                     notice = if (compatible.isEmpty()) {
                         "OpenRouter hat aktuell keine kompatiblen Textmodelle geliefert"
@@ -209,8 +210,22 @@ class OpenRouterDirectController(
         notice = null
     }
 
+    private fun setSelectedModel(value: String) {
+        val normalized = value.trim().take(MAX_MODEL_ID_CHARS)
+        selectedModelId = normalized
+        preferences.edit().putString(KEY_SELECTED_MODEL_ID, normalized).apply()
+    }
+
+    private fun loadPersistedModelId(): String = preferences
+        .getString(KEY_SELECTED_MODEL_ID, "")
+        .orEmpty()
+        .trim()
+        .take(MAX_MODEL_ID_CHARS)
+
     private companion object {
         const val MAX_MODEL_ID_CHARS = 300
         const val MAX_UI_MODELS = 200
+        const val PREFS_NAME = "kal_openrouter_direct"
+        const val KEY_SELECTED_MODEL_ID = "selected_model_id"
     }
 }
