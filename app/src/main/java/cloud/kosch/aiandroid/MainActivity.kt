@@ -243,6 +243,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val settings = launcherViewModel.settings
             val aiHub = launcherViewModel.aiHub
+            val news = launcherViewModel.news
             val universalSearch = launcherViewModel.universalSearch
             val assistantPresentation = settings.document.assistant
             val gestureSurfaceEnabled = !controller.onboardingVisible &&
@@ -250,6 +251,7 @@ class MainActivity : ComponentActivity() {
                 !personalizationVisible &&
                 !widgetStacksVisible &&
                 !aiHub.visible &&
+                !news.visible &&
                 !universalSearch.visible &&
                 !controller.drawerVisible &&
                 !controller.providerChooserVisible &&
@@ -267,6 +269,7 @@ class MainActivity : ComponentActivity() {
 
             KoSchLauncherTheme(
                 dynamicColor = settings.document.appearance.useMaterialYouAccents,
+                mode = settings.document.appearance.mode,
             ) {
                 Box(
                     modifier = Modifier
@@ -558,13 +561,7 @@ class MainActivity : ComponentActivity() {
                 controller.postNotice("Home-Bearbeitung aktiviert · Drag/Resize über Home Studio")
             }
             GestureAction.OPEN_SETTINGS -> launcherViewModel.settings.open()
-            GestureAction.OPEN_ASSISTANT -> {
-                if (launcherViewModel.assistant.settings.enabled) {
-                    launcherViewModel.assistant.open()
-                } else {
-                    launcherViewModel.settings.open(SettingsSection.ASSISTANT)
-                }
-            }
+            GestureAction.OPEN_ASSISTANT -> launcherViewModel.assistant.open()
             GestureAction.OPEN_NOTIFICATIONS -> controller.openSystemPanel(SystemPanel.NOTIFICATIONS)
             GestureAction.PREVIOUS_PAGE -> moveGesturePage(-1)
             GestureAction.NEXT_PAGE -> moveGesturePage(1)
@@ -646,7 +643,7 @@ class MainActivity : ComponentActivity() {
                     .onSuccess { token ->
                         pendingBackupExportToken = token
                         runCatching {
-                            backupCreateRequest.launch("kal-workspace-${LocalDate.now()}.koschbackup")
+                            backupCreateRequest.launch("kal-workspace-${LocalDate.now()}.kalbackup")
                         }.onFailure {
                             pendingDocumentStore.discard(PendingDocumentKind.BACKUP, pendingBackupExportToken)
                             pendingBackupExportToken = null
