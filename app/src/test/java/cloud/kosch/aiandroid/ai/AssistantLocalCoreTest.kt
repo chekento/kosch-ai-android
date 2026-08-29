@@ -38,8 +38,9 @@ class AssistantLocalCoreTest {
         assertEquals(input, reply.handoffPrompt)
         assertEquals(AssistantVisualState.OFFLINE, reply.visualState)
         assertEquals(AssistantActionRisk.EXTERNAL_SIDE_EFFECT, reply.actionRisk)
-        assertTrue(reply.text.contains("kein direkt verwendbarer Provider", ignoreCase = true))
-        assertTrue(reply.text.contains("AI Hub", ignoreCase = true))
+        assertTrue(reply.text.contains("KI-Modell", ignoreCase = true))
+        assertTrue(reply.text.contains("bleibt hier im Chat", ignoreCase = true))
+        assertTrue(reply.text.contains("Launcher-Anweisungen", ignoreCase = true))
     }
 
     @Test
@@ -50,7 +51,7 @@ class AssistantLocalCoreTest {
         assertNull(reply.handoffPrompt)
         assertNull(reply.actionRisk)
         assertTrue(reply.text.contains("Sitzung"))
-        assertTrue(reply.text.contains("ausdrücklich"))
+        assertTrue(reply.text.contains("Netzwerkzugriff freigegeben", ignoreCase = true))
     }
 
     @Test
@@ -59,8 +60,9 @@ class AssistantLocalCoreTest {
 
         assertNull(reply.command)
         assertNull(reply.handoffPrompt)
-        assertTrue(reply.text.contains("Launcher-Befehle"))
-        assertTrue(reply.text.contains("freigegebenen Provider", ignoreCase = true))
-        assertTrue(reply.text.contains("AI Hub", ignoreCase = true))
+        assertTrue(reply.text.contains("KAL Assistant"))
+        assertTrue(reply.text.contains("Launcher-Einstellungen", ignoreCase = true))
+        assertTrue(reply.text.contains("Wissensfragen", ignoreCase = true))
+        assertTrue(reply.text.contains("KI-Modell", ignoreCase = true))
     }
 }
