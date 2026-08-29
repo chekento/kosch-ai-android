@@ -86,6 +86,8 @@ fun PersonalizationQuickSurface(
     var appearanceDraft by remember(settings.document.appearance) { mutableStateOf(settings.document.appearance) }
     var iconPacks by remember { mutableStateOf<List<InstalledIconPack>>(emptyList()) }
     var iconPacksLoaded by remember { mutableStateOf(false) }
+    var gesturesExpanded by remember { mutableStateOf(false) }
+    val dirty = gestureDraft != settings.document.gestures || appearanceDraft != settings.document.appearance
 
     LaunchedEffect(Unit) {
         iconPacks = withContext(Dispatchers.IO) { IconPackResolver(context).discover() }
@@ -112,38 +114,50 @@ fun PersonalizationQuickSurface(
                 Icon(Icons.Rounded.Palette, contentDescription = null, tint = Sky)
                 Column(Modifier.weight(1f)) {
                     Text("Anpassen", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
-                    Text("Homescreen, wichtige Gesten & Icons", color = MutedMist)
+                    Text("Homescreen, Gesten & Icons", color = MutedMist)
                 }
                 TextButton(onClick = onDismiss) { Text("Fertig") }
             }
 
-            OutlinedButton(
-                onClick = {
-                    launcherViewModel?.controller?.apply {
-                        switchHomePage(HomePage.WORKSPACE)
-                        selectWorkspaceMode(WorkspaceMode.EDIT)
+            Surface(color = RaisedSurface, shape = RoundedCornerShape(20.dp)) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text("Homescreen", fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "Apps, Widgets, Ordner und Seiten direkt anordnen.",
+                        color = MutedMist,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    OutlinedButton(
+                        onClick = {
+                            launcherViewModel?.controller?.apply {
+                                switchHomePage(HomePage.WORKSPACE)
+                                selectWorkspaceMode(WorkspaceMode.EDIT)
+                            }
+                            onDismiss()
+                        },
+                        enabled = launcherViewModel != null,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Icon(Icons.Rounded.Edit, contentDescription = null)
+                        Text("Home Studio öffnen")
                     }
-                    onDismiss()
-                },
-                enabled = launcherViewModel != null,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Icon(Icons.Rounded.Edit, contentDescription = null)
-                Text("Home Studio öffnen")
+                }
             }
-            Text(
-                "Apps, Widgets, Ordner und Seiten direkt anordnen – ohne den normalen Homescreen mit Bearbeitungsbuttons zu füllen.",
-                color = MutedMist,
-                style = MaterialTheme.typography.bodySmall,
-            )
 
             Surface(color = RaisedSurface, shape = RoundedCornerShape(20.dp)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
                         Column(Modifier.weight(1f)) {
-                            Text("Alltagsgesten", fontWeight = FontWeight.SemiBold)
+                            Text("Gesten & Haptik", fontWeight = FontWeight.SemiBold)
                             Text(
-                                "Nur freie Launcher-Flächen reagieren. Widgets, Buttons und Drag & Drop haben Vorrang.",
+                                gestureDraft.quickGestureSummary(),
                                 color = MutedMist,
                                 style = MaterialTheme.typography.bodySmall,
                             )
@@ -154,49 +168,58 @@ fun PersonalizationQuickSurface(
                         )
                     }
 
-                    Text("Haptik", style = MaterialTheme.typography.labelLarge, color = MutedMist)
-                    Row(
-                        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    OutlinedButton(
+                        onClick = { gesturesExpanded = !gesturesExpanded },
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
-                        HapticProfile.entries.forEach { profile ->
-                            FilterChip(
-                                selected = gestureDraft.haptics == profile,
-                                onClick = { gestureDraft = gestureDraft.copy(haptics = profile) },
-                                label = { Text(profile.hapticTitle()) },
-                            )
-                        }
+                        Text(if (gesturesExpanded) "Weniger anzeigen" else "Gesten bearbeiten")
                     }
 
-                    HorizontalDivider()
-                    QUICK_GESTURES.forEach { trigger ->
-                        GestureBindingRow(
-                            trigger = trigger,
-                            action = gestureDraft.actionFor(trigger),
-                            enabled = gestureDraft.enabled,
-                            onActionSelected = { action ->
-                                gestureDraft = gestureDraft.withBinding(trigger, action)
-                            },
+                    if (gesturesExpanded) {
+                        Text("Haptik", style = MaterialTheme.typography.labelLarge, color = MutedMist)
+                        Row(
+                            modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            HapticProfile.entries.forEach { profile ->
+                                FilterChip(
+                                    selected = gestureDraft.haptics == profile,
+                                    onClick = { gestureDraft = gestureDraft.copy(haptics = profile) },
+                                    label = { Text(profile.hapticTitle()) },
+                                )
+                            }
+                        }
+
+                        HorizontalDivider()
+                        QUICK_GESTURES.forEach { trigger ->
+                            GestureBindingRow(
+                                trigger = trigger,
+                                action = gestureDraft.actionFor(trigger),
+                                enabled = gestureDraft.enabled,
+                                onActionSelected = { action ->
+                                    gestureDraft = gestureDraft.withBinding(trigger, action)
+                                },
+                            )
+                        }
+                        Text(
+                            "Links/rechts blättert standardmäßig durch die Seiten. Ein bewusstes „Keine Aktion“ bleibt deaktiviert.",
+                            color = MutedMist,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                        Text(
+                            "Zwei-Finger-, Pinch-, Rand-, Stift- und weitere Spezialgesten bleiben im vollständigen Settings Center.",
+                            color = MutedMist,
+                            style = MaterialTheme.typography.labelSmall,
                         )
                     }
-                    Text(
-                        "Links/rechts blättert standardmäßig durch die Seiten. Ein bewusstes „Keine Aktion“ bleibt wirklich deaktiviert.",
-                        color = MutedMist,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
-                    Text(
-                        "Zwei-Finger-, Pinch-, Rand-, Stift- und weitere Spezialgesten findest du im vollständigen Settings Center.",
-                        color = MutedMist,
-                        style = MaterialTheme.typography.labelSmall,
-                    )
                 }
             }
 
             Surface(color = RaisedSurface, shape = RoundedCornerShape(20.dp)) {
                 Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Text("Icon Pack", fontWeight = FontWeight.SemiBold)
+                    Text("Icons", fontWeight = FontWeight.SemiBold)
                     Text(
-                        "Systemicons sind immer der sichere Fallback. Arbeitsprofil-Icons behalten vorerst Androids sichtbares Profil-Badge.",
+                        "Systemicons funktionieren immer. Installierte Icon Packs kannst du hier direkt wählen.",
                         color = MutedMist,
                         style = MaterialTheme.typography.bodySmall,
                     )
@@ -218,7 +241,7 @@ fun PersonalizationQuickSurface(
                         }
                     }
                     if (iconPacksLoaded && iconPacks.isEmpty()) {
-                        Text("Kein kompatibles installiertes Icon Pack erkannt.", color = MutedMist, style = MaterialTheme.typography.labelSmall)
+                        Text("Kein kompatibles Icon Pack erkannt.", color = MutedMist, style = MaterialTheme.typography.labelSmall)
                     } else if (!iconPacksLoaded) {
                         Text("Suche installierte Icon Packs …", color = MutedMist, style = MaterialTheme.typography.labelSmall)
                     }
@@ -234,12 +257,13 @@ fun PersonalizationQuickSurface(
                     modifier = Modifier.weight(1f),
                 ) {
                     Icon(Icons.Rounded.RestartAlt, contentDescription = null)
-                    Text("Standard")
+                    Text("Zurücksetzen")
                 }
                 Button(
                     onClick = {
                         if (settings.applyQuickPersonalization(gestureDraft, appearanceDraft)) onDismiss()
                     },
+                    enabled = dirty,
                     modifier = Modifier.weight(1f),
                 ) {
                     Icon(Icons.Rounded.AutoAwesome, contentDescription = null)
@@ -248,7 +272,7 @@ fun PersonalizationQuickSurface(
             }
 
             Text(
-                "Raster, Dock, Ordner, Widgets, KI, Datenschutz und Barrierefreiheit bleiben im Settings Center übersichtlich nach Bereichen getrennt.",
+                "Weitere Optionen – Raster, Dock, Widgets, KI, Datenschutz und Barrierefreiheit – findest du im Settings Center.",
                 color = Mint,
                 style = MaterialTheme.typography.labelSmall,
             )
@@ -307,6 +331,16 @@ private fun GestureBindingRow(
 
 private fun GestureSettings.actionFor(trigger: GestureTrigger): GestureAction =
     LauncherGestureBindingResolver.actionFor(this, trigger)
+
+private fun GestureSettings.quickGestureSummary(): String {
+    if (!enabled) return "Aus"
+    return listOf(
+        "↑ ${actionFor(GestureTrigger.SWIPE_UP).actionTitle()}",
+        "↓ ${actionFor(GestureTrigger.SWIPE_DOWN).actionTitle()}",
+        "← ${actionFor(GestureTrigger.SWIPE_LEFT).actionTitle()}",
+        "→ ${actionFor(GestureTrigger.SWIPE_RIGHT).actionTitle()}",
+    ).joinToString(" · ")
+}
 
 private fun GestureSettings.withBinding(trigger: GestureTrigger, action: GestureAction): GestureSettings {
     val next = bindings.filterNot { it.trigger == trigger }.toMutableList()
