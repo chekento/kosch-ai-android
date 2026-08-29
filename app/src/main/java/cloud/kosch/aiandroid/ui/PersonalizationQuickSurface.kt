@@ -1,5 +1,6 @@
 package cloud.kosch.aiandroid.ui
 
+import androidx.activity.ComponentActivity
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -42,7 +43,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModelProvider
 import cloud.kosch.aiandroid.LauncherSettingsController
+import cloud.kosch.aiandroid.LauncherViewModel
 import cloud.kosch.aiandroid.data.IconPackResolver
 import cloud.kosch.aiandroid.data.InstalledIconPack
 import cloud.kosch.aiandroid.model.GestureAction
@@ -50,6 +53,8 @@ import cloud.kosch.aiandroid.model.GestureBinding
 import cloud.kosch.aiandroid.model.GestureSettings
 import cloud.kosch.aiandroid.model.GestureTrigger
 import cloud.kosch.aiandroid.model.HapticProfile
+import cloud.kosch.aiandroid.model.HomePage
+import cloud.kosch.aiandroid.model.WorkspaceMode
 import cloud.kosch.aiandroid.system.LauncherGestureBindingResolver
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 import cloud.kosch.aiandroid.ui.theme.Mint
@@ -67,10 +72,13 @@ import kotlinx.coroutines.withContext
 @Composable
 fun PersonalizationQuickSurface(
     settings: LauncherSettingsController,
-    onOpenHomeStudio: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
+    val activity = context as? ComponentActivity
+    val launcherViewModel = remember(activity) {
+        activity?.let { ViewModelProvider(it)[LauncherViewModel::class.java] }
+    }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var gestureDraft by remember(settings.document.gestures) { mutableStateOf(settings.document.gestures) }
     var appearanceDraft by remember(settings.document.appearance) { mutableStateOf(settings.document.appearance) }
@@ -108,7 +116,14 @@ fun PersonalizationQuickSurface(
             }
 
             OutlinedButton(
-                onClick = onOpenHomeStudio,
+                onClick = {
+                    launcherViewModel?.controller?.apply {
+                        switchHomePage(HomePage.WORKSPACE)
+                        selectWorkspaceMode(WorkspaceMode.EDIT)
+                    }
+                    onDismiss()
+                },
+                enabled = launcherViewModel != null,
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Icon(Icons.Rounded.Edit, contentDescription = null)
