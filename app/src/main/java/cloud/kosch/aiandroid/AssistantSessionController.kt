@@ -35,6 +35,7 @@ class AssistantSessionController(context: Context) {
     private var visualStateAfterSpeech = AssistantVisualState.IDLE
     private var lastVisualReadyRequestId = -1L
     private var lastVisualFailureGeneration = -1L
+    private var launcherControlRequester: ((String) -> String?)? = null
     private var generativeRequester: ((String) -> Boolean)? = null
     private var generativeReadinessProvider: (() -> String)? = null
     private var lastGenerativeReadinessText: String? = null
@@ -63,6 +64,14 @@ class AssistantSessionController(context: Context) {
         AssistantVisualContextRuntime.setEventListener { event ->
             mainHandler.post { handleVisualContextEvent(event) }
         }
+    }
+
+    /**
+     * Local, closed-vocabulary launcher/settings bridge. Returning null means the input was not a supported local
+     * control request and may continue through visual/local-command/generative routing.
+     */
+    fun setLauncherControlRequester(requester: ((String) -> String?)?) {
+        launcherControlRequester = requester
     }
 
     /**
@@ -104,7 +113,7 @@ class AssistantSessionController(context: Context) {
         if (enabled && messages.isEmpty()) {
             append(
                 AssistantMessageRole.ASSISTANT,
-                "Bereit. Launcher-Befehle laufen lokal. Ein bereits freigegebener KI-Provider kann hier direkt antworten; sonst bleibt die bewusste Anbieterübergabe verfügbar.",
+                "Bereit. Ich kann Apps öffnen sowie Launcher-Einstellungen und Darstellung direkt lokal ändern. Für freie Wissensfragen nutze ich nur einen von dir eingerichteten KI-Anbieter.",
             )
         }
         if (enabled && sheetVisible) publishGenerativeReadinessIfChanged()
@@ -155,6 +164,7 @@ class AssistantSessionController(context: Context) {
     }
 
     fun close() {
+        launcherControlRequester = null
         generativeRequester = null
         generativeReadinessProvider = null
         pendingGenerativeSpeech = null
@@ -231,6 +241,18 @@ class AssistantSessionController(context: Context) {
         append(AssistantMessageRole.USER, input)
         handoffPrompt = null
         visualState = AssistantVisualState.THINKING
+
+        val launcherControlReply = launcherControlRequester?.invoke(input)
+            ?.trim()
+            ?.take(MAX_MESSAGE_LENGTH)
+            ?.takeIf(String::isNotBlank)
+        if (launcherControlReply != null) {
+            append(AssistantMessageRole.ASSISTANT, launcherControlReply)
+            handoffPrompt = null
+            visualState = AssistantVisualState.IDLE
+            if (settings.speechOutputEnabled) requestSpeech(launcherControlReply)
+            return
+        }
 
         val visualRequest = AssistantVisualContextRequestParser.parseRequest(input)
         if (visualRequest != null) {
@@ -317,7 +339,7 @@ class AssistantSessionController(context: Context) {
         val safeReason = reason.trim().take(320).ifBlank { "Die Provider-Anfrage ist fehlgeschlagen" }
         append(
             AssistantMessageRole.ASSISTANT,
-            "$safeReason. Du kannst die Anfrage im AI Hub prüfen oder erneut senden.",
+            "$safeReason. Deine Frage bleibt hier erhalten; du kannst das KI-Modell gezielt verbinden oder später erneut senden.",
         )
         handoffPrompt = fallbackPrompt?.trim()?.take(MAX_MESSAGE_LENGTH)?.takeIf(String::isNotBlank)
         visualState = AssistantVisualState.ERROR
