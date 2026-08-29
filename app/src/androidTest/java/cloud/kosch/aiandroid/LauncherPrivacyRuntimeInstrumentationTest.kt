@@ -25,13 +25,13 @@ class LauncherPrivacyRuntimeInstrumentationTest {
         context = ApplicationProvider.getApplicationContext()
         store = LauncherSettingsStore(context)
         store.reset()
-        LauncherPrivacyRuntimePolicy.resetForTest()
+        LauncherPrivacyRuntimePolicy.configure(PrivacySettings())
     }
 
     @After
     fun tearDown() {
         store.reset()
-        LauncherPrivacyRuntimePolicy.resetForTest()
+        LauncherPrivacyRuntimePolicy.configure(PrivacySettings())
     }
 
     @Test
@@ -47,7 +47,7 @@ class LauncherPrivacyRuntimeInstrumentationTest {
                 ),
             ),
         )
-        LauncherPrivacyRuntimePolicy.resetForTest()
+        LauncherPrivacyRuntimePolicy.configure(PrivacySettings())
 
         LauncherSettingsController(context)
 
