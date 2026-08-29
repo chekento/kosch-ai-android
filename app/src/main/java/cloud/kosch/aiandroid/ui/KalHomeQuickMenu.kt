@@ -77,7 +77,7 @@ fun KalHomeQuickMenu(
                 },
             )
             DropdownMenuItem(
-                text = { Text("Personalisieren", style = MaterialTheme.typography.bodyLarge) },
+                text = { Text("Anpassen", style = MaterialTheme.typography.bodyLarge) },
                 leadingIcon = { Icon(Icons.Rounded.Palette, contentDescription = null) },
                 onClick = {
                     expanded = false
