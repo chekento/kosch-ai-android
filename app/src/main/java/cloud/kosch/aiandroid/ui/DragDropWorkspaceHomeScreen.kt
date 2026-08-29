@@ -31,20 +31,27 @@ import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.DragIndicator
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.AssistChip
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -77,9 +84,12 @@ import cloud.kosch.aiandroid.model.LauncherFolder
 import cloud.kosch.aiandroid.model.WorkspaceDragResolver
 import cloud.kosch.aiandroid.model.WorkspaceItem
 import cloud.kosch.aiandroid.model.WorkspaceItemContent
+import cloud.kosch.aiandroid.model.WorkspaceMode
 import cloud.kosch.aiandroid.model.WorkspaceObjectStyle
 import cloud.kosch.aiandroid.model.WorkspaceObjectStyleResolver
+import cloud.kosch.aiandroid.model.WorkspacePage
 import cloud.kosch.aiandroid.model.WorkspacePageEditor
+import cloud.kosch.aiandroid.model.WorkspacePagePolicy
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 import cloud.kosch.aiandroid.ui.theme.Ink
 import cloud.kosch.aiandroid.ui.theme.Mint
@@ -94,6 +104,9 @@ import kotlin.math.roundToInt
  * Direct-manipulation Home Studio for the portable v7 workspace.
  * Finger, mouse and Android stylus pointer drags all arrive through Compose pointer input. The existing
  * item editor remains the non-drag keyboard/TalkBack path while Home Studio adds fast page, size and object-style tools.
+ *
+ * The normal Home stays free of permanent edit chrome. OPEN_HOME_STUDIO changes WorkspaceMode to EDIT; this surface
+ * observes that explicit state and opens the full manager. Closing it returns to PLAY.
  */
 @Composable
 fun DragDropWorkspaceHomeScreen(
@@ -107,29 +120,21 @@ fun DragDropWorkspaceHomeScreen(
 ) {
     var arrangeVisible by remember { mutableStateOf(false) }
 
-    Box(Modifier.fillMaxSize()) {
-        CompositionLocalProvider(
-            LocalLauncherSettings provides settings.document,
-            LocalScopedSettings provides scopedSettings.document,
-        ) {
-            UnifiedWorkspaceHomeScreen(
-                controller = controller,
-                home = home,
-                requestVoiceInput = requestVoiceInput,
-                requestDocument = requestDocument,
-                requestContact = requestContact,
-            )
-        }
-        if (home.isUserPage()) {
-            AssistChip(
-                onClick = { arrangeVisible = true },
-                label = { Text("Home Studio") },
-                leadingIcon = { Icon(Icons.Rounded.DragIndicator, contentDescription = null) },
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 76.dp),
-            )
-        }
+    LaunchedEffect(controller.workspaceMode) {
+        if (controller.workspaceMode == WorkspaceMode.EDIT) arrangeVisible = true
+    }
+
+    CompositionLocalProvider(
+        LocalLauncherSettings provides settings.document,
+        LocalScopedSettings provides scopedSettings.document,
+    ) {
+        UnifiedWorkspaceHomeScreen(
+            controller = controller,
+            home = home,
+            requestVoiceInput = requestVoiceInput,
+            requestDocument = requestDocument,
+            requestContact = requestContact,
+        )
     }
 
     if (arrangeVisible) {
@@ -138,7 +143,10 @@ fun DragDropWorkspaceHomeScreen(
             home = home,
             settings = settings,
             scopedSettings = scopedSettings,
-            onDismiss = { arrangeVisible = false },
+            onDismiss = {
+                arrangeVisible = false
+                controller.selectWorkspaceMode(WorkspaceMode.PLAY)
+            },
         )
     }
 }
@@ -153,6 +161,9 @@ private fun WorkspaceArrangeDialog(
 ) {
     var selectedItemId by remember(home.activePage.id) { mutableStateOf<String?>(null) }
     var styleEditorItemId by remember(home.activePage.id) { mutableStateOf<String?>(null) }
+    var renameVisible by remember { mutableStateOf(false) }
+    var renameText by remember(home.activePage.id) { mutableStateOf(home.activePage.title) }
+    var deleteVisible by remember { mutableStateOf(false) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -182,7 +193,7 @@ private fun WorkspaceArrangeDialog(
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Home Studio", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Ziehen · skalieren · gestalten · Seiten verwalten · 30× Undo/Redo",
+                            "Apps · Widgets · Seiten · Raster · Drag & Drop · 30× Undo/Redo",
                             color = MutedMist,
                             style = MaterialTheme.typography.labelMedium,
                         )
@@ -204,20 +215,47 @@ private fun WorkspaceArrangeDialog(
                     }
                 }
 
-                ArrangeUserPageRail(home)
+                ArrangePageRail(home)
 
                 if (home.isUserPage()) {
-                    HomeStudioPageActions(home)
+                    HomeStudioPageActions(
+                        home = home,
+                        onRename = {
+                            renameText = home.activePage.title
+                            renameVisible = true
+                        },
+                        onDelete = { deleteVisible = true },
+                    )
                 }
 
                 if (!home.isUserPage()) {
+                    val scene = home.activePage.sceneAdapter
                     Surface(
                         modifier = Modifier.fillMaxWidth().weight(1f),
                         color = DeepSurface,
                         shape = RoundedCornerShape(28.dp),
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Text("Szenenseiten sind geschützt. Wähle oben eine freie Home-Seite.", color = MutedMist)
+                        Column(
+                            modifier = Modifier.fillMaxSize().padding(24.dp),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Text(
+                                scene?.title ?: home.activePage.title,
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                scene?.subtitle ?: "KAL-Systembereich",
+                                color = MutedMist,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                            Spacer(Modifier.size(10.dp))
+                            Text(
+                                "Dieser Funktionsraum bleibt geschützt. Apps, Widgets und eigene Inhalte legst du auf Home oder einer persönlichen Seite ab.",
+                                color = MutedMist,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
                         }
                     }
                 } else {
@@ -254,22 +292,77 @@ private fun WorkspaceArrangeDialog(
                 }
 
                 Text(
-                    "Tipp wählt ein Element für Größe und Stil. Ziehen verschiebt es. Versteckte Objekte bleiben im Home Studio schwach sichtbar und können jederzeit wieder eingeblendet werden.",
+                    "Home ist geschützt. Eigene Seiten kannst du anlegen, umbenennen, duplizieren, sortieren und löschen. KAL-Funktionsseiten bleiben dahinter erhalten.",
                     color = MutedMist,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
         }
     }
+
+    if (renameVisible) {
+        Dialog(onDismissRequest = { renameVisible = false }) {
+            Surface(color = DeepSurface, shape = RoundedCornerShape(24.dp)) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Seite umbenennen", style = MaterialTheme.typography.titleLarge)
+                    OutlinedTextField(
+                        value = renameText,
+                        onValueChange = { renameText = it.take(80) },
+                        label = { Text("Seitenname") },
+                        singleLine = true,
+                    )
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { renameVisible = false }) { Text("Abbrechen") }
+                        Button(
+                            enabled = renameText.isNotBlank(),
+                            onClick = {
+                                home.renameActivePage(renameText)
+                                renameVisible = false
+                            },
+                        ) { Text("Speichern") }
+                    }
+                }
+            }
+        }
+    }
+
+    if (deleteVisible) {
+        Dialog(onDismissRequest = { deleteVisible = false }) {
+            Surface(color = DeepSurface, shape = RoundedCornerShape(24.dp)) {
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text("Seite löschen?", style = MaterialTheme.typography.titleLarge, color = Warm)
+                    Text("„${home.activePage.title}“ und ihre Home-Elemente werden aus dem Launcher-Layout entfernt.")
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { deleteVisible = false }) { Text("Abbrechen") }
+                        Button(
+                            onClick = {
+                                home.deleteActiveUserPage()
+                                deleteVisible = false
+                            },
+                        ) { Text("Löschen") }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
-private fun HomeStudioPageActions(home: WorkspaceHomeController) {
+private fun HomeStudioPageActions(
+    home: WorkspaceHomeController,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
+) {
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        AssistChip(
+            onClick = { home.createPage() },
+            label = { Text("Neue Seite") },
+            leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+        )
         AssistChip(
             onClick = home::duplicateActivePage,
             label = { Text("Seite duplizieren") },
@@ -280,6 +373,32 @@ private fun HomeStudioPageActions(home: WorkspaceHomeController) {
             label = { Text("Auto-Anordnen") },
             leadingIcon = { Icon(Icons.Rounded.DragIndicator, contentDescription = null) },
         )
+        if (home.canRenameActivePage()) {
+            AssistChip(
+                onClick = onRename,
+                label = { Text("Umbenennen") },
+                leadingIcon = { Icon(Icons.Rounded.Edit, contentDescription = null) },
+            )
+        }
+        if (home.canMoveActivePage()) {
+            AssistChip(
+                onClick = { home.moveActivePage(-1) },
+                label = { Text("Nach links") },
+                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null) },
+            )
+            AssistChip(
+                onClick = { home.moveActivePage(1) },
+                label = { Text("Nach rechts") },
+                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null) },
+            )
+        }
+        if (home.canDeleteActivePage()) {
+            AssistChip(
+                onClick = onDelete,
+                label = { Text("Seite löschen") },
+                leadingIcon = { Icon(Icons.Rounded.DeleteOutline, contentDescription = null) },
+            )
+        }
         if (home.canUndo) {
             AssistChip(
                 onClick = home::undo,
@@ -346,35 +465,35 @@ private fun HomeStudioSelectionBar(
 }
 
 @Composable
-private fun ArrangeUserPageRail(home: WorkspaceHomeController) {
-    val userPages = home.document.pages.filter { it.sceneAdapter == null }
+private fun ArrangePageRail(home: WorkspaceHomeController) {
+    val pages = home.document.pages
     Row(
         modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        val activeIndex = userPages.indexOfFirst { it.id == home.activePage.id }
-        IconButton(
-            enabled = activeIndex > 0,
-            onClick = { home.activatePage(userPages[activeIndex - 1].id) },
-        ) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "Vorherige freie Home-Seite")
-        }
-        userPages.forEach { page ->
+        pages.forEach { page ->
+            val label = when {
+                WorkspacePagePolicy.isPrimaryHome(page) -> "⌂ Home"
+                WorkspacePagePolicy.isSystem(page) -> "KAL · ${pageDisplayTitle(page)}"
+                else -> page.title
+            }
             FilterChip(
                 selected = page.id == home.activePage.id,
                 onClick = { home.activatePage(page.id) },
-                label = { Text(page.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                label = { Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             )
         }
         IconButton(
-            enabled = activeIndex >= 0 && activeIndex < userPages.lastIndex,
-            onClick = { home.activatePage(userPages[activeIndex + 1].id) },
+            enabled = !home.layoutLocked,
+            onClick = { home.createPage() },
         ) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = "Nächste freie Home-Seite")
+            Icon(Icons.Rounded.Add, contentDescription = "Neue persönliche Seite")
         }
     }
 }
+
+private fun pageDisplayTitle(page: WorkspacePage): String = page.sceneAdapter?.title ?: page.title
 
 @Composable
 private fun ArrangeCanvas(
@@ -419,7 +538,11 @@ private fun ArrangeCanvas(
 
         if (page.items.isEmpty()) {
             Text(
-                "Noch keine Elemente auf ${page.title}",
+                if (home.isPrimaryHomePage(page)) {
+                    "Dein Home ist frei. Füge Apps, Widgets oder Ordner hinzu."
+                } else {
+                    "Noch keine Elemente auf ${page.title}"
+                },
                 modifier = Modifier.align(Alignment.Center),
                 color = MutedMist,
             )
