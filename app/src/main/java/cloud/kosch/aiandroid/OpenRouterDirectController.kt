@@ -138,7 +138,7 @@ class OpenRouterDirectController(
         val (ai, privacy) = settingsProvider()
         sending = true
         response = null
-        notice = "Anfrage wird nach deiner Bestätigung direkt an OpenRouter gesendet …"
+        notice = "Bestätigte Anfrage wird direkt an OpenRouter gesendet …"
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 api.chat(
@@ -153,7 +153,7 @@ class OpenRouterDirectController(
                 is OpenRouterApiResult.Success -> {
                     response = result.value
                     notice = result.value.costUsd?.let { cost ->
-                        "OpenRouter-Antwort erhalten · gemeldete Kosten: $${"%.6f".format(cost)}"
+                        "OpenRouter-Antwort erhalten · gemeldete Kosten: $cost USD"
                     } ?: "OpenRouter-Antwort erhalten"
                 }
                 is OpenRouterApiResult.Blocked -> notice = result.reason
