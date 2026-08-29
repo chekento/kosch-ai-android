@@ -48,7 +48,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -182,7 +181,7 @@ private fun AssistantSheet(
     ModalBottomSheet(
         onDismissRequest = assistant::closeSheet,
         sheetState = sheetState,
-        containerColor = DeepSurface,
+        containerColor = MaterialTheme.colorScheme.surface,
     ) {
         Column(
             modifier = Modifier
@@ -209,7 +208,7 @@ private fun AssistantSheet(
                     )
                     Text(
                         agent.character.displayName,
-                        color = MutedMist,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -226,8 +225,8 @@ private fun AssistantSheet(
                     }
                 }
                 Surface(
-                    modifier = Modifier.size(width = 118.dp, height = 150.dp),
-                    color = RaisedSurface.copy(alpha = 0.62f),
+                    modifier = Modifier.size(width = 104.dp, height = 132.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.72f),
                     shape = RoundedCornerShape(26.dp),
                 ) {
                     AssistantInteractiveAvatar(
@@ -265,7 +264,7 @@ private fun AssistantSheet(
                 if (!assistant.settings.enabled) {
                     AssistantToggleRow(
                         title = "Assistant aktivieren",
-                        body = "Aktiviert nur den Assistant. Screen und Camera Awareness bleiben separat aus, bis du sie ausdrücklich einschaltest.",
+                        body = "Chat und lokale Launcher-Steuerung. Screen und Camera Awareness bleiben separat aus.",
                         checked = false,
                         onCheckedChange = { enabled ->
                             AssistantEnableCoordinator.apply(
@@ -278,15 +277,47 @@ private fun AssistantSheet(
                             )
                         },
                     )
-                }
-
-                Surface(color = Mint.copy(alpha = 0.09f), shape = RoundedCornerShape(18.dp)) {
+                } else {
                     Text(
-                        "Launcher-Befehle bleiben lokal. Freie Fragen werden nur dann direkt an einen externen Provider gesendet, wenn Verbindung, Cloud Access und Modell bereits ausdrücklich eingerichtet sind. Sonst bleibt der AI-Hub-Handoff sichtbar.",
-                        modifier = Modifier.padding(13.dp),
-                        color = MutedMist,
-                        style = MaterialTheme.typography.bodyMedium,
+                        "Frag mich etwas oder ändere den Launcher direkt – zum Beispiel Theme, Dock, Icons oder Seitenanzeige.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        style = MaterialTheme.typography.bodySmall,
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        AssistChip(
+                            onClick = {
+                                submitAssistantInput(
+                                    input = "Theme dunkel",
+                                    assistant = assistant,
+                                    launcherController = launcherController,
+                                    requestVoiceInput = requestVoiceInput,
+                                    requestDocument = requestDocument,
+                                    requestContact = requestContact,
+                                    requestSpeech = requestSpeech,
+                                    onConsumed = {},
+                                )
+                            },
+                            label = { Text("Theme dunkel") },
+                        )
+                        AssistChip(
+                            onClick = {
+                                submitAssistantInput(
+                                    input = "Icons größer",
+                                    assistant = assistant,
+                                    launcherController = launcherController,
+                                    requestVoiceInput = requestVoiceInput,
+                                    requestDocument = requestDocument,
+                                    requestContact = requestContact,
+                                    requestSpeech = requestSpeech,
+                                    onConsumed = {},
+                                )
+                            },
+                            label = { Text("Icons größer") },
+                        )
+                    }
                 }
 
                 LazyColumn(
@@ -300,7 +331,11 @@ private fun AssistantSheet(
                             horizontalArrangement = if (user) Arrangement.End else Arrangement.Start,
                         ) {
                             Surface(
-                                color = if (user) Sky.copy(alpha = 0.18f) else RaisedSurface.copy(alpha = 0.94f),
+                                color = if (user) {
+                                    MaterialTheme.colorScheme.secondaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surfaceVariant
+                                },
                                 shape = RoundedCornerShape(18.dp),
                                 modifier = Modifier.fillMaxWidth(if (user) 0.84f else 0.92f),
                             ) {
@@ -308,7 +343,11 @@ private fun AssistantSheet(
                                     message.text,
                                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = Color.White,
+                                    color = if (user) {
+                                        MaterialTheme.colorScheme.onSecondaryContainer
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
                                 )
                             }
                         }
@@ -316,13 +355,13 @@ private fun AssistantSheet(
                 }
 
                 assistant.handoffPrompt?.let {
-                    Button(
+                    OutlinedButton(
                         onClick = { assistant.handoffToProvider(launcherController) },
                         modifier = Modifier.fillMaxWidth(),
                     ) {
                         Icon(Icons.Rounded.OpenInNew, contentDescription = null)
                         Spacer(Modifier.width(7.dp))
-                        Text("Im AI Hub öffnen")
+                        Text("KI-Modell für diese Frage wählen")
                     }
                 }
 
@@ -332,7 +371,7 @@ private fun AssistantSheet(
                     enabled = assistant.settings.enabled,
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("Nachricht") },
-                    placeholder = { Text("Frag etwas oder gib einen Launcher-Befehl …") },
+                    placeholder = { Text("Frage oder Anweisung …") },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
                     keyboardActions = KeyboardActions(
                         onSend = {
@@ -373,7 +412,7 @@ private fun AssistantSheet(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    OutlinedButton(
+                    Button(
                         enabled = assistant.settings.enabled && input.isNotBlank(),
                         onClick = {
                             submitAssistantInput(
@@ -418,7 +457,7 @@ private fun AssistantToggleRow(
     enabled: Boolean = true,
     onCheckedChange: (Boolean) -> Unit,
 ) {
-    Surface(color = RaisedSurface, shape = RoundedCornerShape(16.dp)) {
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(16.dp)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -429,7 +468,7 @@ private fun AssistantToggleRow(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(title, fontWeight = FontWeight.SemiBold)
-                Text(body, color = MutedMist, style = MaterialTheme.typography.bodySmall)
+                Text(body, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
             Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
         }
@@ -465,7 +504,7 @@ private fun assistantStatus(state: AssistantVisualState): String = when (state) 
     AssistantVisualState.THINKING -> "DENKT"
     AssistantVisualState.SPEAKING -> "SPRICHT"
     AssistantVisualState.WORKING -> "FÜHRT AUS"
-    AssistantVisualState.OFFLINE -> "AI HUB BEREIT"
+    AssistantVisualState.OFFLINE -> "LOKAL BEREIT"
     AssistantVisualState.ERROR -> "FEHLER"
 }
 
