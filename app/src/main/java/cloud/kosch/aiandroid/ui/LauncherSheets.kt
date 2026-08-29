@@ -192,14 +192,14 @@ fun OnboardingExperience(
             add(OnboardingPage(
                 eyebrow = "DEIN ANDROID · NEU GEDACHT",
                 title = "Ein Launcher, der zuerst funktioniert.",
-                body = "KoSch startet Apps, ordnet Szenen und versteht Systembefehle vollständig lokal. Ein Konto oder API-Schlüssel ist nicht nötig.",
+                body = "KAL startet Apps, ordnet Szenen und versteht Systembefehle vollständig lokal. Ein Konto oder API-Schlüssel ist nicht nötig.",
                 icon = Icons.Rounded.AutoAwesome,
                 bullets = listOf("Local Core sofort aktiv", "Keine versteckte Cloud", "Freier Workspace statt starrem Raster"),
             ))
             add(OnboardingPage(
                 eyebrow = "ECHTE HOME-APP",
-                title = "Mache KoSch zu deinem Startbildschirm.",
-                body = "Android zeigt die geschützte Systemauswahl. Du kannst KoSch testen, überspringen oder später jederzeit wieder wechseln.",
+                title = "Mache KAL zu deinem Startbildschirm.",
+                body = "Android zeigt die geschützte Systemauswahl. Du kannst KAL testen, überspringen oder später jederzeit wieder wechseln.",
                 icon = Icons.Rounded.Home,
                 bullets = listOf("Android entscheidet die Rolle", "Keine Tricks mit Zurück-Tasten", "Notausgang immer im Kontrollzentrum"),
             ))
@@ -260,7 +260,7 @@ fun OnboardingExperience(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        Text("KoSch AI", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("KAL", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text("${page + 1} / ${pages.size}", color = Mint, style = MaterialTheme.typography.labelLarge)
                     }
                     Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -390,8 +390,8 @@ fun ControlCenterSheet(
                     ) {
                         Icon(Icons.Rounded.Security, contentDescription = null, tint = Mint)
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("API-frei betriebsbereit", fontWeight = FontWeight.SemiBold)
-                            Text("Kein INTERNET-Recht, kein Konto, keine Modellkosten", color = MutedMist)
+                            Text("Kernfunktionen ohne API-Konto", fontWeight = FontWeight.SemiBold)
+                            Text("Netzwerk nur für ausdrücklich aktivierte Online-Funktionen", color = MutedMist)
                         }
                     }
                 }
@@ -610,7 +610,7 @@ fun ControlCenterSheet(
                 Surface(color = Warm.copy(alpha = 0.12f), shape = RoundedCornerShape(18.dp)) {
                     Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("Sicherheitsausgang", color = Warm, style = MaterialTheme.typography.labelLarge)
-                        Text("Falls KoSch Probleme macht, öffnet dieser Weg direkt Androids Auswahl der Start-App.")
+                        Text("Falls KAL Probleme macht, öffnet dieser Weg direkt Androids Auswahl der Start-App.")
                         Button(
                             onClick = { controller.openSystemPanel(SystemPanel.HOME_SELECTION) },
                             modifier = Modifier.fillMaxWidth(),
@@ -724,7 +724,7 @@ fun PhoneSheet(controller: LauncherController, requestContact: () -> Unit) {
             )
             Surface(color = Violet.copy(alpha = 0.10f), shape = RoundedCornerShape(16.dp)) {
                 Text(
-                    "KoSch besitzt keine Anrufberechtigung. Der System-Wähler zeigt die Nummer; erst du startest den Anruf. Es gibt keinen globalen Kontaktzugriff – nur die von dir gewählte Nummer wird temporär übernommen.",
+                    "KAL besitzt keine Anrufberechtigung. Der System-Wähler zeigt die Nummer; erst du startest den Anruf. Es gibt keinen globalen Kontaktzugriff – nur die von dir gewählte Nummer wird temporär übernommen.",
                     modifier = Modifier.padding(13.dp),
                     color = MutedMist,
                     style = MaterialTheme.typography.bodySmall,
@@ -744,7 +744,7 @@ fun PhoneSheet(controller: LauncherController, requestContact: () -> Unit) {
                     modifier = Modifier.weight(1f),
                 ) {
                     Icon(Icons.Rounded.Message, contentDescription = null)
-                    Spacer(Modifier.width(6.dp))
+                    Spacer(Modifier.width(5.dp))
                     Text("Nachricht")
                 }
             }
@@ -799,7 +799,7 @@ fun FileIntelligenceSheet(
                             item {
                                 InsightBlock(
                                     "Sicherer Namensvorschlag",
-                                    "$suggestion\n\nNur Vorschau – KoSch benennt nichts automatisch um.",
+                                    "$suggestion\n\nNur Vorschau – KAL benennt nichts automatisch um.",
                                 )
                             }
                         }
@@ -892,7 +892,7 @@ fun FileWorkspaceSheet(
                         Icon(Icons.Rounded.FolderOpen, contentDescription = null, tint = Sky, modifier = Modifier.size(42.dp))
                         Text("Sicheren Arbeitsordner wählen", style = MaterialTheme.typography.titleLarge)
                         Text(
-                            "Android gibt KoSch ausschließlich den ausgewählten Ordner frei. Es gibt kein MANAGE_EXTERNAL_STORAGE und keinen heimlichen Gerätescan.",
+                            "Android gibt KAL ausschließlich den ausgewählten Ordner frei. Es gibt kein MANAGE_EXTERNAL_STORAGE und keinen heimlichen Gerätescan.",
                             color = MutedMist,
                         )
                         Button(onClick = requestWorkspace, modifier = Modifier.fillMaxWidth()) {
@@ -1107,7 +1107,7 @@ fun FileWorkspaceSheet(
                 Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("Endgültig löschen?", style = MaterialTheme.typography.titleLarge, color = Warm)
                     Text(
-                        "„${entry.displayName}“ wird über den gewählten Android-Dateianbieter gelöscht. KoSch kann diese Aktion nicht rückgängig machen.",
+                        "„${entry.displayName}“ wird über den gewählten Android-Dateianbieter gelöscht. KAL kann diese Aktion nicht rückgängig machen.",
                     )
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
                         TextButton(onClick = { deleteTarget = null }) { Text("Abbrechen") }
