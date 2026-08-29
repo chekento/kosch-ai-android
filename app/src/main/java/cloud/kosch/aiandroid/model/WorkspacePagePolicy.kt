@@ -51,13 +51,15 @@ object WorkspacePagePolicy {
 
     /**
      * Keeps the navigation contract stable: primary Home first, user-created pages next, KAL system spaces last.
-     * The active page is preserved and only order metadata changes.
+     * Existing system adapter pages also receive the current KAL-facing title. User-created titles are never rewritten.
      */
     fun organize(document: WorkspaceDocument): WorkspaceDocument {
         val normalized = document.normalized()
         val primary = normalized.pages.filter(::isPrimaryHome)
         val users = normalized.pages.filter(::isUserManaged)
-        val systems = normalized.pages.filter(::isSystem)
+        val systems = normalized.pages.filter(::isSystem).map { page ->
+            page.sceneAdapter?.let { scene -> page.copy(title = scene.title) } ?: page
+        }
         val ordered = (primary + users + systems).mapIndexed { index, page -> page.copy(order = index) }
         return normalized.copy(pages = ordered).normalized()
     }
