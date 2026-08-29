@@ -13,6 +13,7 @@ import cloud.kosch.aiandroid.ai.AiHubOrigin
 import cloud.kosch.aiandroid.ai.AiHubRoutingContext
 import cloud.kosch.aiandroid.ai.PenAiContextPlanner
 import cloud.kosch.aiandroid.ai.UniversalSearchSourcesFactory
+import cloud.kosch.aiandroid.assistant.AssistantLauncherControlEngine
 import cloud.kosch.aiandroid.assistant.AssistantProviderReadiness
 import cloud.kosch.aiandroid.data.WorkspaceWidgetHostRecovery
 import cloud.kosch.aiandroid.model.AdaptiveInputRuntimeState
@@ -50,6 +51,7 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
 
     val homeWorkspace = WorkspaceHomeController(application)
+    private val assistantLauncherControl = AssistantLauncherControlEngine(settings, homeWorkspace)
     val widgetStacks = WidgetStackController(application).also { it.repair(controller.widgetIds) }
     val directProvider = OpenRouterDirectController(
         context = application,
@@ -111,6 +113,10 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     val assistantVoice = AssistantVoiceController(application)
 
     init {
+        // Safe launcher customisation is resolved locally before any visual or generative route. The engine exposes a
+        // deliberately small reversible vocabulary and cannot grant permissions, connect providers or start capture.
+        assistant.setLauncherControlRequester(assistantLauncherControl::handle)
+
         // Free-form Assistant text may use the already configured direct provider, but this bridge cannot turn cloud
         // access on, connect credentials or choose a model. sendForAssistant returns false unless all three decisions
         // have already been made by the user; the Assistant then retains its explicit provider-handoff fallback.
