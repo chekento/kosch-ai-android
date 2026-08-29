@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.AssistantAgentController
@@ -82,7 +83,9 @@ fun AssistantControlCenter(
     val cameraActive = AssistantObservationRuntime.cameraActive
 
     LazyColumn(
-        modifier = modifier.fillMaxWidth(),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(ASSISTANT_CONTROL_CENTER_SCROLL_TAG),
         contentPadding = PaddingValues(bottom = 28.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -487,4 +490,5 @@ private fun wakeWordLabel(mode: AssistantWakeWordMode): String = when (mode) {
     AssistantWakeWordMode.CUSTOM -> "Eigenes"
 }
 
+internal const val ASSISTANT_CONTROL_CENTER_SCROLL_TAG = "assistant-control-center-scroll"
 private const val MAX_VISIBLE_VOICES = 14
