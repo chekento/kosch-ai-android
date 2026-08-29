@@ -121,7 +121,7 @@ The runtime catalog follows the project asset matrix so character Canvas fallbac
 - spawn: 16 frames, `000..015`;
 - despawn: reverse spawn playback;
 - Y rotation: 24 frames from `000` through `345` in 15-degree steps, including true back view at `180`;
-- visemes: `sil`, `pp`, `ff`, `th`, `dd`, `kk`, `ch`, `ss`, `nn`, `rr`, `aa`, `e`, `ih`, `oh`, `ou`.
+- visemes: `sil`, `pp`, `ff`, `th`, `dd`, `kk`, `ch`, `ss`, `nn`, `rr`, `aa`, `ee`, `ih`, `oh`, `ou`.
 
 ### Target runtime budgets from the matrix
 
