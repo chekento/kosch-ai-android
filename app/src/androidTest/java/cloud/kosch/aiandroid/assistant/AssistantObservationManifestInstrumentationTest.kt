@@ -44,12 +44,16 @@ class AssistantObservationManifestInstrumentationTest {
             Manifest.permission.FOREGROUND_SERVICE,
             Manifest.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION,
         )
+        // INTERNET belongs to the separately gated Provider Connections capability. It is intentionally present at
+        // package level but is not an Assistant Observation permission and must not relax the observation boundary.
+        val productLevelAllowed = setOf(
+            Manifest.permission.INTERNET,
+        )
         val toolingAndFrameworkAllowed = setOf(
             Manifest.permission.DUMP,
             "${context.packageName}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
         )
         val forbidden = setOf(
-            Manifest.permission.INTERNET,
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.ACCESS_FINE_LOCATION,
             Manifest.permission.ACCESS_COARSE_LOCATION,
@@ -62,14 +66,14 @@ class AssistantObservationManifestInstrumentationTest {
             Manifest.permission.READ_PHONE_STATE,
             Manifest.permission.QUERY_ALL_PACKAGES,
         )
+        val allowed = required + productLevelAllowed + toolingAndFrameworkAllowed
 
         assertTrue("Missing required observation permissions: ${required - requested}", requested.containsAll(required))
         assertTrue(
-            "Unexpected permission expansion in debug APK: ${requested - required - toolingAndFrameworkAllowed}",
-            requested.all { it in required || it in toolingAndFrameworkAllowed },
+            "Unexpected permission expansion in debug APK: ${requested - allowed}",
+            requested.all { it in allowed },
         )
         assertTrue("Forbidden observation permissions requested: ${requested intersect forbidden}", (requested intersect forbidden).isEmpty())
-        assertFalse(Manifest.permission.INTERNET in requested)
         assertFalse(Manifest.permission.RECORD_AUDIO in requested)
     }
 }

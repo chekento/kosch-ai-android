@@ -14,16 +14,18 @@ class LocalAuditLog(context: Context) {
 
     @Synchronized
     fun append(action: AuditAction, outcome: AuditOutcome) {
-        val cutoff = System.currentTimeMillis() - RETENTION_MILLIS
-        val updated = (listOf(AuditEvent(System.currentTimeMillis(), action, outcome)) + events())
+        if (!LauncherPrivacyRuntimePolicy.auditEnabled) return
+        val now = System.currentTimeMillis()
+        val cutoff = LauncherPrivacyRuntimePolicy.auditCutoffEpochMillis(now)
+        val updated = (listOf(AuditEvent(now, action, outcome)) + events(now))
             .filter { it.timestampEpochMillis >= cutoff }
             .take(MAX_EVENTS)
         write(updated)
     }
 
     @Synchronized
-    fun events(): List<AuditEvent> = runCatching {
-        val cutoff = System.currentTimeMillis() - RETENTION_MILLIS
+    fun events(nowEpochMillis: Long = System.currentTimeMillis()): List<AuditEvent> = runCatching {
+        val cutoff = LauncherPrivacyRuntimePolicy.auditCutoffEpochMillis(nowEpochMillis)
         val array = JSONArray(preferences.getString(KEY_EVENTS, "[]"))
         buildList {
             repeat(array.length().coerceAtMost(MAX_EVENTS)) { index ->
@@ -60,8 +62,6 @@ class LocalAuditLog(context: Context) {
 
     companion object {
         const val MAX_EVENTS = 250
-        const val RETENTION_DAYS = 90
-        private const val RETENTION_MILLIS = RETENTION_DAYS * 24L * 60L * 60L * 1_000L
         private const val PREFERENCES_NAME = "kosch_local_audit_v1"
         private const val KEY_EVENTS = "events"
     }

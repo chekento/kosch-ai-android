@@ -84,6 +84,32 @@ class AssistantAgentPolicyTest {
     }
 
     @Test
+    fun sensitiveActions_alwaysRequireConfirmationEvenWhenExternalConfirmationPreferenceIsOff() {
+        val preferences = AssistantAgentPreferences(
+            actionExecutionEnabled = true,
+            confirmationRequiredForExternalActions = false,
+        )
+        assertEquals(
+            AssistantPolicyDecision.REQUIRE_ACTION_CONFIRMATION,
+            AssistantAgentPolicy.actionDecision(
+                assistantEnabled = true,
+                preferences = preferences,
+                risk = AssistantActionRisk.SENSITIVE_SIDE_EFFECT,
+                explicitUserConfirmation = false,
+            ),
+        )
+        assertEquals(
+            AssistantPolicyDecision.ALLOW,
+            AssistantAgentPolicy.actionDecision(
+                assistantEnabled = true,
+                preferences = preferences,
+                risk = AssistantActionRisk.SENSITIVE_SIDE_EFFECT,
+                explicitUserConfirmation = true,
+            ),
+        )
+    }
+
+    @Test
     fun localReadOnlyDoesNotRequireAgentExecutionPrivilege() {
         assertEquals(
             AssistantPolicyDecision.ALLOW,
@@ -93,6 +119,21 @@ class AssistantAgentPolicyTest {
                 risk = AssistantActionRisk.LOCAL_READ_ONLY,
                 explicitUserConfirmation = false,
             ),
+        )
+    }
+
+    @Test
+    fun launcherCommands_haveCentralRiskClasses() {
+        assertEquals(AssistantActionRisk.LOCAL_READ_ONLY, AssistantCommandRiskClassifier.risk(LauncherCommand.OpenDrawer))
+        assertEquals(AssistantActionRisk.LOCAL_REVERSIBLE, AssistantCommandRiskClassifier.risk(LauncherCommand.OpenPenSpace))
+        assertEquals(AssistantActionRisk.SENSITIVE_SIDE_EFFECT, AssistantCommandRiskClassifier.risk(LauncherCommand.StartVoice))
+        assertEquals(
+            AssistantActionRisk.EXTERNAL_SIDE_EFFECT,
+            AssistantCommandRiskClassifier.risk(LauncherCommand.RoutePrompt("hello")),
+        )
+        assertEquals(
+            AssistantActionRisk.EXTERNAL_SIDE_EFFECT,
+            AssistantCommandRiskClassifier.risk(LauncherCommand.OpenCamera),
         )
     }
 

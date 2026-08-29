@@ -3,6 +3,7 @@ package cloud.kosch.aiandroid.ui
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -25,11 +26,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
+import androidx.compose.material.icons.automirrored.rounded.Redo
 import androidx.compose.material.icons.automirrored.rounded.Undo
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material.icons.rounded.Folder
+import androidx.compose.material.icons.rounded.Palette
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -40,6 +44,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -47,6 +52,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
@@ -62,12 +68,17 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import cloud.kosch.aiandroid.LauncherController
+import cloud.kosch.aiandroid.LauncherSettingsController
+import cloud.kosch.aiandroid.ScopedSettingsController
 import cloud.kosch.aiandroid.WorkspaceHomeController
 import cloud.kosch.aiandroid.model.AppProfile
+import cloud.kosch.aiandroid.model.LabelMode
 import cloud.kosch.aiandroid.model.LauncherFolder
 import cloud.kosch.aiandroid.model.WorkspaceDragResolver
 import cloud.kosch.aiandroid.model.WorkspaceItem
 import cloud.kosch.aiandroid.model.WorkspaceItemContent
+import cloud.kosch.aiandroid.model.WorkspaceObjectStyle
+import cloud.kosch.aiandroid.model.WorkspaceObjectStyleResolver
 import cloud.kosch.aiandroid.model.WorkspacePageEditor
 import cloud.kosch.aiandroid.ui.theme.DeepSurface
 import cloud.kosch.aiandroid.ui.theme.Ink
@@ -80,14 +91,16 @@ import cloud.kosch.aiandroid.ui.theme.Warm
 import kotlin.math.roundToInt
 
 /**
- * Keeps the proven v7 Home intact and adds a focused direct-manipulation surface on top of it.
+ * Direct-manipulation Home Studio for the portable v7 workspace.
  * Finger, mouse and Android stylus pointer drags all arrive through Compose pointer input. The existing
- * item editor remains the non-drag keyboard/TalkBack path.
+ * item editor remains the non-drag keyboard/TalkBack path while Home Studio adds fast page, size and object-style tools.
  */
 @Composable
 fun DragDropWorkspaceHomeScreen(
     controller: LauncherController,
     home: WorkspaceHomeController,
+    settings: LauncherSettingsController,
+    scopedSettings: ScopedSettingsController,
     requestVoiceInput: () -> Unit,
     requestDocument: () -> Unit,
     requestContact: () -> Unit,
@@ -95,17 +108,22 @@ fun DragDropWorkspaceHomeScreen(
     var arrangeVisible by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
-        UnifiedWorkspaceHomeScreen(
-            controller = controller,
-            home = home,
-            requestVoiceInput = requestVoiceInput,
-            requestDocument = requestDocument,
-            requestContact = requestContact,
-        )
+        CompositionLocalProvider(
+            LocalLauncherSettings provides settings.document,
+            LocalScopedSettings provides scopedSettings.document,
+        ) {
+            UnifiedWorkspaceHomeScreen(
+                controller = controller,
+                home = home,
+                requestVoiceInput = requestVoiceInput,
+                requestDocument = requestDocument,
+                requestContact = requestContact,
+            )
+        }
         if (home.isUserPage()) {
             AssistChip(
                 onClick = { arrangeVisible = true },
-                label = { Text("Anordnen") },
+                label = { Text("Home Studio") },
                 leadingIcon = { Icon(Icons.Rounded.DragIndicator, contentDescription = null) },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
@@ -118,6 +136,8 @@ fun DragDropWorkspaceHomeScreen(
         WorkspaceArrangeDialog(
             controller = controller,
             home = home,
+            settings = settings,
+            scopedSettings = scopedSettings,
             onDismiss = { arrangeVisible = false },
         )
     }
@@ -127,8 +147,13 @@ fun DragDropWorkspaceHomeScreen(
 private fun WorkspaceArrangeDialog(
     controller: LauncherController,
     home: WorkspaceHomeController,
+    settings: LauncherSettingsController,
+    scopedSettings: ScopedSettingsController,
     onDismiss: () -> Unit,
 ) {
+    var selectedItemId by remember(home.activePage.id) { mutableStateOf<String?>(null) }
+    var styleEditorItemId by remember(home.activePage.id) { mutableStateOf<String?>(null) }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
@@ -155,22 +180,35 @@ private fun WorkspaceArrangeDialog(
                         }
                     }
                     Column(modifier = Modifier.weight(1f)) {
-                        Text("Homescreen anordnen", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                        Text("Home Studio", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Ziehen · am Raster einrasten · über Seitenkante auf andere Home-Seite",
+                            "Ziehen · skalieren · gestalten · Seiten verwalten · 30× Undo/Redo",
                             color = MutedMist,
                             style = MaterialTheme.typography.labelMedium,
                         )
                     }
                     IconButton(enabled = home.canUndo, onClick = home::undo) {
-                        Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = "Letzten Homescreen-Schritt rückgängig")
+                        Icon(
+                            Icons.AutoMirrored.Rounded.Undo,
+                            contentDescription = "Homescreen rückgängig · ${home.undoDepth} Schritte verfügbar",
+                        )
+                    }
+                    IconButton(enabled = home.canRedo, onClick = home::redo) {
+                        Icon(
+                            Icons.AutoMirrored.Rounded.Redo,
+                            contentDescription = "Homescreen wiederholen · ${home.redoDepth} Schritte verfügbar",
+                        )
                     }
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Rounded.Close, contentDescription = "Anordnen schließen")
+                        Icon(Icons.Rounded.Close, contentDescription = "Home Studio schließen")
                     }
                 }
 
                 ArrangeUserPageRail(home)
+
+                if (home.isUserPage()) {
+                    HomeStudioPageActions(home)
+                }
 
                 if (!home.isUserPage()) {
                     Surface(
@@ -186,16 +224,123 @@ private fun WorkspaceArrangeDialog(
                     ArrangeCanvas(
                         controller = controller,
                         home = home,
+                        settings = settings,
+                        scopedSettings = scopedSettings,
+                        selectedItemId = selectedItemId,
+                        onSelectItem = {
+                            selectedItemId = it
+                            if (styleEditorItemId != it) styleEditorItemId = null
+                        },
                         modifier = Modifier.fillMaxWidth().weight(1f),
                     )
                 }
 
+                selectedItemId?.let { itemId ->
+                    HomeStudioSelectionBar(
+                        home = home,
+                        itemId = itemId,
+                        onEditStyle = { styleEditorItemId = itemId },
+                    )
+                    if (styleEditorItemId == itemId) {
+                        HomeStudioObjectStylePanel(
+                            scopedSettings = scopedSettings,
+                            pageId = home.activePage.id,
+                            itemId = itemId,
+                            globalIconScale = settings.document.home.iconScale,
+                            globalShowLabels = settings.document.home.labelMode != LabelMode.NEVER,
+                            onClose = { styleEditorItemId = null },
+                        )
+                    }
+                }
+
                 Text(
-                    "Tastatur/TalkBack: Anordnen schließen und im normalen Edit-Modus ein Element antippen; die Pfeilsteuerung bleibt vollständig erhalten.",
+                    "Tipp wählt ein Element für Größe und Stil. Ziehen verschiebt es. Versteckte Objekte bleiben im Home Studio schwach sichtbar und können jederzeit wieder eingeblendet werden.",
                     color = MutedMist,
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun HomeStudioPageActions(home: WorkspaceHomeController) {
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AssistChip(
+            onClick = home::duplicateActivePage,
+            label = { Text("Seite duplizieren") },
+            leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+        )
+        AssistChip(
+            onClick = home::compactActivePage,
+            label = { Text("Auto-Anordnen") },
+            leadingIcon = { Icon(Icons.Rounded.DragIndicator, contentDescription = null) },
+        )
+        if (home.canUndo) {
+            AssistChip(
+                onClick = home::undo,
+                label = { Text("Rückgängig · ${home.undoDepth}") },
+                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Undo, contentDescription = null) },
+            )
+        }
+        if (home.canRedo) {
+            AssistChip(
+                onClick = home::redo,
+                label = { Text("Wiederholen · ${home.redoDepth}") },
+                leadingIcon = { Icon(Icons.AutoMirrored.Rounded.Redo, contentDescription = null) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeStudioSelectionBar(
+    home: WorkspaceHomeController,
+    itemId: String,
+    onEditStyle: () -> Unit,
+) {
+    val item = home.activePage.items.firstOrNull { it.id == itemId } ?: return
+    val presets = listOf(
+        HomeStudioSizePreset("Kompakt", 2, 2),
+        HomeStudioSizePreset("Breit", 4, 2),
+        HomeStudioSizePreset("Groß", 4, 4),
+        HomeStudioSizePreset("XL", 6, 4),
+    )
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        color = DeepSurface.copy(alpha = 0.96f),
+        shape = RoundedCornerShape(20.dp),
+        border = BorderStroke(1.dp, Sky.copy(alpha = 0.22f)),
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 10.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Größe ${item.bounds.columnSpan}×${item.bounds.rowSpan}",
+                color = MutedMist,
+                style = MaterialTheme.typography.labelMedium,
+            )
+            presets.forEach { preset ->
+                FilterChip(
+                    selected = item.bounds.columnSpan == preset.columns && item.bounds.rowSpan == preset.rows,
+                    onClick = { home.resizeItem(itemId, preset.columns, preset.rows) },
+                    label = { Text(preset.title) },
+                )
+            }
+            AssistChip(
+                onClick = onEditStyle,
+                label = { Text("Stil") },
+                leadingIcon = { Icon(Icons.Rounded.Palette, contentDescription = null) },
+            )
         }
     }
 }
@@ -235,6 +380,10 @@ private fun ArrangeUserPageRail(home: WorkspaceHomeController) {
 private fun ArrangeCanvas(
     controller: LauncherController,
     home: WorkspaceHomeController,
+    settings: LauncherSettingsController,
+    scopedSettings: ScopedSettingsController,
+    selectedItemId: String?,
+    onSelectItem: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val page = home.activePage
@@ -278,11 +427,21 @@ private fun ArrangeCanvas(
 
         page.items.forEach { item ->
             if (item.content is WorkspaceItemContent.ActionTile) return@forEach
+            val objectStyle = WorkspaceObjectStyleResolver.resolve(
+                document = scopedSettings.document,
+                pageId = page.id,
+                itemId = item.id,
+                globalIconScale = settings.document.home.iconScale,
+                globalShowLabels = settings.document.home.labelMode != LabelMode.NEVER,
+            )
             key(item.id) {
                 DraggableArrangeItem(
                     item = item,
                     controller = controller,
                     home = home,
+                    style = objectStyle,
+                    selected = item.id == selectedItemId,
+                    onSelect = { onSelectItem(item.id) },
                     cellWidthPx = cellWidthPx,
                     cellHeightPx = cellHeightPx,
                     cellWidth = cellWidth,
@@ -300,6 +459,9 @@ private fun DraggableArrangeItem(
     item: WorkspaceItem,
     controller: LauncherController,
     home: WorkspaceHomeController,
+    style: WorkspaceObjectStyle,
+    selected: Boolean,
+    onSelect: () -> Unit,
     cellWidthPx: Float,
     cellHeightPx: Float,
     cellWidth: androidx.compose.ui.unit.Dp,
@@ -361,7 +523,9 @@ private fun DraggableArrangeItem(
         val height = cellHeight * item.bounds.rowSpan
         val baseX = item.bounds.column * cellWidthPx
         val baseY = item.bounds.row * cellHeightPx
-        Card(
+        WorkspaceObjectStyleFrame(
+            style = style,
+            editing = true,
             modifier = Modifier
                 .offset {
                     IntOffset(
@@ -373,11 +537,19 @@ private fun DraggableArrangeItem(
                 .padding(3.dp)
                 .semantics(mergeDescendants = true) {
                     role = Role.Button
-                    contentDescription = arrangeDescription(item, controller)
+                    contentDescription = arrangeDescription(item, controller) + if (selected) {
+                        ". Ausgewählt. Größe und Stil verfügbar"
+                    } else {
+                        ". Tippen für Größe und Stil"
+                    }
                 }
+                .clickable(onClick = onSelect)
                 .pointerInput(item.id, item.bounds, previousPageId, nextPageId) {
                     detectDragGestures(
-                        onDragStart = { dragging = true },
+                        onDragStart = {
+                            dragging = true
+                            onSelect()
+                        },
                         onDrag = { change, delta ->
                             change.consume()
                             dragOffset += delta
@@ -387,8 +559,6 @@ private fun DraggableArrangeItem(
                             dragging = false
                         },
                         onDragEnd = {
-                            // Re-resolve from the final mutable pointer delta. Do not depend on a last-frame
-                            // recomposition: ACTION_UP can arrive before visual preview state is republished.
                             val finalIntent = WorkspaceDragResolver.resolve(
                                 itemBounds = item.bounds,
                                 deltaColumns = (dragOffset.x / cellWidthPx).roundToInt(),
@@ -423,13 +593,25 @@ private fun DraggableArrangeItem(
                         },
                     )
                 },
-            colors = CardDefaults.cardColors(
-                containerColor = if (dragging) Sky.copy(alpha = 0.20f) else RaisedSurface.copy(alpha = 0.96f),
-            ),
-            border = BorderStroke(1.dp, if (dragging) Sky else Mint.copy(alpha = 0.34f)),
-            shape = RoundedCornerShape(18.dp),
         ) {
-            ArrangeItemContent(item, controller, crossTarget)
+            Card(
+                modifier = Modifier.fillMaxSize(),
+                colors = CardDefaults.cardColors(
+                    containerColor = when {
+                        dragging -> Sky.copy(alpha = 0.20f)
+                        selected -> Violet.copy(alpha = 0.20f)
+                        else -> Color.Transparent
+                    },
+                ),
+                border = when {
+                    dragging -> BorderStroke(1.dp, Sky)
+                    selected -> BorderStroke(1.dp, Violet)
+                    else -> null
+                },
+                shape = RoundedCornerShape(style.cornerDp.dp),
+            ) {
+                ArrangeItemContent(item, controller, crossTarget)
+            }
         }
     }
 }
@@ -440,6 +622,7 @@ private fun ArrangeItemContent(
     controller: LauncherController,
     crossTarget: String?,
 ) {
+    val style = LocalWorkspaceObjectStyle.current
     Column(
         modifier = Modifier.fillMaxSize().padding(8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -452,8 +635,20 @@ private fun ArrangeItemContent(
                     Icon(Icons.Rounded.Apps, contentDescription = null, tint = Warm)
                     Text("App fehlt", color = Warm, style = MaterialTheme.typography.labelSmall)
                 } else {
-                    Image(app.icon, contentDescription = null, modifier = Modifier.size(38.dp))
-                    Text(app.label, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium)
+                    Image(
+                        app.icon,
+                        contentDescription = null,
+                        modifier = Modifier.size((38f * style.iconScale).dp),
+                    )
+                    if (style.showLabel) {
+                        Text(
+                            app.label,
+                            modifier = Modifier.scale(style.labelScale),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.labelMedium,
+                        )
+                    }
                     if (app.profile != AppProfile.PERSONAL) {
                         Text(app.profile.title, color = Sky, style = MaterialTheme.typography.labelSmall)
                     }
@@ -461,10 +656,23 @@ private fun ArrangeItemContent(
             }
             is WorkspaceItemContent.Folder -> {
                 val folder: LauncherFolder? = controller.folders.firstOrNull { it.id == content.folderId }
-                Icon(Icons.Rounded.Folder, contentDescription = null, tint = Violet)
-                Text(folder?.title ?: "Ordner fehlt", maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelMedium)
+                Icon(
+                    Icons.Rounded.Folder,
+                    contentDescription = null,
+                    tint = Violet,
+                    modifier = Modifier.size((24f * style.iconScale).dp),
+                )
+                if (style.showLabel) {
+                    Text(
+                        folder?.title ?: "Ordner fehlt",
+                        modifier = Modifier.scale(style.labelScale),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.labelMedium,
+                    )
+                }
             }
-            is WorkspaceItemContent.Widget -> Text("Widget · Remap", color = Warm, style = MaterialTheme.typography.labelSmall)
+            is WorkspaceItemContent.Widget -> Text("Widget · Zuordnung erforderlich", color = Warm, style = MaterialTheme.typography.labelSmall)
             is WorkspaceItemContent.ActionTile -> Unit
         }
         if (crossTarget != null) {
@@ -503,3 +711,9 @@ private fun arrangeDescription(item: WorkspaceItem, controller: LauncherControll
     is WorkspaceItemContent.Widget -> "Widget. Ziehen zum Verschieben"
     is WorkspaceItemContent.ActionTile -> "Geschützte Aktion"
 }
+
+private data class HomeStudioSizePreset(
+    val title: String,
+    val columns: Int,
+    val rows: Int,
+)

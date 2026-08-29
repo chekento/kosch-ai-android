@@ -35,6 +35,58 @@ class WorkspacePageEditorTest {
     }
 
     @Test
+    fun duplicateUserPage_copiesPortableLayoutWithFreshIdsImmediatelyAfterSource() {
+        var document = WorkspacePageEditor.createUserPage(base(), "page:user:one", "Studio")
+        document = WorkspacePageEditor.addApp(document, "page:user:one", "item:app:1", "app:one")
+        document = WorkspacePageEditor.addFolder(document, "page:user:one", "item:folder:1", "folder:one")
+
+        val duplicate = WorkspacePageEditor.duplicateUserPage(
+            document = document,
+            sourcePageId = "page:user:one",
+            pageId = "page:user:copy",
+            title = "",
+            newItemIds = listOf("item:copy:1", "item:copy:2"),
+        )
+
+        val sourceIndex = duplicate.pages.indexOfFirst { it.id == "page:user:one" }
+        val copied = duplicate.pages.first { it.id == "page:user:copy" }
+        val source = duplicate.pages[sourceIndex]
+        assertEquals(sourceIndex + 1, duplicate.pages.indexOf(copied))
+        assertEquals("Studio Kopie", copied.title)
+        assertEquals("page:user:copy", duplicate.activePageId)
+        assertEquals(source.items.map { it.bounds }, copied.items.map { it.bounds })
+        assertEquals(source.items.map { it.content }, copied.items.map { it.content })
+        assertEquals(listOf("item:copy:1", "item:copy:2"), copied.items.map { it.id })
+        assertTrue(source.items.map { it.id }.intersect(copied.items.map { it.id }.toSet()).isEmpty())
+    }
+
+    @Test
+    fun duplicateUserPage_rejectsLegacyPagesAndReusedItemIds() {
+        val legacyId = WorkspaceStableIds.scenePage(SceneId.AI)
+        assertThrows(IllegalArgumentException::class.java) {
+            WorkspacePageEditor.duplicateUserPage(
+                document = base(),
+                sourcePageId = legacyId,
+                pageId = "page:user:copy",
+                title = "Copy",
+                newItemIds = base().pages.first { it.id == legacyId }.items.mapIndexed { index, _ -> "copy:$index" },
+            )
+        }
+
+        var document = WorkspacePageEditor.createUserPage(base(), "page:user:one", "Home")
+        document = WorkspacePageEditor.addApp(document, "page:user:one", "item:app:1", "app:one")
+        assertThrows(IllegalArgumentException::class.java) {
+            WorkspacePageEditor.duplicateUserPage(
+                document = document,
+                sourcePageId = "page:user:one",
+                pageId = "page:user:copy",
+                title = "Copy",
+                newItemIds = listOf("item:app:1"),
+            )
+        }
+    }
+
+    @Test
     fun legacyScenePages_areProtectedFromRenameDeleteAndAppPlacement() {
         val document = base()
         val legacyId = WorkspaceStableIds.scenePage(SceneId.AI)
@@ -81,6 +133,52 @@ class WorkspacePageEditorTest {
         assertEquals(WorkspaceCellBounds(0, 0, 2, 2), first.bounds)
         assertEquals(WorkspaceCellBounds(2, 0, 2, 2), second.bounds)
         assertFalse(first.bounds.overlaps(second.bounds))
+    }
+
+    @Test
+    fun resizeItem_preservesRequestedSizeAndAvoidsCollisionsDeterministically() {
+        var document = WorkspacePageEditor.createUserPage(base(), "page:user:one", "Home")
+        document = WorkspacePageEditor.addApp(document, "page:user:one", "item:app:1", "app:one")
+        document = WorkspacePageEditor.addApp(document, "page:user:one", "item:app:2", "app:two")
+
+        document = WorkspacePageEditor.resizeItem(
+            document = document,
+            pageId = "page:user:one",
+            itemId = "item:app:2",
+            columnSpan = 4,
+            rowSpan = 2,
+        )
+
+        val page = document.pages.first { it.id == "page:user:one" }
+        val first = page.items.first { it.id == "item:app:1" }
+        val second = page.items.first { it.id == "item:app:2" }
+        assertEquals(4, second.bounds.columnSpan)
+        assertEquals(2, second.bounds.rowSpan)
+        assertFalse(first.bounds.overlaps(second.bounds))
+        assertEquals(WorkspaceCellBounds(2, 0, 4, 2), second.bounds)
+    }
+
+    @Test
+    fun compactUserPage_packsItemsTopLeftWithoutChangingOrderSizeOrContent() {
+        var document = WorkspacePageEditor.createUserPage(base(), "page:user:one", "Home")
+        document = WorkspacePageEditor.addApp(document, "page:user:one", "item:app:1", "app:one")
+        document = WorkspacePageEditor.addFolder(document, "page:user:one", "item:folder:1", "folder:one")
+        document = WorkspacePageEditor.moveItem(
+            document,
+            "page:user:one",
+            "item:app:1",
+            WorkspaceCellBounds(8, 8, 2, 2),
+        )
+        val before = document.pages.first { it.id == "page:user:one" }.items
+
+        val compacted = WorkspacePageEditor.compactUserPage(document, "page:user:one")
+        val after = compacted.pages.first { it.id == "page:user:one" }.items
+
+        assertEquals(before.map { it.id }, after.map { it.id })
+        assertEquals(before.map { it.content }, after.map { it.content })
+        assertEquals(before.map { it.bounds.columnSpan to it.bounds.rowSpan }, after.map { it.bounds.columnSpan to it.bounds.rowSpan })
+        assertEquals(WorkspaceCellBounds(0, 0, 2, 2), after[0].bounds)
+        assertEquals(WorkspaceCellBounds(2, 0, 2, 2), after[1].bounds)
     }
 
     @Test

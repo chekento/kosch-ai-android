@@ -50,12 +50,26 @@ class WorkspaceDragDropInstrumentationTest {
             }
             composeTestRule.waitForIdle()
 
-            composeTestRule.onNodeWithText("Anordnen", useUnmergedTree = true).performClick()
+            composeTestRule.onNodeWithText("Home Studio", useUnmergedTree = true).performClick()
             composeTestRule.waitForIdle()
-            composeTestRule.onNodeWithText("Homescreen anordnen", useUnmergedTree = true).fetchSemanticsNode()
+            composeTestRule.onNodeWithText(
+                "Ziehen · skalieren · gestalten · Seiten verwalten",
+                substring = true,
+                useUnmergedTree = true,
+            ).fetchSemanticsNode()
+
+            val itemDescription = "App. Ziehen zum Verschieben. Tippen für Größe und Stil"
+            composeTestRule
+                .onNodeWithContentDescription(itemDescription, useUnmergedTree = true)
+                .performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule.onNodeWithText("Stil", useUnmergedTree = true).fetchSemanticsNode()
 
             composeTestRule
-                .onNodeWithContentDescription("App. Ziehen zum Verschieben", useUnmergedTree = true)
+                .onNodeWithContentDescription(
+                    "App. Ziehen zum Verschieben. Ausgewählt. Größe und Stil verfügbar",
+                    useUnmergedTree = true,
+                )
                 .performTouchInput {
                     down(center)
                     // Touch injection distances are physical pixels. Move in several realistic pointer steps
