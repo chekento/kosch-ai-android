@@ -109,6 +109,19 @@ class LauncherViewModel(application: Application) : AndroidViewModel(application
     }
     val assistantVoice = AssistantVoiceController(application)
 
+    init {
+        // Free-form Assistant text may use the already configured direct provider, but this bridge cannot turn cloud
+        // access on, connect credentials or choose a model. sendForAssistant returns false unless all three decisions
+        // have already been made by the user; the Assistant then retains its explicit provider-handoff fallback.
+        assistant.setGenerativeRequester { prompt ->
+            directProvider.sendForAssistant(
+                prompt = prompt,
+                onSuccess = { reply -> assistant.consumeGenerativeResponse(reply.text) },
+                onFailure = { reason -> assistant.consumeGenerativeFailure(reason, prompt) },
+            )
+        }
+    }
+
     fun openAiHub(
         initialPrompt: String = "",
         requestedOrigin: AiHubOrigin = AiHubOrigin.HOME,
