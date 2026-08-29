@@ -29,7 +29,11 @@ class SettingsCenterInstrumentationTest {
         composeTestRule.waitForIdle()
 
         composeTestRule
-            .onNodeWithContentDescription("Launcher-Einstellungen", useUnmergedTree = true)
+            .onNodeWithContentDescription("KAL Menü", useUnmergedTree = true)
+            .performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule
+            .onNodeWithText("Einstellungen", useUnmergedTree = true)
             .performClick()
         composeTestRule.waitForIdle()
 
