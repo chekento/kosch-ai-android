@@ -1,5 +1,6 @@
 package cloud.kosch.aiandroid
 
+import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
@@ -18,7 +19,7 @@ class SettingsCenterInstrumentationTest {
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun launcherSettingsEntry_opensSearchableSettingsCenterAndLiveHomeSection() {
+    fun launcherSettingsEntry_opensSearchableCalmSettingsCenterAndLiveHomeSection() {
         composeTestRule.waitForIdle()
         dismissOnboardingIfVisible()
         val viewModel = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
@@ -37,14 +38,27 @@ class SettingsCenterInstrumentationTest {
             .performClick()
         composeTestRule.waitForIdle()
 
-        composeTestRule.onNodeWithText("Settings Center", useUnmergedTree = true).fetchSemanticsNode()
+        composeTestRule.onNodeWithText("Finde schnell, was du ändern möchtest.", useUnmergedTree = true).fetchSemanticsNode()
         composeTestRule.onNodeWithText("Einstellungen durchsuchen", useUnmergedTree = true).fetchSemanticsNode()
+
+        // Expert/diagnostic areas are still available, but no longer dominate the first screen.
+        composeTestRule
+            .onNodeWithText("Erweitert & Diagnose", useUnmergedTree = true)
+            .assertDoesNotExist()
+        composeTestRule
+            .onNodeWithText("Weitere Einstellungen", useUnmergedTree = true)
+            .performClick()
+        composeTestRule.waitForIdle()
+        composeTestRule
+            .onNodeWithText("Erweitert & Diagnose", useUnmergedTree = true)
+            .fetchSemanticsNode()
+
         composeTestRule.onNodeWithText("Home & Raster", useUnmergedTree = true).performClick()
         composeTestRule.waitForIdle()
         composeTestRule.onNodeWithText("Rasterspalten", useUnmergedTree = true).fetchSemanticsNode()
         composeTestRule.onNodeWithText("Rasterzeilen", useUnmergedTree = true).fetchSemanticsNode()
 
-        // Phone navigation is intentionally hierarchical: detail -> section list -> close.
+        // Phone navigation stays hierarchical: detail -> section list -> close.
         composeTestRule
             .onNodeWithContentDescription("Zurück zu allen Einstellungen", useUnmergedTree = true)
             .performClick()
