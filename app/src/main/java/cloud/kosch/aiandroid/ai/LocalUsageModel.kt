@@ -14,6 +14,7 @@ object LocalUsageModel {
     ): Map<String, AppUsageSignal> {
         require(appKey.isNotBlank())
         require(nowEpochMillis > 0L)
+        if (!LauncherPrivacyRuntimePolicy.localUsageLearningEnabled) return current
         if (limit <= 0) return emptyMap()
         val previous = current[appKey]
         val updated = current + (
