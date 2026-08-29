@@ -78,10 +78,17 @@ class WorkspaceHomeBackupInstrumentationTest {
         var tamperedToWipe: ByteArray? = null
         try {
             val root = JSONObject(payload.toString(StandardCharsets.UTF_8))
-            val workspace = root.getJSONObject("workspaceV7")
-            val firstPage = workspace.getJSONArray("pages").getJSONObject(0)
-            val firstItem = firstPage.getJSONArray("items").getJSONObject(0)
-            firstItem.put("appWidgetId", 12345)
+            val pages = root.getJSONObject("workspaceV7").getJSONArray("pages")
+            var firstItem: JSONObject? = null
+            for (pageIndex in 0 until pages.length()) {
+                val items = pages.getJSONObject(pageIndex).getJSONArray("items")
+                if (items.length() > 0) {
+                    firstItem = items.getJSONObject(0)
+                    break
+                }
+            }
+            val targetItem = requireNotNull(firstItem) { "Fixture must contain at least one portable workspace item" }
+            targetItem.put("appWidgetId", 12345)
             val tampered = root.toString().toByteArray(StandardCharsets.UTF_8)
             tamperedToWipe = tampered
 
