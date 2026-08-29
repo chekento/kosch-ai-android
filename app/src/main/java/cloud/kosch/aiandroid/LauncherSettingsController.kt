@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import cloud.kosch.aiandroid.data.LauncherPrivacyRuntimePolicy
 import cloud.kosch.aiandroid.data.LauncherSettingsStore
 import cloud.kosch.aiandroid.data.WorkspaceStore
 import cloud.kosch.aiandroid.model.AccessibilitySettings
@@ -39,6 +40,9 @@ import cloud.kosch.aiandroid.model.WorkspaceGridReflow
  * their dedicated stores. Disruptive Home changes are coordinated with the v7 Workspace document before settings
  * are committed so a failed reflow cannot leave settings and workspace out of sync. Every portable settings domain
  * has one explicit apply route and therefore shares the same atomic store + single-level undo semantics.
+ *
+ * Privacy switches also configure [LauncherPrivacyRuntimePolicy] after every successful load/apply/undo so the
+ * visible setting is an operational gate, not documentation-only state.
  */
 class LauncherSettingsController(context: Context) {
     private val store = LauncherSettingsStore(context.applicationContext)
@@ -56,6 +60,10 @@ class LauncherSettingsController(context: Context) {
         private set
     var canUndo by mutableStateOf(false)
         private set
+
+    init {
+        syncRuntimePrivacy()
+    }
 
     fun open(section: SettingsSection? = null) {
         requestedSection = section
@@ -106,6 +114,7 @@ class LauncherSettingsController(context: Context) {
         undoDocument = previousSettings
         undoWorkspace = previousWorkspace.takeIf { gridChanged }
         document = updatedSettings
+        syncRuntimePrivacy()
         canUndo = true
         if (gridChanged) home.reload()
         notice = if (gridChanged) {
@@ -210,6 +219,7 @@ class LauncherSettingsController(context: Context) {
         undoDocument = currentSettings
         undoWorkspace = currentWorkspace.takeIf { previousWorkspace != null }
         document = previousSettings
+        syncRuntimePrivacy()
         canUndo = true
         if (previousWorkspace != null) home.reload()
         notice = "Letzte Settings-Änderung rückgängig"
@@ -218,6 +228,7 @@ class LauncherSettingsController(context: Context) {
 
     fun reload() {
         document = store.load().normalized()
+        syncRuntimePrivacy()
         undoDocument = null
         undoWorkspace = null
         canUndo = false
@@ -227,6 +238,7 @@ class LauncherSettingsController(context: Context) {
         val previous = document
         val normalized = updated.normalized()
         if (normalized == previous) {
+            syncRuntimePrivacy()
             notice = "Keine Änderung"
             return true
         }
@@ -237,8 +249,13 @@ class LauncherSettingsController(context: Context) {
         undoDocument = previous
         undoWorkspace = null
         document = normalized
+        syncRuntimePrivacy()
         canUndo = true
         notice = message
         return true
+    }
+
+    private fun syncRuntimePrivacy() {
+        LauncherPrivacyRuntimePolicy.configure(document.privacy)
     }
 }
