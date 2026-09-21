@@ -17,23 +17,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import cloud.kosch.aiandroid.data.PendingDocumentKind
 import cloud.kosch.aiandroid.data.PendingDocumentStore
-import cloud.kosch.aiandroid.model.HomePage
 import cloud.kosch.aiandroid.system.HomeRoleController
 import cloud.kosch.aiandroid.system.DocumentGrantManager
 import cloud.kosch.aiandroid.system.ProfessionalShortcut
 import cloud.kosch.aiandroid.system.ProfessionalShortcutResolver
 import cloud.kosch.aiandroid.system.WidgetHostController
-import cloud.kosch.aiandroid.ui.DragDropWorkspaceHomeScreen
-import cloud.kosch.aiandroid.ui.LauncherRoot
-import cloud.kosch.aiandroid.ui.components.CompanionFace
+import cloud.kosch.aiandroid.ui.KALLauncherShell
 import cloud.kosch.aiandroid.ui.theme.KoSchLauncherTheme
 import java.time.LocalDate
 
@@ -207,60 +198,26 @@ class MainActivity : ComponentActivity() {
             .forEach(controller::removeWidgetRecord)
 
         setContent {
-            KoSchLauncherTheme {
-                Box {
-                    val unifiedHomeSelected = controller.homePage == HomePage.WORKSPACE && !controller.onboardingVisible
-                    val legacyOverlayVisible = controller.drawerVisible ||
-                        controller.providerChooserVisible ||
-                        controller.contextDetailsVisible ||
-                        controller.controlCenterVisible ||
-                        controller.phoneVisible ||
-                        controller.fileSheetVisible ||
-                        controller.fileWorkspaceVisible ||
-                        controller.widgetBoardVisible ||
-                        controller.appActionsVisible ||
-                        controller.folderSheetVisible ||
-                        controller.faqVisible ||
-                        controller.backupVisible ||
-                        controller.auditVisible
-                    val unifiedHomeVisible = unifiedHomeSelected && !legacyOverlayVisible
-
-                    if (unifiedHomeVisible) {
-                        DragDropWorkspaceHomeScreen(
-                            controller = controller,
-                            home = launcherViewModel.homeWorkspace,
-                            requestVoiceInput = ::requestVoiceInput,
-                            requestDocument = ::requestDocument,
-                            requestContact = ::requestContact,
-                        )
-                    } else {
-                        LauncherRoot(
-                            controller = controller,
-                            requestHomeRole = ::requestHomeRole,
-                            requestVoiceInput = ::requestVoiceInput,
-                            requestDocument = ::requestDocument,
-                            requestFileWorkspace = ::requestFileWorkspace,
-                            requestContact = ::requestContact,
-                            requestWidget = ::requestWidget,
-                            requestBackupExport = ::requestBackupExport,
-                            requestBackupImport = ::requestBackupImport,
-                            requestAuditExport = ::requestAuditExport,
-                            requestInkExport = ::requestInkExport,
-                            createWidgetView = widgetHostController::createView,
-                            deleteWidget = ::deleteWidget,
-                            forgetDocument = ::forgetDocument,
-                        )
-                    }
-                    if (unifiedHomeVisible) {
-                        CompanionFace(
-                            onClick = ::requestVoiceInput,
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .padding(end = 18.dp, bottom = 150.dp)
-                                .size(width = 76.dp, height = 68.dp),
-                        )
-                    }
-                }
+            KoSchLauncherTheme(dynamicColor = false) {
+                KALLauncherShell(
+                    controller = controller,
+                    home = launcherViewModel.homeWorkspace,
+                    assistant = launcherViewModel.assistant,
+                    assistantAgent = launcherViewModel.assistantAgent,
+                    requestHomeRole = ::requestHomeRole,
+                    requestVoiceInput = ::requestVoiceInput,
+                    requestDocument = ::requestDocument,
+                    requestFileWorkspace = ::requestFileWorkspace,
+                    requestContact = ::requestContact,
+                    requestWidget = ::requestWidget,
+                    requestBackupExport = ::requestBackupExport,
+                    requestBackupImport = ::requestBackupImport,
+                    requestAuditExport = ::requestAuditExport,
+                    requestInkExport = ::requestInkExport,
+                    createWidgetView = widgetHostController::createView,
+                    deleteWidget = ::deleteWidget,
+                    forgetDocument = ::forgetDocument,
+                )
             }
         }
     }
