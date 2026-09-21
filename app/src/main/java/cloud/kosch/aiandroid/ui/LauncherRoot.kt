@@ -438,7 +438,7 @@ private fun LauncherHeader(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "KoSch AI",
+                    text = "KAL",
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.SemiBold,
                 )
@@ -851,7 +851,7 @@ private fun AskDock(
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-private fun AppDrawerSheet(controller: LauncherController) {
+fun AppDrawerSheet(controller: LauncherController) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var query by rememberSaveable { mutableStateOf("") }
     var sortName by rememberSaveable { mutableStateOf(AppDrawerSort.SMART.name) }
@@ -1028,7 +1028,7 @@ private enum class AppDrawerSort(val title: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ProviderChooserSheet(controller: LauncherController) {
+fun ProviderChooserSheet(controller: LauncherController) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -1184,7 +1184,7 @@ private fun ProviderCard(
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-private fun ContextDetailsSheet(
+fun ContextDetailsSheet(
     snapshot: ContextSnapshot,
     onUseSuggestion: () -> Unit,
     onDismiss: () -> Unit,
