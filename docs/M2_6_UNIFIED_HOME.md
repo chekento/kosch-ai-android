@@ -1,5 +1,22 @@
 # M2.6 Unified Home · Stage B
 
+## KAL 0.3.0 shell integration
+
+The Stage-B workspace is now hosted inside one product shell, `KALLauncherShell`. The Activity no longer
+switches between the old `LauncherRoot` and the v7 drag surface based on page and overlay state. KAL owns
+the top-level information architecture:
+
+- Home: personal command center, Assistant status, Smart Dock, folders and local context;
+- Apps: inline LauncherApps search with local ranking, collection filters and long-press actions;
+- Workspace: persisted v7 pages and portable items;
+- AI News: an explicit browser-source hub with model, product, open-source, security and governance feeds;
+- Tools: phone, files, widgets, calendar, camera, Pen Space, backup, audit, security and help;
+- Settings: one place for HOME selection, Assistant entry and recovery controls.
+
+All existing sheets remain task surfaces beneath the shell. This is an information-architecture change, not a
+permission expansion: the offline build still has no `INTERNET` or `RECORD_AUDIO` permission, and Screen/Cam
+awareness remains consent-first and disabled by default.
+
 This stage turns `WorkspaceDocument` v7 into a user-facing launcher Home surface.
 
 ## Delivered in this slice
