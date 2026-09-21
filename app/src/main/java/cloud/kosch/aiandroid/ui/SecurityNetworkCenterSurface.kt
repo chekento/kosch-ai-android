@@ -73,8 +73,8 @@ fun ColumnScope.SecurityNetworkCenterSurface(
         VpnAuthorizationState.AUTHORIZED -> "Von Android autorisiert"
     }
     val authorizationDetail = when (snapshot.vpnAuthorization) {
-        VpnAuthorizationState.UNKNOWN -> "KoSch nimmt keinen positiven Status an, solange Android ihn nicht bestätigt."
-        VpnAuthorizationState.CONSENT_REQUIRED -> "Nur Android darf die VPN-Berechtigung erteilen. KoSch öffnet dafür den Systemdialog."
+        VpnAuthorizationState.UNKNOWN -> "KAL nimmt keinen positiven Status an, solange Android ihn nicht bestätigt."
+        VpnAuthorizationState.CONSENT_REQUIRED -> "Nur Android darf die VPN-Berechtigung erteilen. KAL öffnet dafür den Systemdialog."
         VpnAuthorizationState.AUTHORIZED -> "Das ist nur eine Berechtigung. In N1 ist weiterhin kein VPN-Tunnel aktiv."
     }
     val metrics = listOf(
@@ -102,7 +102,7 @@ fun ColumnScope.SecurityNetworkCenterSurface(
         SecurityMetric(
             title = "Routing / Proxy",
             value = "DIREKT",
-            detail = "KoSch verändert in N1 weder Routing noch Proxy-Konfiguration und installiert keine Zertifikate.",
+            detail = "KAL verändert in N1 weder Routing noch Proxy-Konfiguration und installiert keine Zertifikate.",
             icon = Icons.Rounded.Wifi,
             healthy = true,
         ),
