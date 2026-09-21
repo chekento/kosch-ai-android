@@ -83,10 +83,10 @@ jobs:
       - name: Prepare installable APK and checksum
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/debug/app-debug.apk dist/KoSch-AI-Launcher-M2.5-debug.apk
+          cp app/build/outputs/apk/debug/app-debug.apk dist/KAL-AI-Launcher-0.3.0-alpha01-debug.apk
           cd dist
-          sha256sum KoSch-AI-Launcher-M2.5-debug.apk > KoSch-AI-Launcher-M2.5-debug.apk.sha256
-          sha256sum -c KoSch-AI-Launcher-M2.5-debug.apk.sha256
+          sha256sum KAL-AI-Launcher-0.3.0-alpha01-debug.apk > KAL-AI-Launcher-0.3.0-alpha01-debug.apk.sha256
+          sha256sum -c KAL-AI-Launcher-0.3.0-alpha01-debug.apk.sha256
 
       - name: Prepare instrumentation test package
         run: |
