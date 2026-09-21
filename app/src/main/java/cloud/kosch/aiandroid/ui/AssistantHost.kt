@@ -103,7 +103,7 @@ fun AssistantHost(
                         speechSignal = assistant.speechSignal,
                         reducedMotion = effectiveReducedMotion,
                         attentionSignal = assistant.attentionSignal,
-                        contentDescription = "KoSch Assistent öffnen",
+                        contentDescription = "KAL Assistant öffnen",
                         onPointerAttention = assistant::pointerAttention,
                         onActivate = assistant::attentionActivated,
                         onClick = assistant::open,
@@ -204,7 +204,7 @@ private fun AssistantSheet(
                         speechSignal = assistant.speechSignal,
                         reducedMotion = effectiveReducedMotion,
                         attentionSignal = assistant.attentionSignal,
-                        contentDescription = "KoSch Assistent begrüßen",
+                        contentDescription = "KAL Assistant begrüßen",
                         onPointerAttention = assistant::pointerAttention,
                         onActivate = assistant::attentionActivated,
                         onClick = {},
@@ -213,7 +213,7 @@ private fun AssistantSheet(
                     )
                 }
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("KoSch Assistant", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
+                    Text("KAL Assistant", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                     Text(
                         assistantStatus(assistant.visualState),
                         color = assistantStatusColor(assistant.visualState),
