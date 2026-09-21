@@ -63,7 +63,7 @@
         <service
             android:name=".system.KoSchNotificationListenerService"
             android:exported="true"
-            android:label="KoSch Benachrichtigungspunkte"
+            android:label="KAL Benachrichtigungspunkte"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
