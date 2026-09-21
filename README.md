@@ -1,10 +1,16 @@
-# KoSch AI Android
+# KAL – KoSch AI Launcher
 
-KoSch ist ein nativer, local-first Android-Launcher für professionelle Nutzer: eine belastbare HOME-Shell, ein programmierbarer Workspace und eine sichere KI-Orchestrierung statt eines starren App-Rasters. Der Kern funktioniert **beim ersten Start offline – ohne Konto, API-Schlüssel oder Modell-Download**. KI liegt unter Suche, Kontext, Dateien, Aktionen und Layout; App-Start, Telefon, Dateien, Widgets, Einstellungen und der Sicherheitsausgang bleiben auch ohne Modell verfügbar.
+KAL ist ein nativer, local-first Android-Launcher für professionelle Nutzer: eine klare HOME-Shell, ein persönlicher Workspace und eine sichere KI-Orchestrierung statt eines überladenen App-Rasters. Der Kern funktioniert **beim ersten Start offline – ohne Konto, API-Schlüssel oder Modell-Download**. KAL bündelt Command Center, Apps, Assistant, Workspace, AI-News, Tools und Settings in einer einheitlichen Oberfläche; App-Start, Telefon, Dateien, Widgets, Einstellungen und der Sicherheitsausgang bleiben auch ohne Modell verfügbar.
 
 LCARS ist bewusst kein Kernbestandteil. Themes sollen später als austauschbare Programme entstehen; LCARS kann dann eines davon sein.
 
-## Aktueller Stand: M2.5 Professional Parity & Correctness
+## Aktueller Stand: KAL 0.3.0 · Unified Professional Shell
+
+Die 0.3er-Neuordnung führt eine verbindliche KAL-Shell ein. Die bisherigen Feature-Surfaces bleiben als fokussierte Aufgabenflächen erhalten, konkurrieren aber nicht mehr als parallele Homescreens miteinander. Die Startoberfläche besteht aus Home, Apps, Workspace, AI News, Tools und Settings; die Command Bar ist der zentrale lokale Eingang für Sprache, Suche und Launcher-Aktionen.
+
+Die AI-News-Seite ist als bewusster Quellenhub mit mehr als 20 Modell-, Produkt-, Open-Source-, Security- und Governance-Quellen angelegt. Sie öffnet ausgewählte Quellen im Browser und fügt dem Offline-Kern kein verstecktes Netzwerkrecht hinzu.
+
+Die folgenden M2.5/M2.6-Funktionen bleiben darunter aktiv:
 
 M2.5 vertieft den professionellen Alpha-Kern an den Stellen, an denen klassische Launcher-Parität und korrekte Android-Semantik im Alltag zählen:
 
@@ -41,7 +47,7 @@ M2.5 vertieft den professionellen Alpha-Kern an den Stellen, an denen klassische
 
 Der reproduzierbare M2.5-Vergleich bewertet KoSch, Pixel/Android 17 als Systemreferenz sowie Nova, Niagara, Smart Launcher, Microsoft Launcher und Lawnchair in **100 Kategorien von 0,1 bis 10,0**. Zusätzlich werden **25 simulierte Fachperspektiven** berechnet; sie sind keine tatsächlich befragten Personen.
 
-- KoSch M2.5: **8,2/10 allgemein**
+- KoSch M2.5-Basisstand: **8,2/10 allgemein**
 - Mittel der 25 Fachperspektiven: **8,1/10**
 - Rang in dieser breiten Matrix: **2**
 - Zielwert über 9,5: **nicht erreicht**
@@ -66,16 +72,16 @@ Voraussetzungen: JDK 17, Android SDK 36 und Android Studio/AGP 8.13.
 
 Die lokale Debug-APK liegt unter `app/build/outputs/apk/debug/app-debug.apk`. Ein grüner GitHub-Actions-Lauf veröffentlicht das Artefakt `kosch-ai-launcher-m2.5-debug` mit:
 
-- `KoSch-AI-Launcher-M2.5-debug.apk`
-- `KoSch-AI-Launcher-M2.5-debug.apk.sha256`
+- `KAL-AI-Launcher-0.3.0-alpha01-debug.apk`
+- `KAL-AI-Launcher-0.3.0-alpha01-debug.apk.sha256`
 
 ## Sicher testen
 
 1. APK zuerst auf Emulator oder Zweitgerät installieren.
-2. Einführung durchlaufen und KoSch öffnen.
+2. Einführung durchlaufen und KAL öffnen.
 3. Optional **Android-Start-App auswählen** verwenden.
 4. **Kontrollzentrum → Sicherheitsausgang** testen.
-5. KoSch dort jederzeit durch einen anderen Launcher ersetzen.
+5. KAL dort jederzeit durch einen anderen Launcher ersetzen.
 
 Telefon, Dateien, Kontakte, Sprache, Widgets, Deinstallation und Systemeinstellungen öffnen sichtbare Android-System- oder App-Oberflächen. KoSch simuliert keine Berührungen und übernimmt weder Notruf- noch vollständige Dialer-/Dateisystemrechte.
 
@@ -98,7 +104,7 @@ Telefon, Dateien, Kontakte, Sprache, Widgets, Deinstallation und Systemeinstellu
 ## Technischer Rahmen
 
 - Package: `cloud.kosch.aiandroid`
-- Version: `0.2.5-alpha01` (Version Code 7)
+- Version: `0.3.0-alpha01` (Version Code 8)
 - minSdk 29, targetSdk/compileSdk 36
 - Kotlin 2.3, Jetpack Compose, Material 3
 - Gradle 8.13, Android Gradle Plugin 8.13
