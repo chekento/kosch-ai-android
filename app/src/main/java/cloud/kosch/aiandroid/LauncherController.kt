@@ -663,7 +663,7 @@ class LauncherController(context: Context) {
     fun completeOnboarding() {
         store.completeOnboarding()
         onboardingVisible = false
-        notice = "KoSch ist bereit – der lokale Kern bleibt ohne API aktiv"
+        notice = "KAL ist bereit – der lokale Kern bleibt ohne API aktiv"
     }
 
     fun reopenOnboarding() {
@@ -1354,7 +1354,7 @@ class LauncherController(context: Context) {
                 notice = if (isDefaultHome) {
                     "Arbeitsprofil konnte nicht geändert werden"
                 } else {
-                    "KoSch muss aktive Start-App sein, um das Arbeitsprofil zu pausieren"
+                    "KAL muss aktive Start-App sein, um das Arbeitsprofil zu pausieren"
                 }
             }
     }
@@ -1555,6 +1555,13 @@ class LauncherController(context: Context) {
 
     fun postNotice(message: String) {
         notice = message
+    }
+
+    /** Opens an explicitly selected external destination without adding a network dependency to KAL. */
+    fun openExternalUrl(url: String, label: String = "Ziel") {
+        openWeb(url)
+            .onSuccess { notice = "$label im Browser geöffnet" }
+            .onFailure { notice = "$label konnte nicht geöffnet werden" }
     }
 
     private fun launchBestMatch(query: String) {
