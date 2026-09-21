@@ -353,7 +353,7 @@ fun AssistantControlCenter(
                     )
                 } else {
                     Text(
-                        "Keine Kamera-Session aktiv. KoSch hält keine Kamera im Hintergrund offen.",
+                        "Keine Kamera-Session aktiv. KAL hält keine Kamera im Hintergrund offen.",
                         color = MutedMist,
                         style = MaterialTheme.typography.bodySmall,
                     )
