@@ -15,7 +15,7 @@ import cloud.kosch.aiandroid.model.AssistantVoiceGender
 object AssistantCharacterCatalog {
     private val defaultProfile = AssistantCharacterProfile(
         id = "default",
-        displayName = "KoSch Default",
+        displayName = "KAL Default",
         assetPackId = "default",
         personaProfileId = "kosch_balanced",
         voiceProfileId = "neutral_default",
