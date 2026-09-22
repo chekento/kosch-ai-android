@@ -123,8 +123,9 @@ fun DragDropWorkspaceHomeScreen(
     }
 }
 
+/** Shared full-screen workspace editor used by the KAL shell and the legacy compatibility surface. */
 @Composable
-private fun WorkspaceArrangeDialog(
+fun WorkspaceArrangeDialog(
     controller: LauncherController,
     home: WorkspaceHomeController,
     onDismiss: () -> Unit,
