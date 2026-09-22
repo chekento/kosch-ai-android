@@ -44,6 +44,7 @@ import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.CloudOff
 import androidx.compose.material.icons.rounded.CreateNewFolder
 import androidx.compose.material.icons.rounded.DeleteOutline
+import androidx.compose.material.icons.rounded.DragIndicator
 import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.GridView
@@ -244,6 +245,17 @@ fun KALLauncherShell(
         if (controller.commandFocusRequest > 0L) keyboardController?.show()
     }
 
+    // Keep the legacy HOME contract as a compatibility bridge for keyboard shortcuts,
+    // persisted launcher state and existing integrations. The visible product remains the
+    // single KAL shell; old page changes simply land in the corresponding KAL section.
+    LaunchedEffect(controller.homePage) {
+        sectionName = when (controller.homePage) {
+            HomePage.WORKSPACE -> KALSection.WORKSPACE.name
+            HomePage.PEN_SPACE -> KALSection.PEN_SPACE.name
+            HomePage.PRO_DESK, HomePage.SMART_SPACE -> KALSection.HOME.name
+        }
+    }
+
     val submitCommand = {
         val text = command.trim()
         if (text.isNotEmpty()) {
@@ -254,6 +266,11 @@ fun KALLauncherShell(
     }
     val navigate: (KALSection) -> Unit = { target ->
         controller.closeTopSurface()
+        when (target) {
+            KALSection.WORKSPACE -> controller.switchHomePage(HomePage.WORKSPACE)
+            KALSection.PEN_SPACE -> controller.switchHomePage(HomePage.PEN_SPACE)
+            else -> Unit
+        }
         sectionName = target.name
     }
 
@@ -991,6 +1008,7 @@ private fun KALWorkspaceSection(
 ) {
     val page = home.activePage
     var addVisible by androidx.compose.runtime.remember { mutableStateOf(false) }
+    var arrangeVisible by androidx.compose.runtime.remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -998,6 +1016,11 @@ private fun KALWorkspaceSection(
                 Text("Persönliche Seiten, Apps und Ordner", color = MutedMist, style = MaterialTheme.typography.bodySmall)
             }
             IconButton(onClick = { addVisible = true }) { Icon(Icons.Rounded.Add, contentDescription = "Workspace-Element hinzufügen") }
+            AssistChip(
+                onClick = { arrangeVisible = true },
+                label = { Text("Anordnen") },
+                leadingIcon = { Icon(Icons.Rounded.DragIndicator, contentDescription = null) },
+            )
             IconButton(onClick = pageDialog) { Icon(Icons.Rounded.Edit, contentDescription = "Workspace-Seiten verwalten") }
         }
         LazyRow(horizontalArrangement = Arrangement.spacedBy(7.dp), contentPadding = PaddingValues(vertical = 10.dp)) {
@@ -1041,6 +1064,13 @@ private fun KALWorkspaceSection(
             onDismiss = { addVisible = false },
         )
     }
+    if (arrangeVisible) {
+        WorkspaceArrangeDialog(
+            controller = controller,
+            home = home,
+            onDismiss = { arrangeVisible = false },
+        )
+    }
 }
 
 @Composable
@@ -1052,7 +1082,7 @@ private fun WorkspaceItemRow(controller: LauncherController, home: WorkspaceHome
     when (val content = item.content) {
         is WorkspaceItemContent.App -> {
             val app = controller.apps.firstOrNull { it.key == content.appKey }
-            title = app?.label ?: "App nicht verfügbar"
+            title = app?.label ?: "App fehlt"
             subtitle = app?.profile?.title ?: "App"
             icon = Icons.Rounded.Apps
             action = { app?.let(controller::launch) }
