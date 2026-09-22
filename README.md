@@ -10,11 +10,12 @@ The product target is ambitious; the current quality claim is deliberately modes
 
 ## Download the test APK
 
-The workflow page is the stable download entry. Open the latest successful **Test, lint and build** run and download the APK together with its `.sha256` checksum. GitHub may require sign-in for Actions artifacts.
+The verified `0.3.0-alpha01` artifact is available directly for the current PR build; the workflow page remains the stable entry for future builds. Download the APK together with its `.sha256` checksum. GitHub may require sign-in for Actions artifacts.
 
-[![Download KAL APK](docs/assets/kal-apk-download.svg)](https://github.com/chekento/kosch-ai-android/actions/workflows/android.yml)
+[![Download KAL APK](docs/assets/kal-apk-download.svg)](https://github.com/chekento/kosch-ai-android/actions/runs/35796850880/artifacts/10724995627)
 
-- [Open the latest retained APK and checksum](https://github.com/chekento/kosch-ai-android/actions/workflows/android.yml)
+- [Download verified 0.3.0-alpha01 APK and checksum](https://github.com/chekento/kosch-ai-android/actions/runs/35796850880/artifacts/10724995627)
+- [Open the future/latest workflow entry](https://github.com/chekento/kosch-ai-android/actions/workflows/android.yml)
 - [Open the version archive](docs/VERSIONS.md)
 - [Read the disclaimer before installing](docs/DISCLAIMER.md)
 
