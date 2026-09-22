@@ -100,18 +100,18 @@ jobs:
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
-          name: kosch-ai-launcher-m2.5-debug
+          name: kal-ai-launcher-0.3.0-alpha01-debug
           path: dist/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 90
 
       - name: Upload instrumentation package
         uses: actions/upload-artifact@v4
         with:
-          name: kosch-ai-launcher-instrumentation
+          name: kal-ai-launcher-instrumentation
           path: dist-instrumentation/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 90
 
   instrumented-api36:
     name: Instrumented tests · API 36 AOSP
@@ -161,4 +161,4 @@ jobs:
             app/build/reports/androidTests/managedDevice/
             app/build/outputs/androidTest-results/managedDevice/
           if-no-files-found: warn
-          retention-days: 30
+          retention-days: 90
