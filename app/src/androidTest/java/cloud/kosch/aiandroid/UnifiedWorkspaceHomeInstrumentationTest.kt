@@ -42,37 +42,36 @@ class UnifiedWorkspaceHomeInstrumentationTest {
 
             assertTextPresent("API36 Home Test")
             composeTestRule
-                .onNodeWithText("V7 HOME · frei platzierbar", useUnmergedTree = true)
+                .onNodeWithText("Persönliche Seiten, Apps und Ordner", useUnmergedTree = true)
                 .fetchSemanticsNode()
             composeTestRule
                 .onNodeWithText("App fehlt", useUnmergedTree = true)
                 .fetchSemanticsNode()
             composeTestRule
-                .onNodeWithContentDescription("App, Ordner oder Seite hinzufügen", useUnmergedTree = true)
+                .onNodeWithContentDescription("Workspace-Element hinzufügen", useUnmergedTree = true)
                 .fetchSemanticsNode()
 
             val assistantNodes = composeTestRule
-                .onAllNodesWithContentDescription("KoSch Assistant einrichten", useUnmergedTree = true)
+                .onAllNodesWithContentDescription("KAL Assistant einrichten", useUnmergedTree = true)
                 .fetchSemanticsNodes() + composeTestRule
-                .onAllNodesWithContentDescription("KoSch Assistant öffnen", useUnmergedTree = true)
+                .onAllNodesWithContentDescription("KAL Assistant öffnen", useUnmergedTree = true)
                 .fetchSemanticsNodes()
             assertTrue("Expected Assistant companion on unified Home", assistantNodes.isNotEmpty())
 
             composeTestRule
-                .onNodeWithContentDescription("Alle Apps", useUnmergedTree = true)
+                .onNodeWithContentDescription("Apps", useUnmergedTree = true)
                 .performClick()
             composeTestRule.waitForIdle()
 
             val openDrawerViewModel = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
             assertEquals(HomePage.WORKSPACE, openDrawerViewModel.controller.homePage)
             composeTestRule
-                .onNodeWithText("App-Raum", useUnmergedTree = true)
+                .onNodeWithText("LauncherApps · profilbewusst · lokal sortiert", useUnmergedTree = true)
                 .fetchSemanticsNode()
 
-            composeTestRule.runOnUiThread {
-                ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
-                    .controller.closeDrawer()
-            }
+            composeTestRule
+                .onNodeWithContentDescription("Workspace", useUnmergedTree = true)
+                .performClick()
             composeTestRule.waitForIdle()
             assertTextPresent("API36 Home Test")
 
