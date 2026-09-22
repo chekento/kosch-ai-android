@@ -59,18 +59,18 @@ class UnifiedWorkspaceHomeInstrumentationTest {
             assertTrue("Expected Assistant companion on unified Home", assistantNodes.isNotEmpty())
 
             composeTestRule
-                .onNodeWithContentDescription("Apps", useUnmergedTree = true)
+                .onNodeWithContentDescription("KAL Apps öffnen", useUnmergedTree = true)
                 .performClick()
             composeTestRule.waitForIdle()
 
             val openDrawerViewModel = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
             assertEquals(HomePage.WORKSPACE, openDrawerViewModel.controller.homePage)
             composeTestRule
-                .onNodeWithText("LauncherApps · profilbewusst · lokal sortiert", useUnmergedTree = true)
+                .onNodeWithText("App oder Anbieter suchen", useUnmergedTree = true)
                 .fetchSemanticsNode()
 
             composeTestRule
-                .onNodeWithContentDescription("Workspace", useUnmergedTree = true)
+                .onNodeWithContentDescription("KAL Workspace öffnen", useUnmergedTree = true)
                 .performClick()
             composeTestRule.waitForIdle()
             assertTextPresent("API36 Home Test")
