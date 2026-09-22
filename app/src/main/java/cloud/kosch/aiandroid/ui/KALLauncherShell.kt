@@ -636,7 +636,7 @@ private fun KALNavItem(item: KALSection, selected: Boolean, onClick: () -> Unit,
                 role = Role.Tab,
                 onClick = onClick,
             )
-            .semantics { contentDescription = item.label; role = Role.Tab },
+            .semantics { contentDescription = "KAL ${item.label} öffnen"; role = Role.Tab },
         color = if (selected) Mint.copy(alpha = 0.16f) else Color.Transparent,
         shape = RoundedCornerShape(14.dp),
     ) {
