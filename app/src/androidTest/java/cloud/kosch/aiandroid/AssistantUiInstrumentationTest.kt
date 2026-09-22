@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -22,16 +23,12 @@ class AssistantUiInstrumentationTest {
         dismissOnboardingIfVisible()
         openAssistant()
 
-        composeTestRule
-            .onNodeWithText("KoSch Assistant", useUnmergedTree = true)
-            .fetchSemanticsNode()
+        assertTextPresent("KAL Assistant")
 
         composeTestRule.activityRule.scenario.recreate()
         composeTestRule.waitForIdle()
 
-        composeTestRule
-            .onNodeWithText("KoSch Assistant", useUnmergedTree = true)
-            .fetchSemanticsNode()
+        assertTextPresent("KAL Assistant")
     }
 
     @Test
@@ -58,15 +55,15 @@ class AssistantUiInstrumentationTest {
 
     private fun openAssistant() {
         val setupNodes = composeTestRule
-            .onAllNodesWithContentDescription("KoSch Assistant einrichten", useUnmergedTree = true)
+            .onAllNodesWithContentDescription("KAL Assistant einrichten", useUnmergedTree = true)
             .fetchSemanticsNodes()
         if (setupNodes.isNotEmpty()) {
             composeTestRule
-                .onNodeWithContentDescription("KoSch Assistant einrichten", useUnmergedTree = true)
+                .onNodeWithContentDescription("KAL Assistant einrichten", useUnmergedTree = true)
                 .performClick()
         } else {
             composeTestRule
-                .onNodeWithContentDescription("KoSch Assistant öffnen", useUnmergedTree = true)
+                .onNodeWithContentDescription("KAL Assistant öffnen", useUnmergedTree = true)
                 .performClick()
         }
         composeTestRule.waitForIdle()
@@ -82,5 +79,12 @@ class AssistantUiInstrumentationTest {
                 .performClick()
             composeTestRule.waitForIdle()
         }
+    }
+
+    private fun assertTextPresent(text: String) {
+        val nodes = composeTestRule
+            .onAllNodesWithText(text, useUnmergedTree = true)
+            .fetchSemanticsNodes()
+        assertTrue("Expected at least one node containing '$text'", nodes.isNotEmpty())
     }
 }

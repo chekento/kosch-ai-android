@@ -127,9 +127,9 @@ fun ColumnScope.SecurityNetworkCenterHost(
                     )
                     Text(
                         if (conflictState == VpnConflictState.ACTIVE_VPN_DETECTED) {
-                            "Android erlaubt nur einer App gleichzeitig die VPN-Autorisierung. Eine KoSch-Freigabe kann die bestehende VPN-Verbindung beenden. N1 startet selbst trotzdem keinen Tunnel."
+                            "Android erlaubt nur einer App gleichzeitig die VPN-Autorisierung. Eine KAL-Freigabe kann die bestehende VPN-Verbindung beenden. N1 startet selbst trotzdem keinen Tunnel."
                         } else {
-                            "KoSch konnte nicht sicher feststellen, ob bereits ein VPN aktiv ist. Der Android-Freigabedialog wird deshalb erst nach zusätzlicher Bestätigung geöffnet."
+                            "KAL konnte nicht sicher feststellen, ob bereits ein VPN aktiv ist. Der Android-Freigabedialog wird deshalb erst nach zusätzlicher Bestätigung geöffnet."
                         },
                         color = MutedMist,
                         style = MaterialTheme.typography.bodySmall,
@@ -160,9 +160,9 @@ fun ColumnScope.SecurityNetworkCenterHost(
             text = {
                 Text(
                     if (conflictState == VpnConflictState.ACTIVE_VPN_DETECTED) {
-                        "Wenn du im folgenden Android-Dialog KoSch als VPN-App autorisierst, kann Android einer bisher autorisierten VPN-App das Recht entziehen und deren Verbindung beenden. KoSch aktiviert in N1 danach noch keinen VPN-Tunnel."
+                        "Wenn du im folgenden Android-Dialog KAL als VPN-App autorisierst, kann Android einer bisher autorisierten VPN-App das Recht entziehen und deren Verbindung beenden. KAL aktiviert in N1 danach noch keinen VPN-Tunnel."
                     } else {
-                        "KoSch kann einen vorhandenen VPN-Konflikt nicht ausschließen. Öffne Androids VPN-Freigabe nur, wenn du akzeptierst, dass eine andere VPN-Autorisierung dadurch ersetzt werden kann."
+                        "KAL kann einen vorhandenen VPN-Konflikt nicht ausschließen. Öffne Androids VPN-Freigabe nur, wenn du akzeptierst, dass eine andere VPN-Autorisierung dadurch ersetzt werden kann."
                     },
                 )
             },

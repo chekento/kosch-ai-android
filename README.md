@@ -1,105 +1,193 @@
-# KoSch AI Android
+# KAL – KoSch AI Launcher
 
-KoSch ist ein nativer, local-first Android-Launcher für professionelle Nutzer: eine belastbare HOME-Shell, ein programmierbarer Workspace und eine sichere KI-Orchestrierung statt eines starren App-Rasters. Der Kern funktioniert **beim ersten Start offline – ohne Konto, API-Schlüssel oder Modell-Download**. KI liegt unter Suche, Kontext, Dateien, Aktionen und Layout; App-Start, Telefon, Dateien, Widgets, Einstellungen und der Sicherheitsausgang bleiben auch ohne Modell verfügbar.
+> **Development warning · test only · not beta:** KAL `0.3.0-alpha01` is an early development snapshot and is not even at beta stage. It is not a production launcher. Install it only on a test device or emulator, keep a second launcher available and back up anything important.
 
-LCARS ist bewusst kein Kernbestandteil. Themes sollen später als austauschbare Programme entstehen; LCARS kann dann eines davon sein.
+KAL is a native Android launcher built around one calm, professional shell: a local Command Center, searchable Apps, persistent Workspace pages, an explicit AI News source hub, practical Tools, Pen Space and Settings. The offline core works without an account, API key or model download. Assistant, screen awareness and camera awareness are opt-in and disabled by default.
 
-## Aktueller Stand: M2.5 Professional Parity & Correctness
+The product target is ambitious; the current quality claim is deliberately modest. This repository contains a usable development build, not a promise that KAL is “the best launcher ever” or ready for daily use.
 
-M2.5 vertieft den professionellen Alpha-Kern an den Stellen, an denen klassische Launcher-Parität und korrekte Android-Semantik im Alltag zählen:
+[![Android CI](https://github.com/chekento/kosch-ai-android/actions/workflows/android.yml/badge.svg?branch=main)](https://github.com/chekento/kosch-ai-android/actions/workflows/android.yml) [![Version](https://img.shields.io/badge/version-0.3.0--alpha01-7bf2ca)](docs/VERSIONS.md) [![License](https://img.shields.io/badge/license-Apache--2.0-4ac8f5)](LICENSE)
 
-- echte HOME-Rolle sowie dauerhaft erreichbare Android-Start-App-Auswahl als Sicherheitsausgang;
-- profilbewusster App-Katalog mit `LauncherApps`, stabilen User-Seriennummern, Work-Badges und Migration alter App-Schlüssel;
-- lokaler App-Raum mit Suche, Smart-/A–Z-/Häufig-/Zuletzt-Sortierung, erklärbarem lokalen Nutzungsranking, Reset und eigener Ansicht für verborgene Apps;
-- sicherer App-Aktionsraum für Start, Shortcuts, App-Info, Store, Dock, Ordner, Sichtbarkeit und Androids Deinstallationsdialog;
-- profilbezogene App-Info und Deinstallationsanfrage für genau das gewählte persönliche oder Arbeitsprofil;
-- Arbeitsprofil-Pause/-Aktivierung über Androids geschützten Quiet Mode mit sichtbarem Status und kontrolliert abgelehnten Starts pausierter Work-Apps;
-- Pro Desk als professioneller Standardbereich mit HOME-, Work-, Audit- und Local-Core-Lage;
-- zwei Home-Räume, fünf Szenen, frei verschiebbare Karten, Preview/Apply/Discard/Undo, Smart Dock und lokale Smart-Ordner;
-- eigene persistente Ordner mit Erstellen, Umbenennen, Add/Remove, App-Reihenfolge und klaren Grenzen sowie steuerbare Dock-Pin-Reihenfolge;
-- echtes `AppWidgetHost`-Board mit Provider-Konfiguration, Größenpresets, Reihenfolge, Undo, Persistenz und Cleanup;
-- Telefon über `ACTION_DIAL` sowie einmalige Kontaktauswahl ohne `READ_CONTACTS`;
-- Nachrichten, Kalender, Wecker und Kamera über dokumentierte Android-Verträge ohne überbreite Rechte;
-- einzelne read-only Dateiinspektion und ein zusätzlicher, **vom Nutzer gewählter SAF-Datei-Arbeitsraum**;
-- Navigation, Suche, Sortierung, lokale Metadatenanalyse, Duplikatnamenshinweise, größte Dateien, Ordnererstellung, Rename mit Undo und separat bestätigtes Löschen – ausschließlich innerhalb des gewählten Dokumentbaums;
-- getrennte Datei-Mutations-, Audit- und Refresh-Semantik: bestätigte Änderungen bleiben erfolgreich, nach Flächenschluss auditiert und im aktuellen Verzeichnis verankert;
-- Kontrollzentrum für HOME, WLAN, Bluetooth, Meldungen, Hintergrund, Anzeige, Ton, Akku, Datenschutz, Accessibility, Standard-Apps, Speicher und Widgets;
-- Hardware-Tastatursteuerung, Android-Shortcut-Hilfe und Escape-Recovery;
-- generische Smartpen-Erkennung mit Druck, Neigung, Orientierung, Hover, Radierer, Tasten und Live-Gerätewechsel;
-- Pen Space mit lokalen Vektorstrichen, Stift/Marker/Radierer, Undo/Clear/Autosave, SVG-Export und endpoint-erhaltendem Resampling sehr langer Striche;
-- Android-14+-Systemnotiz mit Stylus-Modus bei erkanntem Smartpen und Pen Space als ehrlichem Fallback;
-- Activity-unabhängiger `LauncherViewModel`; begrenzte Exportdaten werden hinter einem Saved-State-Einmaltoken in privaten No-Backup-Dateien wiederaufnehmbar gehalten;
-- portables Workspace-Backup mit PBKDF2-HMAC-SHA-256, AES-256-GCM, Restore-Dry-Run, strikter Validierung und zweiter Bestätigung;
-- metadatenarmes Audit ohne Freitext, maximal 250 Ereignisse/90 Tage, CSV-Export und vollständige Löschung;
-- Notification Dots als separates Android-Opt-in, ohne Speicherung von Titel, Text, Personen oder Aktionen;
-- Dynamic Color, adaptive Split-Shell, edge-to-edge, Reduced Motion und explizite Accessibility-Semantik einschließlich Pen-Custom-Actions;
-- 57 lokale, kategorisierte FAQ-Einträge;
-- PocketPal AI, ChatterUI und Maid als freie/Open-Source-Übergabeziele sowie eine vorbereitete Runtime-Grenze für llama.cpp, LiteRT-LM und MLC LLM;
-- Unit-Tests, Android Lint, Debug-/minifizierter Release-Build, Quell- und APK-Berechtigungsbudget, Baseline-Profil und APK-Prüfsumme in modernisierten GitHub Actions.
+## Download the test APK
 
-## Ehrliche Qualitätslage
+The verified `0.3.0-alpha01` artifact is available directly for the current PR build; the workflow page remains the stable entry for future builds. Download the APK together with its `.sha256` checksum. GitHub may require sign-in for Actions artifacts.
 
-Der reproduzierbare M2.5-Vergleich bewertet KoSch, Pixel/Android 17 als Systemreferenz sowie Nova, Niagara, Smart Launcher, Microsoft Launcher und Lawnchair in **100 Kategorien von 0,1 bis 10,0**. Zusätzlich werden **25 simulierte Fachperspektiven** berechnet; sie sind keine tatsächlich befragten Personen.
+[![Download KAL APK](docs/assets/kal-apk-download.svg)](https://github.com/chekento/kosch-ai-android/actions/runs/35796850880/artifacts/10724995627)
 
-- KoSch M2.5: **8,2/10 allgemein**
-- Mittel der 25 Fachperspektiven: **8,1/10**
-- Rang in dieser breiten Matrix: **2**
-- Zielwert über 9,5: **nicht erreicht**
+- [Download verified 0.3.0-alpha01 APK and checksum](https://github.com/chekento/kosch-ai-android/actions/runs/35796850880/artifacts/10724995627)
+- [Open the future/latest workflow entry](https://github.com/chekento/kosch-ai-android/actions/workflows/android.yml)
+- [Open the version archive](docs/VERSIONS.md)
+- [Read the disclaimer before installing](docs/DISCLAIMER.md)
 
-Der Fortschritt von M2.4 (8,1/7,9) ist durch konkrete Quellcode-, Test- und CI-Deltas begründet. Für 9,5 fehlen weiterhin reale OEM-/Foldable-/Stylus-Labs, TalkBack/Switch-Access/200-%-Abnahme, gespeicherte Macrobenchmarks, vollständige Widget-/Launcher-Parität, Release-Signing/SBOM, Lokalisierung und unabhängige Security-Prüfung. Zahlen werden nicht auf das Ziel hochgesetzt.
+## What makes KAL different
 
-## Was „lokale KI“ in M2.5 bedeutet
+| 🧭 | Focus | Benefit |
+|---|---|---|
+| ✦ | **One professional shell** | Home, Apps, Workspace, AI News, Tools, Pen Space and Settings share one understandable information architecture. |
+| 🧠 | **Local Command Center** | Local app/system routes remain useful even without a model or network. External hand-offs are explicit. |
+| 🧩 | **Workspace pages** | Personal pages, folders and items are arranged intentionally instead of competing as several hidden home modes. |
+| 🛡️ | **Consent-first Assistant** | Assistant, Screen Awareness and Camera Awareness are off until the user opts in. |
+| 📰 | **AI News with primary sources** | Research, product, governance and security links are grouped and opened consciously in the browser. |
+| ✒️ | **Pen Space** | Stylus ink, system-note route and optional export stay in a focused surface. |
+| ♻️ | **Recovery is a feature** | HOME selection, backup/restore, audit export, undo paths and a visible security exit remain reachable. |
 
-`KoSch Local Core` ist sofort aktiv und deterministisch. Er plant deutsche und englische Befehle, rankt Apps mit transparenten lokalen Startsignalen, bewertet Kontext, schlägt Szenen/Dock/Ordner/Layout vor und analysiert ausgewählte Dateimetadaten. Er hat keine autonomen Android-Rechte: schreibende oder destruktive Aktionen laufen über feste Capabilities, Vorschau, Bestätigung und – wo technisch ehrlich möglich – Undo.
+## See the current launcher
 
-Ein generatives LLM ist noch nicht ungefragt in der APK gebündelt. Modellgröße, RAM, Thermik, Beschleunigung und Lizenz unterscheiden sich zu stark. Ein späterer optionaler Modell-Pack muss in einer getrennten Service-/Prozessgrenze laufen; der Local Core bleibt Fallback.
+These five product UI images document the current KAL shell. They are versioned SVG assets so GitHub, the website and future release notes show the same interface without blurred screenshots.
 
-Direkte Cloud-APIs sind deaktiviert. Die App besitzt kein eigenes `INTERNET`-Recht. Der vorbereitete Keystore-Vault und die HTTPS-/Loopback-Policy sind Sicherheitsgrenzen für einen späteren, separaten Netzwerk-Flavour – keine versteckte Verbindung.
+| Home | Apps |
+|---|---|
+| ![KAL Home with Command Center](docs/assets/kal-home.svg) | ![KAL Apps grid](docs/assets/kal-apps.svg) |
+| Workspace | AI News |
+|---|---|
+| ![KAL Workspace pages](docs/assets/kal-workspace.svg) | ![KAL AI News source hub](docs/assets/kal-ai-news.svg) |
 
-## Bauen
+### Pen Space
 
-Voraussetzungen: JDK 17, Android SDK 36 und Android Studio/AGP 8.13.
+![KAL Pen Space](docs/assets/kal-pen-space.svg)
+
+### App icon and launcher logo
+
+![KAL app icon](docs/assets/kal-icon.svg)
+
+### Product banners
+
+![KAL local-first banner](docs/assets/kal-banner-local-first.svg)
+
+![KAL professional shell banner](docs/assets/kal-banner-professional-shell.svg)
+
+![KAL consent-first privacy banner](docs/assets/kal-banner-privacy.svg)
+
+## Feature map
+
+### Home and Command Center
+
+- Calm start screen with one local command field and clear next actions.
+- App launch, phone, camera, calendar, file inspection, contact and widget routes remain available without an LLM.
+- Local context can show time, battery, network and a suggested scene without pretending to be autonomous intelligence.
+- Smart Dock, folders and personal Workspace stay visible instead of being hidden behind a mode switch.
+
+### Apps
+
+- `LauncherApps` catalog with search, profile-aware labels, work badges and deterministic local ranking.
+- Smart collections for all, work, communication, media, system and frequently/last-used routes.
+- Long-press actions for launch, app info, store, Dock, folder, visibility and Android's own uninstall flow.
+- Paused work apps stay visibly paused and are not silently launched.
+
+### Workspace
+
+- Persistent user pages with create, rename, reorder, delete and explicit arrange controls.
+- Apps and folders can be added as portable Workspace items.
+- Scene pages remain protected; user-created pages remain editable.
+- Backup, restore, validation and undo boundaries keep the surface recoverable.
+
+### Assistant and awareness
+
+- Assistant entry is opt-in and can remain disabled forever.
+- No API key, account or model download is needed for the offline core.
+- Screen and camera awareness are consent-first; no hidden always-on observation.
+- Capability routes use visible previews and confirmations for actions that leave KAL.
+
+### AI News, Tools and Pen Space
+
+- 23 named sources across models, research, open source, products, security and governance.
+- News links open in the external browser only after the user chooses them; the offline APK does not gain a hidden feed permission.
+- Tools group phone, files, widgets, calendar, camera, backups, audit, security and help.
+- Pen Space supports local vector ink, pen/marker/eraser, undo, autosave and optional SVG export.
+
+## Comparison with other Android launchers
+
+This is a **scope comparison**, not a neutral lab benchmark. `●` means the capability is a named part of the product's current public positioning or KAL's current implementation; `◐` means a related or narrower route exists; `—` means it is not a stated focus in this comparison. A dash never proves that a product cannot do something through Android, an add-on or a newer release. Features change; verify each vendor's current documentation before making a decision.
+
+| Launcher | 🧠 Command / AI | 🛡️ Local / privacy | 🧩 Workspace / pages | 🛠️ System / pro tools | ✒️ Pen / desktop | 📰 AI news / governance | 🎛️ Customizing | Short profile |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|---|
+| **KAL – KoSch AI** | ● | ● | ● | ● | ● | ● | ◐ | Unified local-first shell; current target and test build. |
+| Pixel Launcher | ◐ | ◐ | ◐ | ◐ | — | — | ◐ | Google/Pixel home experience and system integration. |
+| Samsung One UI Home | ◐ | ◐ | ◐ | ● | ◐ | — | ◐ | OEM launcher with device, widget and Galaxy integration. |
+| Nova Launcher | — | ◐ | ● | ◐ | — | — | ● | Deep layout and customization control. |
+| Niagara Launcher | ◐ | ● | ◐ | — | — | — | ◐ | Focused one-hand list and calm home philosophy. |
+| Microsoft Launcher | ◐ | ◐ | ◐ | ● | — | — | ◐ | Productivity and Microsoft-service oriented home. |
+| Lawnchair | — | ● | ◐ | ◐ | — | — | ◐ | Open-source, Pixel-inspired launcher direction. |
+| Smart Launcher 6 | ◐ | ◐ | ● | ◐ | — | — | ● | Automatic app organization and broad customization. |
+| POCO Launcher | — | ◐ | ◐ | ◐ | — | — | ◐ | Xiaomi/POCO-oriented app drawer and performance focus. |
+| Nothing Launcher | — | ◐ | ◐ | — | — | — | ◐ | Minimal Nothing device experience. |
+| Olauncher | — | ● | — | — | — | — | — | Text-first minimal, distraction-reducing home. |
+| Ratio | ◐ | ◐ | ◐ | — | — | — | ● | Productivity-oriented dashboard and visual organization. |
+| AIO Launcher | ◐ | ◐ | ◐ | ◐ | — | — | ◐ | Information-dense, widget-like home dashboard. |
+| KISS Launcher | — | ● | — | — | — | — | ◐ | Fast, text-driven open-source launcher. |
+| Before Launcher | — | ◐ | — | — | — | — | ◐ | Minimalist, notification-conscious home. |
+| Indistractable Launcher | — | ● | — | — | — | — | — | Distraction-free launcher positioning. |
+| Hyperion Launcher | — | ◐ | ● | ◐ | — | — | ● | Launcher3-based customization route. |
+| Total Launcher | — | ◐ | ● | ◐ | — | — | ● | Highly configurable layout and theming. |
+| Action Launcher | — | ◐ | ● | ◐ | — | — | ● | Pixel-inspired customization with shortcuts and panels. |
+| ASUS / ZenUI Launcher | — | ◐ | ◐ | ◐ | — | — | ◐ | OEM launcher and device utility integration. |
+| AOSP Launcher3 | — | ● | ◐ | — | — | — | — | Android reference launcher foundation. |
+
+### How to read the comparison
+
+KAL is not trying to win every customization contest or replace every OEM utility. Its differentiator is the combination of a calm shell, local-first command entry, persistent workspaces, opt-in assistant boundaries, a primary-source AI hub and a pen-capable surface. The trade-off is maturity: KAL is much earlier than the established launchers listed above.
+
+Public product starting points used for the positioning check: [Nova](https://novalauncher.com/), [Niagara](https://niagaralauncher.com/), [Microsoft Launcher](https://www.microsoft.com/en-us/launcher), [Lawnchair](https://lawnchair.app/), [KISS](https://kisslauncher.com/), [AOSP Launcher3](https://android.googlesource.com/platform/packages/apps/Launcher3/) and [Olauncher](https://www.olauncher.com/). This list is context, not an endorsement or a claim of feature completeness.
+
+## Build and test
+
+Requirements: JDK 17, Android SDK 36, Android Studio/AGP 8.13.
 
 ```bash
 ./gradlew testDebugUnitTest lintDebug assembleDebug assembleRelease
 ```
 
-Die lokale Debug-APK liegt unter `app/build/outputs/apk/debug/app-debug.apk`. Ein grüner GitHub-Actions-Lauf veröffentlicht das Artefakt `kosch-ai-launcher-m2.5-debug` mit:
+The local debug APK is `app/build/outputs/apk/debug/app-debug.apk`. The CI package contains:
 
-- `KoSch-AI-Launcher-M2.5-debug.apk`
-- `KoSch-AI-Launcher-M2.5-debug.apk.sha256`
+- `KAL-AI-Launcher-0.3.0-alpha01-debug.apk`
+- `KAL-AI-Launcher-0.3.0-alpha01-debug.apk.sha256`
 
-## Sicher testen
+The current offline manifest intentionally contains no `INTERNET` or `RECORD_AUDIO` permission. Android system surfaces, the external browser and installed apps retain their own behavior and data policies.
 
-1. APK zuerst auf Emulator oder Zweitgerät installieren.
-2. Einführung durchlaufen und KoSch öffnen.
-3. Optional **Android-Start-App auswählen** verwenden.
-4. **Kontrollzentrum → Sicherheitsausgang** testen.
-5. KoSch dort jederzeit durch einen anderen Launcher ersetzen.
+## Documentation and archive
 
-Telefon, Dateien, Kontakte, Sprache, Widgets, Deinstallation und Systemeinstellungen öffnen sichtbare Android-System- oder App-Oberflächen. KoSch simuliert keine Berührungen und übernimmt weder Notruf- noch vollständige Dialer-/Dateisystemrechte.
-
-## Dokumentation
-
-- [Architektur](docs/ARCHITECTURE.md)
-- [FAQ – Bedienung, Dateien, Smartpen, KI, Datenschutz und Recovery](docs/FAQ.md)
-- [KI-Usecases und Open-Source-Routen](docs/AI_USE_CASES.md)
-- [Sicherheit und Datenschutz](docs/SECURITY.md)
-- [Qualitätsgates](docs/QUALITY_GATES.md)
+- [Adaptive product portal](docs/index.html) — English by default; German when the browser language starts with `de`.
+- [Changelog](docs/CHANGELOG.md) · [adaptive Changelog](docs/changelog.html)
+- [Versions and APK archive](docs/VERSIONS.md) · [adaptive versions page](docs/versions.html)
+- [Disclaimer / Haftungsausschluss](docs/DISCLAIMER.md) · [adaptive disclaimer](docs/disclaimer.html)
+- [Architecture](docs/ARCHITECTURE.md)
+- [FAQ](docs/FAQ.md)
+- [Security and privacy](docs/SECURITY.md)
+- [Quality gates](docs/QUALITY_GATES.md)
 - [Roadmap](docs/ROADMAP.md)
-- [M2.5 Release Notes](docs/RELEASE_NOTES_M2_5.md)
-- [Strenges M2.5-Konkurrenzreview](docs/COMPETITOR_REVIEW_M2_5.md)
-- [7 Launcher × 100 Kategorien](docs/launcher_comparison_m2_5.csv)
-- [25 × 100 KoSch-Fachmatrix](docs/expert_scores_m2_5.csv)
-- [25 Rollen × 7 Launcher](docs/expert_launcher_overall_m2_5.csv)
-- [Formatierte M2.5-Benchmark-Arbeitsmappe](docs/launcher_benchmark_m2_5.xlsx)
-- Historie: [M2.4](docs/COMPETITOR_REVIEW_M2_4.md), [M2.3](docs/COMPETITOR_REVIEW_M2_3.md), [M2.2](docs/COMPETITOR_REVIEW_M2_2.md), [M2.1](docs/COMPETITOR_REVIEW_M2_1.md), [M2](docs/EXPERT_REVIEW_M2.md)
 
-## Technischer Rahmen
+## Deutsch
+
+KAL – KoSch AI Launcher ist eine native Android-Shell für professionelle Nutzer: Home, Apps, Workspace, AI News, Tools, Pen Space und Settings liegen in einer verständlichen Oberfläche. Der Offline-Kern funktioniert ohne Konto, API-Key oder Modelldownload. Assistant, Screen Awareness und Camera Awareness bleiben standardmäßig aus und werden nur per Opt-in aktiviert.
+
+Der aktuelle Stand `0.3.0-alpha01` ist **noch nicht einmal Beta**, sondern ein Teststand. Nur auf Testgeräten installieren, einen Fallback-Launcher bereithalten und wichtige Daten sichern. Der [Haftungsausschluss](docs/DISCLAIMER.md) ist vor der Installation zu lesen.
+
+Die vollständige zweisprachige Darstellung, fünf In-App-Ansichten, Icon, APK-Karte und drei Banner sind oben dokumentiert. Für die automatische Sprachauswahl nutzt du das [adaptive Portal](docs/index.html); GitHub-Markdown selbst führt kein JavaScript aus und bleibt daher zweisprachig mit Englisch zuerst.
+
+## Repository information / Repository-Informationen
+
+<details>
+<summary>Expand technical repository information</summary>
+
+### Technical frame
 
 - Package: `cloud.kosch.aiandroid`
-- Version: `0.2.5-alpha01` (Version Code 7)
-- minSdk 29, targetSdk/compileSdk 36
-- Kotlin 2.3, Jetpack Compose, Material 3
-- Gradle 8.13, Android Gradle Plugin 8.13
-- Lizenz: Apache-2.0
+- Product name: `KAL – KoSch AI Launcher`
+- Version: `0.3.0-alpha01` · Version Code `8`
+- minSdk `29` · targetSdk / compileSdk `36`
+- Kotlin `2.3` · Jetpack Compose · Material 3
+- Gradle `8.13` · Android Gradle Plugin `8.13`
+- License: Apache-2.0
+- Offline permission budget: `ACCESS_NETWORK_STATE`, `CAMERA`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PROJECTION`
+- Main source surface: `app/src/main/java/cloud/kosch/aiandroid/ui/KALLauncherShell.kt`
+- Legacy implementation remains below the shell as focused task surfaces and recovery paths.
+
+### Quality discipline
+
+The former M2.5 comparison scored the implementation at 8.2/10 overall and did not reach the 9.5 target. That score is not silently increased for the 0.3 shell. Real OEM, foldable, accessibility, stylus, performance, release-signing and independent security evidence are still outstanding.
+
+### Navigation and recovery
+
+KAL can be selected as Android HOME, but the control center keeps the Android default-home route and a visible security exit reachable. App uninstall, phone, files, widgets, calendar, camera and external links use Android's own contracts; KAL does not pretend to own the whole operating system.
+
+</details>

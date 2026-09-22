@@ -438,7 +438,7 @@ fun CompanionFace(
             launcherController?.postNotice("Diese TTS-Stimme konnte nicht aktiviert werden")
             false
         } else {
-            val sample = "Hallo. Ich bin dein KoSch Assistant. So klingt diese Stimme."
+            val sample = "Hallo. Ich bin dein KAL Assistant. So klingt diese Stimme."
             val utteranceId = "kosch-assistant-preview-${System.nanoTime()}"
             assistant?.speechQueued(utteranceId, sample)
             val result = runCatching {
@@ -477,7 +477,7 @@ fun CompanionFace(
             ttsEngine?.stop()
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_PROMPT, "Was möchtest du den KoSch Assistant fragen?")
+                putExtra(RecognizerIntent.EXTRA_PROMPT, "Was möchtest du den KAL Assistant fragen?")
             }
             runCatching { voiceLauncher.launch(intent) }
                 .onFailure {
@@ -494,9 +494,9 @@ fun CompanionFace(
         reducedMotion = effectiveReducedMotion,
         attentionSignal = assistant?.attentionSignal ?: AssistantAttentionSignal.Idle,
         contentDescription = if (assistant?.settings?.enabled == true) {
-            "KoSch Assistant öffnen"
+            "KAL Assistant öffnen"
         } else {
-            "KoSch Assistant einrichten"
+            "KAL Assistant einrichten"
         },
         onPointerAttention = { x, y, pressed -> assistant?.pointerAttention(x, y, pressed) },
         onActivate = { assistant?.attentionActivated() },

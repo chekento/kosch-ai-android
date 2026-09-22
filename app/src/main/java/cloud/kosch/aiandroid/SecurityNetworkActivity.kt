@@ -75,7 +75,7 @@ class SecurityNetworkActivity : ComponentActivity() {
                             Spacer(Modifier.width(6.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    "KoSch AI · Security",
+                                    "KAL · Security",
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.SemiBold,
                                 )
@@ -108,9 +108,9 @@ class SecurityNetworkActivity : ComponentActivity() {
                                 "N1 nutzt Androids VPN-Autorisierung, startet aber keinen aktiven Tunnel, " +
                                     "keine Paket- oder DNS-Inspektion, keine Firewall-Regeln, keinen Proxy, " +
                                     "keine Zertifikatsinstallation und keine Traffic-Historie. Android erlaubt " +
-                                    "nur einer App gleichzeitig die VPN-Autorisierung; eine KoSch-Freigabe kann " +
+                                    "nur einer App gleichzeitig die VPN-Autorisierung; eine KAL-Freigabe kann " +
                                     "deshalb eine andere VPN-App verdrängen. Bei erkanntem oder unklarem Konflikt " +
-                                    "verlangt KoSch vor dem Android-Dialog eine zusätzliche Bestätigung.",
+                                    "verlangt KAL vor dem Android-Dialog eine zusätzliche Bestätigung.",
                             )
                         },
                         confirmButton = {

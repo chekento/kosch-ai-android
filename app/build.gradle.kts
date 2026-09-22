@@ -12,8 +12,8 @@ android {
         applicationId = "cloud.kosch.aiandroid"
         minSdk = 29
         targetSdk = 36
-        versionCode = 7
-        versionName = "0.2.5-alpha01"
+        versionCode = 8
+        versionName = "0.3.0-alpha01"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables.useSupportLibrary = true

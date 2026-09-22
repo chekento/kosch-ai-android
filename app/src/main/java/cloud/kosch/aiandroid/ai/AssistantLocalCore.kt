@@ -25,7 +25,7 @@ class AssistantLocalCore(
 
         val normalized = raw.normalized()
         if (normalized in greetingPhrases) {
-            return AssistantLocalReply("Hallo. Ich bin dein optionaler KoSch-Assistent. Launcher-Befehle kann ich lokal ausführen; freie KI-Fragen übergebe ich nur nach deiner Auswahl.")
+            return AssistantLocalReply("Hallo. Ich bin dein optionaler KAL Assistant. Launcher-Befehle kann ich lokal ausführen; freie KI-Fragen übergebe ich nur nach deiner Auswahl.")
         }
         if (normalized in thanksPhrases) {
             return AssistantLocalReply("Gern.")
