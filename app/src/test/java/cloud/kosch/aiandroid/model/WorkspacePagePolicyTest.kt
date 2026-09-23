@@ -36,15 +36,15 @@ class WorkspacePagePolicyTest {
     }
 
     @Test
-    fun organize_keepsHomeThenUsersThenSystemSpaces_andOnlyRefreshesSystemTitles() {
+    fun organize_preservesPersonalLeftRightOrder_andMovesSystemSpacesBehindIt() {
         val document = WorkspaceDocument(
-            activePageId = "page:user:games",
+            activePageId = "page:user:left",
             pages = listOf(
-                WorkspacePage("page:scene:ai", "Old AI", 0, sceneAdapter = SceneId.AI),
-                WorkspacePage("page:user:games", "Games", 1),
+                WorkspacePage("page:user:left", "Links", 0),
+                WorkspacePage("page:scene:ai", "Old AI", 1, sceneAdapter = SceneId.AI),
                 WorkspacePage(WorkspaceDocument.DEFAULT_PAGE_ID, "Home", 2),
-                WorkspacePage("page:scene:work", "Old Work", 3, sceneAdapter = SceneId.WORK),
-                WorkspacePage("page:user:media", "Mein Media", 4),
+                WorkspacePage("page:user:right", "Rechts", 3),
+                WorkspacePage("page:scene:work", "Old Work", 4, sceneAdapter = SceneId.WORK),
             ),
         )
 
@@ -52,24 +52,24 @@ class WorkspacePagePolicyTest {
 
         assertEquals(
             listOf(
+                "page:user:left",
                 WorkspaceDocument.DEFAULT_PAGE_ID,
-                "page:user:games",
-                "page:user:media",
+                "page:user:right",
                 "page:scene:ai",
                 "page:scene:work",
             ),
             organized.pages.map { it.id },
         )
-        assertEquals("page:user:games", organized.activePageId)
+        assertEquals("page:user:left", organized.activePageId)
         assertEquals(organized.pages.indices.toList(), organized.pages.map { it.order })
-        assertEquals("Games", organized.pages.first { it.id == "page:user:games" }.title)
-        assertEquals("Mein Media", organized.pages.first { it.id == "page:user:media" }.title)
+        assertEquals("Links", organized.pages.first { it.id == "page:user:left" }.title)
+        assertEquals("Rechts", organized.pages.first { it.id == "page:user:right" }.title)
         assertEquals(SceneId.AI.title, organized.pages.first { it.id == "page:scene:ai" }.title)
         assertEquals(SceneId.WORK.title, organized.pages.first { it.id == "page:scene:work" }.title)
     }
 
     @Test
-    fun moveUserPage_neverMovesAcrossHomeOrSystemBoundary() {
+    fun userPage_canMoveAcrossHome_butSystemPagesStayOutsidePersonalStrip() {
         val document = WorkspaceDocument(
             activePageId = "page:user:media",
             pages = listOf(
@@ -80,16 +80,62 @@ class WorkspacePagePolicyTest {
             ),
         )
 
-        val moved = WorkspacePagePolicy.moveUserPage(document, "page:user:media", -1)
+        val once = WorkspacePagePolicy.moveUserPage(document, "page:user:media", -1)
+        val twice = WorkspacePagePolicy.moveUserPage(once, "page:user:media", -1)
 
         assertEquals(
             listOf(
-                WorkspaceDocument.DEFAULT_PAGE_ID,
                 "page:user:media",
+                WorkspaceDocument.DEFAULT_PAGE_ID,
                 "page:user:work",
                 "page:scene:ai",
             ),
-            moved.pages.map { it.id },
+            twice.pages.map { it.id },
+        )
+    }
+
+    @Test
+    fun placeUserPageAdjacent_supportsLeftAndRightOfProtectedHome() {
+        val document = WorkspaceDocument(
+            activePageId = WorkspaceDocument.DEFAULT_PAGE_ID,
+            pages = listOf(
+                WorkspacePage(WorkspaceDocument.DEFAULT_PAGE_ID, "Home", 0),
+                WorkspacePage("page:user:left", "Links", 1),
+                WorkspacePage("page:user:right", "Rechts", 2),
+                WorkspacePage("page:scene:ai", "AI", 3, sceneAdapter = SceneId.AI),
+            ),
+        )
+
+        val left = WorkspacePagePolicy.placeUserPageAdjacent(
+            document = document,
+            pageId = "page:user:left",
+            anchorPageId = WorkspaceDocument.DEFAULT_PAGE_ID,
+            direction = -1,
+        )
+        assertEquals(
+            listOf(
+                "page:user:left",
+                WorkspaceDocument.DEFAULT_PAGE_ID,
+                "page:user:right",
+                "page:scene:ai",
+            ),
+            left.pages.map { it.id },
+        )
+
+        val right = WorkspacePagePolicy.placeUserPageAdjacent(
+            document = left,
+            pageId = "page:user:right",
+            anchorPageId = WorkspaceDocument.DEFAULT_PAGE_ID,
+            direction = 1,
+        )
+        assertEquals(
+            listOf(
+                "page:user:left",
+                WorkspaceDocument.DEFAULT_PAGE_ID,
+                "page:user:right",
+                "page:scene:ai",
+            ),
+            right.pages.map { it.id },
         )
     }
 }
