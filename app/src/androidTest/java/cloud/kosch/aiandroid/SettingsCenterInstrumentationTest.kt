@@ -2,11 +2,11 @@ package cloud.kosch.aiandroid
 
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextClearance
-import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import cloud.kosch.aiandroid.model.HomePage
@@ -40,7 +40,8 @@ class SettingsCenterInstrumentationTest {
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithText("Finde schnell, was du ändern möchtest.", useUnmergedTree = true).fetchSemanticsNode()
-        val search = composeTestRule.onNodeWithText("Einstellungen durchsuchen", useUnmergedTree = true)
+        composeTestRule.onNodeWithText("Einstellungen durchsuchen", useUnmergedTree = true).fetchSemanticsNode()
+        val search = composeTestRule.onNode(hasSetTextAction(), useUnmergedTree = true)
         search.fetchSemanticsNode()
 
         // Expert/diagnostic areas do not dominate the first screen, but stay one search away.
@@ -50,15 +51,13 @@ class SettingsCenterInstrumentationTest {
                 .fetchSemanticsNodes()
                 .isEmpty(),
         ) { "Advanced diagnostics must not dominate the initial Settings Center view." }
-        // API 36 requires the text field to own focus before semantics text input is dispatched.
-        search.performClick()
-        composeTestRule.waitForIdle()
-        search.performTextInput("Erweitert")
+        // Address the editable node itself rather than its label; replacement uses the field's SetText semantics.
+        search.performTextReplacement("Erweitert")
         composeTestRule.waitForIdle()
         composeTestRule
             .onNodeWithText("Erweitert & Diagnose", useUnmergedTree = true)
             .fetchSemanticsNode()
-        search.performTextClearance()
+        search.performTextReplacement("")
         composeTestRule.waitForIdle()
 
         composeTestRule.onNodeWithText("Home & Raster", useUnmergedTree = true).performClick()
