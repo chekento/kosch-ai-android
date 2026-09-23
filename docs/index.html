@@ -46,13 +46,36 @@
       </div>
     </section>
 
-    <section><div data-lang="en"><h2>See the shell</h2><p>These are product UI previews, not decorative concept art. They document the current 0.3 alpha direction.</p></div><div data-lang="de"><h2>Die Shell im Bild</h2><p>Das sind UI-Produktansichten und keine reine Konzeptgrafik. Sie dokumentieren die aktuelle 0.3-Alpha-Richtung.</p></div>
-      <div class="gallery">
-        <figure><img src="assets/kal-home.svg" alt="KAL Home with Command Center"><figcaption data-lang="en">01 · Home — Command Center, Assistant status and local context</figcaption><figcaption data-lang="de">01 · Home — Command Center, Assistant-Status und lokaler Kontext</figcaption></figure>
-        <figure><img src="assets/kal-apps.svg" alt="KAL Apps grid"><figcaption data-lang="en">02 · Apps — local search, smart collections and profile labels</figcaption><figcaption data-lang="de">02 · Apps — lokale Suche, Smart Collections und Profilkennzeichnung</figcaption></figure>
-        <figure><img src="assets/kal-workspace.svg" alt="KAL Workspace pages"><figcaption data-lang="en">03 · Workspace — pages, protected scenes and arrange mode</figcaption><figcaption data-lang="de">03 · Workspace — Seiten, geschützte Szenen und Anordnen-Modus</figcaption></figure>
-        <figure><img src="assets/kal-ai-news.svg" alt="KAL AI News source hub"><figcaption data-lang="en">04 · AI News — official source categories and conscious browser hand-off</figcaption><figcaption data-lang="de">04 · AI News — offizielle Quellenkategorien und bewusste Browser-Übergabe</figcaption></figure>
-        <figure><img src="assets/kal-pen-space.svg" alt="KAL Pen Space canvas"><figcaption data-lang="en">05 · Pen Space — local ink, tools and optional export</figcaption><figcaption data-lang="de">05 · Pen Space — lokaler Ink, Werkzeuge und optionaler Export</figcaption></figure>
+    <section id="screenshots" class="screenshots-section">
+      <div data-lang="en"><h2>Launcher screenshots</h2><p>Large, store-style views of the current KAL shell. Swipe, use the mouse wheel or trackpad, tap the arrows, then open any card full-size.</p></div>
+      <div data-lang="de"><h2>Launcher-Screenshots</h2><p>Große Store-Ansichten der aktuellen KAL-Shell. Wischen, Mausrad oder Trackpad verwenden, Pfeile antippen und jedes Bild bei Bedarf in voller Größe öffnen.</p></div>
+
+      <div class="store-carousel-shell">
+        <button class="carousel-nav carousel-prev" type="button" aria-label="Previous screenshot">‹</button>
+        <div class="store-carousel" data-carousel tabindex="0" aria-label="KAL launcher screenshots">
+          <figure class="store-slide" data-slide><a class="screenshot-zoom" href="assets/screenshots/kal-store-01-home.svg"><img src="assets/screenshots/kal-store-01-home.svg" alt="KAL Command Center screenshot" loading="eager"></a></figure>
+          <figure class="store-slide" data-slide><a class="screenshot-zoom" href="assets/screenshots/kal-store-02-apps.svg"><img src="assets/screenshots/kal-store-02-apps.svg" alt="KAL Apps screenshot" loading="lazy"></a></figure>
+          <figure class="store-slide" data-slide><a class="screenshot-zoom" href="assets/screenshots/kal-store-03-workspace.svg"><img src="assets/screenshots/kal-store-03-workspace.svg" alt="KAL Workspace screenshot" loading="lazy"></a></figure>
+          <figure class="store-slide" data-slide><a class="screenshot-zoom" href="assets/screenshots/kal-store-04-ai-news.svg"><img src="assets/screenshots/kal-store-04-ai-news.svg" alt="KAL AI News screenshot" loading="lazy"></a></figure>
+          <figure class="store-slide" data-slide><a class="screenshot-zoom" href="assets/screenshots/kal-store-05-pen-space.svg"><img src="assets/screenshots/kal-store-05-pen-space.svg" alt="KAL Pen Space screenshot" loading="lazy"></a></figure>
+        </div>
+        <button class="carousel-nav carousel-next" type="button" aria-label="Next screenshot">›</button>
+      </div>
+      <div class="carousel-dots" aria-label="Screenshot position">
+        <button type="button" data-dot="0" aria-label="Screenshot 1"></button>
+        <button type="button" data-dot="1" aria-label="Screenshot 2"></button>
+        <button type="button" data-dot="2" aria-label="Screenshot 3"></button>
+        <button type="button" data-dot="3" aria-label="Screenshot 4"></button>
+        <button type="button" data-dot="4" aria-label="Screenshot 5"></button>
+      </div>
+      <p class="note" data-lang="en">Play-Store-style navigation: swipe on touch, scroll horizontally with wheel/trackpad, use the arrows or dots, and tap an image for full-size zoom.</p>
+      <p class="note" data-lang="de">Play-Store-artige Navigation: auf Touch wischen, mit Mausrad/Trackpad horizontal scrollen, Pfeile oder Punkte nutzen und ein Bild für die Vollansicht antippen.</p>
+
+      <div class="screenshot-lightbox" id="screenshot-lightbox" hidden aria-hidden="true">
+        <button class="lightbox-close" type="button" aria-label="Close full-size screenshot">×</button>
+        <button class="lightbox-nav lightbox-prev" type="button" aria-label="Previous full-size screenshot">‹</button>
+        <img src="" alt="Full-size KAL launcher screenshot">
+        <button class="lightbox-nav lightbox-next" type="button" aria-label="Next full-size screenshot">›</button>
       </div>
     </section>
 
