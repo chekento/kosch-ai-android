@@ -28,6 +28,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.AutoAwesome
+import androidx.compose.material.icons.rounded.Call
+import androidx.compose.material.icons.rounded.Contacts
+import androidx.compose.material.icons.rounded.Message
 import androidx.compose.material.icons.rounded.Draw
 import androidx.compose.material.icons.rounded.Folder
 import androidx.compose.material.icons.rounded.Widgets
@@ -118,6 +121,7 @@ fun UnifiedWorkspaceHomeScreen(
     val pageIndicatorBottomPadding = if (dockSettings.enabled) dockChromeHeight + 18.dp else 18.dp
     var addVisible by remember { mutableStateOf(false) }
     var folderPreviewId by remember { mutableStateOf<String?>(null) }
+    val isFrontDesktop = home.isPrimaryHomePage()
 
     LaunchedEffect(home.statusMessage) {
         home.statusMessage?.let {
@@ -155,17 +159,19 @@ fun UnifiedWorkspaceHomeScreen(
                     ),
             )
 
-            KalHomeClock(
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(start = 22.dp, top = 18.dp),
-            )
+            if (isFrontDesktop) {
+                KalHomeClock(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(start = 22.dp, top = 18.dp),
+                )
+            }
 
             ReferenceWorkspaceGrid(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(horizontal = 12.dp)
-                    .padding(top = 104.dp, bottom = workspaceBottomPadding),
+                    .padding(top = if (isFrontDesktop) 96.dp else 18.dp, bottom = workspaceBottomPadding),
                 controller = controller,
                 home = home,
                 onOpenFolder = { folderPreviewId = it },
@@ -183,7 +189,6 @@ fun UnifiedWorkspaceHomeScreen(
             if (dockSettings.enabled) {
                 ReferenceHomeDock(
                     controller = controller,
-                    onAdd = { addVisible = true },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(horizontal = 14.dp, vertical = 14.dp),
@@ -251,7 +256,9 @@ private fun ReferenceWorkspaceGrid(
     val page = home.activePage
     val launcherSettings = LocalLauncherSettings.current
     val scopedSettings = LocalScopedSettings.current
-    val styledItems = page.items.map { item ->
+    val styledItems = page.items
+        .filterNot { item -> WorkspacePagePolicy.isPersonal(page) && item.content is WorkspaceItemContent.ActionTile }
+        .map { item ->
         item to WorkspaceObjectStyleResolver.resolve(
             document = scopedSettings,
             pageId = page.id,
@@ -422,7 +429,7 @@ private fun ReferenceLegacyActionItem(
 
 @Composable
 private fun CompactPageDots(home: WorkspaceHomeController, modifier: Modifier = Modifier) {
-    val pages = home.document.pages
+    val pages = home.personalPages()
     if (pages.size <= 1) return
     val activeIndex = pages.indexOfFirst { it.id == home.document.activePageId }.coerceAtLeast(0)
     val slots = WorkspacePageIndicatorPolicy.slots(pages.size, activeIndex)
@@ -442,22 +449,16 @@ private fun CompactPageDots(home: WorkspaceHomeController, modifier: Modifier = 
             } else {
                 val page = pages[pageIndex]
                 val selected = page.id == home.document.activePageId
-                val system = WorkspacePagePolicy.isSystem(page)
-                val baseColor = if (system) Sky else Color.White
                 Surface(
                     modifier = Modifier
                         .size(if (selected) 9.dp else 7.dp)
                         .semantics {
                             role = Role.Button
-                            contentDescription = buildString {
-                                append(page.title)
-                                append(", Seite ${pageIndex + 1} von ${pages.size}")
-                                if (system) append(", KAL-Bereich") else append(", persönliche Seite")
-                            }
+                            contentDescription = "${page.title}, persönliche Seite ${pageIndex + 1} von ${pages.size}"
                         }
                         .clickable { home.activatePage(page.id) },
                     shape = CircleShape,
-                    color = if (selected) baseColor else baseColor.copy(alpha = 0.38f),
+                    color = if (selected) Color.White else Color.White.copy(alpha = 0.38f),
                 ) {}
             }
         }
@@ -467,118 +468,95 @@ private fun CompactPageDots(home: WorkspaceHomeController, modifier: Modifier = 
 @Composable
 private fun ReferenceHomeDock(
     controller: LauncherController,
-    onAdd: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val launcherSettings = LocalLauncherSettings.current
-    val dockSettings = launcherSettings.dock
-    val visibleApps = controller.apps.filterNot { it.key in controller.hiddenAppKeys }
-    val byKey = visibleApps.associateBy(LaunchableApp::key)
-    val dockKeys = SmartDockRuntimePolicy.selectKeys(
-        apps = visibleApps.map { app ->
-            SmartAppDescriptor(
-                key = app.key,
-                label = app.label,
-                packageName = app.packageName,
-            )
-        },
-        pinnedKeys = controller.pinnedAppKeys,
-        recentPackages = controller.recentPackages,
-        usageSignals = controller.appUsageSignals,
-        scene = controller.activeScene,
-        settings = dockSettings,
-    )
-    val dockApps = dockKeys.mapNotNull(byKey::get)
-    val itemExtent = maxOf(48f, 38f * dockSettings.iconScale + 10f).dp
+    val showBadges = launcherSettings.notifications.showBadgesOnDock
+    val whatsapp = controller.apps.firstOrNull { it.packageName == "com.whatsapp" }
+        ?: controller.apps.firstOrNull { it.packageName == "com.whatsapp.w4b" }
 
     Surface(
         modifier = modifier
-            .widthIn(max = 440.dp)
+            .widthIn(max = 380.dp)
             .semantics { contentDescription = "KAL Dock" },
-        color = DeepSurface.copy(alpha = dockSettings.backgroundOpacity),
-        shape = RoundedCornerShape(24.dp),
-        shadowElevation = 10.dp,
+        color = DeepSurface.copy(alpha = launcherSettings.dock.backgroundOpacity.coerceIn(0.18f, 0.86f)),
+        shape = RoundedCornerShape(26.dp),
+        shadowElevation = 8.dp,
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 7.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            IconButton(onClick = controller::openDrawer) {
-                Icon(Icons.Rounded.Apps, contentDescription = "Alle Apps", tint = Color.White)
+            CommunicationDockButton(
+                label = "Telefon",
+                badgeCount = if (showBadges) controller.phoneBadgeCount() else 0,
+                onClick = controller::openPhone,
+            ) {
+                Icon(Icons.Rounded.Call, contentDescription = null, tint = Color.White)
             }
-
-            if (dockApps.isNotEmpty()) {
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    dockApps.forEach { app ->
-                        ReferenceDockAppButton(
-                            app = app,
-                            badgeCount = SmartDockRuntimePolicy.visibleBadgeCount(
-                                rawCount = controller.notificationCounts[app.packageName] ?: 0,
-                                showBadgesOnDock = launcherSettings.notifications.showBadgesOnDock,
-                            ),
-                            iconScale = dockSettings.iconScale,
-                            itemExtent = itemExtent,
-                            onClick = { controller.launch(app) },
-                        )
-                    }
+            CommunicationDockButton(
+                label = "SMS",
+                badgeCount = if (showBadges) controller.messageBadgeCount() else 0,
+                onClick = { controller.message(null) },
+            ) {
+                Icon(Icons.Rounded.Message, contentDescription = null, tint = Color.White)
+            }
+            CommunicationDockButton(
+                label = "Alle Apps",
+                badgeCount = 0,
+                onClick = controller::openDrawer,
+            ) {
+                Icon(Icons.Rounded.Apps, contentDescription = null, tint = Color.White)
+            }
+            CommunicationDockButton(
+                label = "WhatsApp",
+                badgeCount = if (showBadges) controller.whatsAppBadgeCount() else 0,
+                onClick = controller::openWhatsApp,
+            ) {
+                if (whatsapp != null) {
+                    Image(
+                        bitmap = whatsapp.icon,
+                        contentDescription = null,
+                        modifier = Modifier.size(36.dp),
+                    )
+                } else {
+                    Icon(Icons.Rounded.Message, contentDescription = null, tint = Color.White)
                 }
             }
-
-            if (controller.stylusState.present) {
-                IconButton(onClick = controller::openPenSpace) {
-                    Icon(Icons.Rounded.Draw, contentDescription = "Pen Space", tint = Mint)
-                }
-            }
-            if (dockSettings.showAskButton) {
-                IconButton(onClick = controller::openProviderChooser) {
-                    Icon(Icons.Rounded.AutoAwesome, contentDescription = "Ask / KI", tint = Mint)
-                }
-            }
-            IconButton(onClick = onAdd) {
-                Icon(Icons.Rounded.Add, contentDescription = "Zum Homescreen hinzufügen", tint = Color.White)
+            CommunicationDockButton(
+                label = "Kontakte",
+                badgeCount = 0,
+                onClick = controller::openContacts,
+            ) {
+                Icon(Icons.Rounded.Contacts, contentDescription = null, tint = Color.White)
             }
         }
     }
 }
 
 @Composable
-private fun ReferenceDockAppButton(
-    app: LaunchableApp,
+private fun CommunicationDockButton(
+    label: String,
     badgeCount: Int,
-    iconScale: Float,
-    itemExtent: androidx.compose.ui.unit.Dp,
     onClick: () -> Unit,
+    icon: @Composable () -> Unit,
 ) {
     IconButton(
         onClick = onClick,
         modifier = Modifier
-            .size(itemExtent)
+            .size(52.dp)
             .semantics {
-                contentDescription = if (badgeCount > 0) {
-                    "${app.label}, $badgeCount Benachrichtigungen"
-                } else {
-                    app.label
-                }
+                contentDescription = if (badgeCount > 0) "$label, $badgeCount ungelesen" else label
             },
     ) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Image(
-                bitmap = app.icon,
-                contentDescription = null,
-                modifier = Modifier.size((38f * iconScale).dp),
-            )
+            icon()
             if (badgeCount > 0) {
                 Surface(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .size(if (badgeCount > 9) 20.dp else 16.dp),
+                        .size(if (badgeCount > 9) 21.dp else 17.dp),
                     color = Mint,
                     shape = CircleShape,
                 ) {
@@ -587,6 +565,7 @@ private fun ReferenceDockAppButton(
                             text = if (badgeCount > 99) "99+" else badgeCount.toString(),
                             color = DeepSurface,
                             style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Bold,
                         )
                     }
                 }
