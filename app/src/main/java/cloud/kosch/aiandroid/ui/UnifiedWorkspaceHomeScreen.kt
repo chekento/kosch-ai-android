@@ -104,6 +104,7 @@ import kotlinx.coroutines.delay
 fun UnifiedWorkspaceHomeScreen(
     controller: LauncherController,
     home: WorkspaceHomeController,
+    addRequest: Long = 0L,
     requestVoiceInput: () -> Unit,
     requestDocument: () -> Unit,
     requestContact: () -> Unit,
@@ -122,6 +123,10 @@ fun UnifiedWorkspaceHomeScreen(
     var addVisible by remember { mutableStateOf(false) }
     var folderPreviewId by remember { mutableStateOf<String?>(null) }
     val isFrontDesktop = home.isPrimaryHomePage()
+
+    LaunchedEffect(addRequest) {
+        if (addRequest > 0L) addVisible = true
+    }
 
     LaunchedEffect(home.statusMessage) {
         home.statusMessage?.let {
