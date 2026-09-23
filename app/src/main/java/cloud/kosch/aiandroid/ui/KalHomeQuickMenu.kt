@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.AutoAwesome
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Newspaper
@@ -42,6 +43,7 @@ import cloud.kosch.aiandroid.ui.theme.DeepSurface
 /** One quiet launcher entry keeps professional tools available without cluttering Home. */
 @Composable
 fun KalHomeQuickMenu(
+    onAdd: () -> Unit,
     onSearch: () -> Unit,
     onAiHub: () -> Unit,
     onPersonalize: () -> Unit,
@@ -79,6 +81,14 @@ fun KalHomeQuickMenu(
             onDismissRequest = { expanded = false },
             containerColor = DeepSurface.copy(alpha = 0.98f),
         ) {
+            DropdownMenuItem(
+                text = { Text("Zum Home hinzufügen", style = MaterialTheme.typography.bodyLarge) },
+                leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+                onClick = {
+                    expanded = false
+                    onAdd()
+                },
+            )
             DropdownMenuItem(
                 text = { Text("Suche", style = MaterialTheme.typography.bodyLarge) },
                 leadingIcon = { Icon(Icons.Rounded.Search, contentDescription = null) },
