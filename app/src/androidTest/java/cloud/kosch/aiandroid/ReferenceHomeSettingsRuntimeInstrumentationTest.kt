@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.performClick
 import androidx.lifecycle.ViewModelProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import cloud.kosch.aiandroid.data.WorkspaceStore
 import cloud.kosch.aiandroid.model.HomePage
 import org.junit.Rule
 import org.junit.Test
@@ -18,7 +19,7 @@ class ReferenceHomeSettingsRuntimeInstrumentationTest {
     val composeTestRule = createAndroidComposeRule<MainActivity>()
 
     @Test
-    fun dockEnabledAndAskSwitch_areImmediateRuntimeGates() {
+    fun communicationDockEnabled_isAnImmediateRuntimeGate() {
         composeTestRule.waitForIdle()
         dismissOnboardingIfVisible()
         val viewModel = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
@@ -27,23 +28,14 @@ class ReferenceHomeSettingsRuntimeInstrumentationTest {
         try {
             composeTestRule.runOnUiThread {
                 viewModel.controller.switchHomePage(HomePage.WORKSPACE)
-                check(viewModel.settings.applyDock(original.copy(enabled = true, showAskButton = true)))
+                check(viewModel.settings.applyDock(original.copy(enabled = true)))
             }
             composeTestRule.waitForIdle()
 
             composeTestRule.onNodeWithContentDescription("KAL Dock", useUnmergedTree = true).fetchSemanticsNode()
-            composeTestRule.onNodeWithContentDescription("Ask / KI", useUnmergedTree = true).fetchSemanticsNode()
-
-            composeTestRule.runOnUiThread {
-                check(viewModel.settings.applyDock(viewModel.settings.document.dock.copy(showAskButton = false)))
+            listOf("Telefon", "SMS", "Alle Apps", "WhatsApp", "Kontakte").forEach { label ->
+                composeTestRule.onNodeWithContentDescription(label, useUnmergedTree = true).fetchSemanticsNode()
             }
-            composeTestRule.waitForIdle()
-            check(
-                composeTestRule
-                    .onAllNodesWithContentDescription("Ask / KI", useUnmergedTree = true)
-                    .fetchSemanticsNodes()
-                    .isEmpty(),
-            ) { "Ask/AI dock entry must disappear when its setting is disabled." }
 
             composeTestRule.runOnUiThread {
                 check(viewModel.settings.applyDock(viewModel.settings.document.dock.copy(enabled = false)))
@@ -54,7 +46,7 @@ class ReferenceHomeSettingsRuntimeInstrumentationTest {
                     .onAllNodesWithContentDescription("KAL Dock", useUnmergedTree = true)
                     .fetchSemanticsNodes()
                     .isEmpty(),
-            ) { "Reference Home dock must disappear when DockSettings.enabled is false." }
+            ) { "Clean Home dock must disappear when DockSettings.enabled is false." }
         } finally {
             composeTestRule.runOnUiThread {
                 viewModel.settings.applyDock(original)
@@ -64,19 +56,22 @@ class ReferenceHomeSettingsRuntimeInstrumentationTest {
     }
 
     @Test
-    fun pageIndicatorSetting_isAnImmediateRuntimeGate() {
+    fun pageIndicatorSetting_isAnImmediateRuntimeGateForPersonalPages() {
         composeTestRule.waitForIdle()
         dismissOnboardingIfVisible()
         val viewModel = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
-        val original = viewModel.settings.document.home
+        val workspaceStore = WorkspaceStore(composeTestRule.activity.applicationContext)
+        val originalWorkspace = workspaceStore.loadWorkspaceDocument()
+        val originalHome = viewModel.settings.document.home
 
         try {
             composeTestRule.runOnUiThread {
                 viewModel.controller.switchHomePage(HomePage.WORKSPACE)
-                check(viewModel.homeWorkspace.document.pages.size > 1) {
-                    "Reference Home contract requires more than one workspace page."
+                if (viewModel.homeWorkspace.personalPages().size < 2) {
+                    viewModel.homeWorkspace.createPage("Indicator Test")
                 }
-                check(viewModel.settings.applyHome(original.copy(showPageIndicator = true), viewModel.homeWorkspace))
+                check(viewModel.homeWorkspace.personalPages().size > 1)
+                check(viewModel.settings.applyHome(originalHome.copy(showPageIndicator = true), viewModel.homeWorkspace))
             }
             composeTestRule.waitForIdle()
             composeTestRule
@@ -100,7 +95,9 @@ class ReferenceHomeSettingsRuntimeInstrumentationTest {
             ) { "Page indicator must disappear when HomeSettings.showPageIndicator is false." }
         } finally {
             composeTestRule.runOnUiThread {
-                viewModel.settings.applyHome(original, viewModel.homeWorkspace)
+                workspaceStore.saveWorkspaceDocument(originalWorkspace)
+                viewModel.homeWorkspace.reload()
+                viewModel.settings.applyHome(originalHome, viewModel.homeWorkspace)
             }
             composeTestRule.waitForIdle()
         }
