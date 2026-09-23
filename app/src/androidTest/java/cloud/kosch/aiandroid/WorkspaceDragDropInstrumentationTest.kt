@@ -70,7 +70,7 @@ class WorkspaceDragDropInstrumentationTest {
                     .isNotEmpty()
             }
             composeTestRule.onNodeWithText(
-                "Apps · Widgets · Seiten · Raster · Drag & Drop",
+                "Apps · Widgets · freie Seiten · Raster · Drag & Drop",
                 substring = true,
                 useUnmergedTree = true,
             ).fetchSemanticsNode()
