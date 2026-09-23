@@ -31,32 +31,27 @@ The verified `0.3.0-alpha01` artifact is available directly for the current PR b
 | ✒️ | **Pen Space** | Stylus ink, system-note route and optional export stay in a focused surface. |
 | ♻️ | **Recovery is a feature** | HOME selection, backup/restore, audit export, undo paths and a visible security exit remain reachable. |
 
-## See the current launcher
+## Launcher screenshots
 
-These five product UI images document the current KAL shell. They are versioned SVG assets so GitHub, the website and future release notes show the same interface without blurred screenshots.
+The launcher views are now presented as large store-style screenshots. The interactive GitHub Pages gallery supports horizontal wheel/trackpad scrolling, touch swipe, snap-to-card navigation, arrow buttons, position dots and full-size zoom.
 
-| Home | Apps |
-|---|---|
-| ![KAL Home with Command Center](docs/assets/kal-home.svg) | ![KAL Apps grid](docs/assets/kal-apps.svg) |
-| Workspace | AI News |
-|---|---|
-| ![KAL Workspace pages](docs/assets/kal-workspace.svg) | ![KAL AI News source hub](docs/assets/kal-ai-news.svg) |
+**[Open the Play-Store-style screenshot wheel →](https://chekento.github.io/kosch-ai-android/#screenshots)**
 
-### Pen Space
+<p align="center">
+  <a href="https://chekento.github.io/kosch-ai-android/#screenshots"><img src="docs/assets/screenshots/kal-store-01-home.svg" width="880" alt="KAL Command Center large screenshot"></a>
+</p>
 
-![KAL Pen Space](docs/assets/kal-pen-space.svg)
+<p align="center">
+  <a href="docs/assets/screenshots/kal-store-02-apps.svg"><img src="docs/assets/screenshots/kal-store-02-apps.svg" width="520" alt="KAL Apps large screenshot"></a>
+  <a href="docs/assets/screenshots/kal-store-03-workspace.svg"><img src="docs/assets/screenshots/kal-store-03-workspace.svg" width="520" alt="KAL Workspace large screenshot"></a>
+</p>
 
-### App icon and launcher logo
+<p align="center">
+  <a href="docs/assets/screenshots/kal-store-04-ai-news.svg"><img src="docs/assets/screenshots/kal-store-04-ai-news.svg" width="520" alt="KAL AI News large screenshot"></a>
+  <a href="docs/assets/screenshots/kal-store-05-pen-space.svg"><img src="docs/assets/screenshots/kal-store-05-pen-space.svg" width="520" alt="KAL Pen Space large screenshot"></a>
+</p>
 
-![KAL app icon](docs/assets/kal-icon.svg)
-
-### Product banners
-
-![KAL local-first banner](docs/assets/kal-banner-local-first.svg)
-
-![KAL professional shell banner](docs/assets/kal-banner-professional-shell.svg)
-
-![KAL consent-first privacy banner](docs/assets/kal-banner-privacy.svg)
+The images document the current KAL shell and remain deliberately marked as an early development / test-only build rather than a finished Play Store release.
 
 ## Feature map
 
