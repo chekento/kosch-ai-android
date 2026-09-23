@@ -114,6 +114,7 @@ fun DragDropWorkspaceHomeScreen(
     home: WorkspaceHomeController,
     settings: LauncherSettingsController,
     scopedSettings: ScopedSettingsController,
+    addRequest: Long,
     requestVoiceInput: () -> Unit,
     requestDocument: () -> Unit,
     requestContact: () -> Unit,
@@ -131,6 +132,7 @@ fun DragDropWorkspaceHomeScreen(
         UnifiedWorkspaceHomeScreen(
             controller = controller,
             home = home,
+            addRequest = addRequest,
             requestVoiceInput = requestVoiceInput,
             requestDocument = requestDocument,
             requestContact = requestContact,
