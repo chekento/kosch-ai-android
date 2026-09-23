@@ -39,21 +39,28 @@ class UnifiedWorkspaceHomeInstrumentationTest {
             }
             composeTestRule.waitForIdle()
 
-            assertEquals(WorkspaceDocument.DEFAULT_PAGE_ID, initialViewModel.homeWorkspace.document.pages.first().id)
+            assertTrue(
+                initialViewModel.homeWorkspace.personalPages().any { it.id == WorkspaceDocument.DEFAULT_PAGE_ID },
+            )
             assertEquals("API36 Home Test", initialViewModel.homeWorkspace.activePage.title)
             assertTrue(initialViewModel.homeWorkspace.isUserManagedPage())
             composeTestRule
                 .onNodeWithText("App fehlt", useUnmergedTree = true)
                 .fetchSemanticsNode()
             composeTestRule
-                .onNodeWithContentDescription("Zum Homescreen hinzufügen", useUnmergedTree = true)
-                .fetchSemanticsNode()
-            composeTestRule
                 .onNodeWithContentDescription("Alle Apps", useUnmergedTree = true)
                 .fetchSemanticsNode()
             composeTestRule
                 .onNodeWithContentDescription("KAL Menü", useUnmergedTree = true)
+                .performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule
+                .onNodeWithText("Zum Home hinzufügen", useUnmergedTree = true)
                 .fetchSemanticsNode()
+            composeTestRule
+                .onNodeWithContentDescription("KAL Menü", useUnmergedTree = true)
+                .performClick()
+            composeTestRule.waitForIdle()
 
             // Click the merged button semantics rather than the unmerged icon descendant. This keeps the test tied to
             // the same accessible action a user invokes and avoids API-36 dispatching the click to a non-clickable child.
@@ -82,7 +89,9 @@ class UnifiedWorkspaceHomeInstrumentationTest {
             composeTestRule.waitForIdle()
 
             val recreated = ViewModelProvider(composeTestRule.activity)[LauncherViewModel::class.java]
-            assertEquals(WorkspaceDocument.DEFAULT_PAGE_ID, recreated.homeWorkspace.document.pages.first().id)
+            assertTrue(
+                recreated.homeWorkspace.personalPages().any { it.id == WorkspaceDocument.DEFAULT_PAGE_ID },
+            )
             assertEquals("API36 Home Test", recreated.homeWorkspace.activePage.title)
             assertTrue(recreated.homeWorkspace.isUserManagedPage())
             composeTestRule
@@ -92,7 +101,11 @@ class UnifiedWorkspaceHomeInstrumentationTest {
                 .onNodeWithContentDescription("Alle Apps", useUnmergedTree = true)
                 .fetchSemanticsNode()
             composeTestRule
-                .onNodeWithContentDescription("Zum Homescreen hinzufügen", useUnmergedTree = true)
+                .onNodeWithContentDescription("KAL Menü", useUnmergedTree = true)
+                .performClick()
+            composeTestRule.waitForIdle()
+            composeTestRule
+                .onNodeWithText("Zum Home hinzufügen", useUnmergedTree = true)
                 .fetchSemanticsNode()
         } finally {
             composeTestRule.runOnUiThread {
