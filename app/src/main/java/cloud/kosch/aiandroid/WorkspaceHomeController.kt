@@ -30,8 +30,9 @@ import java.util.UUID
  * Home Studio keeps a bounded in-process edit history. Undo/redo snapshots contain only the portable WorkspaceDocument;
  * device-local widget bindings remain owned by WorkspaceWidgetBindingStore and are reconciled independently.
  *
- * Navigation follows one explicit product contract: the protected personal Home is first, user-created personal pages
- * follow it, and KAL system/tool spaces live behind those pages. The stable persisted schema does not need to change.
+ * Navigation follows one explicit product contract: the protected personal Home is the anchor desktop, user-created
+ * personal pages may live to its left or right, and KAL system/tool spaces stay outside that personal swipe strip. The
+ * stable persisted schema already carries page order, so this does not require a schema migration.
  */
 class WorkspaceHomeController(
     context: Context,
@@ -104,21 +105,36 @@ class WorkspaceHomeController(
         return released
     }
 
-    fun createPage(title: String = "") {
+    fun createPage(title: String = "", direction: Int = 1) {
         if (!allowLayoutMutation()) return
+        if (direction != -1 && direction != 1) {
+            statusMessage = "Neue Seiten können nur links oder rechts angelegt werden"
+            return
+        }
+        val anchor = activePage.takeIf(WorkspacePagePolicy::isPersonal)
+            ?: document.pages.firstOrNull(WorkspacePagePolicy::isPrimaryHome)
+            ?: document.pages.first()
+        val pageId = "page:user:${UUID.randomUUID()}"
         val updated = runCatching {
-            WorkspacePagePolicy.organize(
-                WorkspacePageEditor.createUserPage(
-                    document = document,
-                    pageId = "page:user:${UUID.randomUUID()}",
-                    title = title,
-                ),
+            val created = WorkspacePageEditor.createUserPage(
+                document = document,
+                pageId = pageId,
+                title = title,
+            )
+            WorkspacePagePolicy.placeUserPageAdjacent(
+                document = created,
+                pageId = pageId,
+                anchorPageId = anchor.id,
+                direction = direction,
             )
         }.getOrElse {
             statusMessage = it.message ?: "Home-Seite konnte nicht erstellt werden"
             return
         }
-        persist(updated, "Neue persönliche Seite erstellt")
+        persist(
+            updated,
+            if (direction < 0) "Neue persönliche Seite links erstellt" else "Neue persönliche Seite rechts erstellt",
+        )
     }
 
     fun duplicateActivePage() {
@@ -196,9 +212,9 @@ class WorkspaceHomeController(
         if (!allowLayoutMutation()) return
         if (!WorkspacePagePolicy.canMove(activePage)) {
             statusMessage = if (WorkspacePagePolicy.isPrimaryHome(activePage)) {
-                "Home bleibt immer die erste Seite"
+                "Der Hauptdesktop selbst bleibt geschützt"
             } else {
-                "KAL-Systemseiten bleiben hinter den persönlichen Seiten"
+                "Persönliche Seiten können links und rechts von Home sortiert werden"
             }
             return
         }
@@ -484,12 +500,20 @@ class WorkspaceHomeController(
                 return null
             }
             val withNewPage = runCatching {
-                WorkspacePagePolicy.organize(
-                    WorkspacePageEditor.createUserPage(
-                        working,
-                        "page:user:${UUID.randomUUID()}",
-                        "",
-                    ),
+                val pageId = "page:user:${UUID.randomUUID()}"
+                val anchor = working.pages.firstOrNull { it.id == working.activePageId }
+                    ?.takeIf(WorkspacePagePolicy::isPersonal)
+                    ?: working.pages.first(WorkspacePagePolicy::isPrimaryHome)
+                val created = WorkspacePageEditor.createUserPage(
+                    working,
+                    pageId,
+                    "",
+                )
+                WorkspacePagePolicy.placeUserPageAdjacent(
+                    document = created,
+                    pageId = pageId,
+                    anchorPageId = anchor.id,
+                    direction = 1,
                 )
             }.getOrElse {
                 statusMessage = "Homescreen ist voll und es kann keine weitere persönliche Seite erstellt werden"
