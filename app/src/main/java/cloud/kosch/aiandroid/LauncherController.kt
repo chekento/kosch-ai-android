@@ -663,7 +663,7 @@ class LauncherController(context: Context) {
     fun completeOnboarding() {
         store.completeOnboarding()
         onboardingVisible = false
-        notice = "KoSch ist bereit – der lokale Kern bleibt ohne API aktiv"
+        notice = "KAL ist bereit – der lokale Kern bleibt ohne API aktiv"
     }
 
     fun reopenOnboarding() {
@@ -680,7 +680,42 @@ class LauncherController(context: Context) {
     }
 
     fun openPhone() {
-        phoneVisible = true
+        systemActions.openDialer()
+            .onSuccess {
+                phoneVisible = false
+                selectedContact = null
+                notice = "Android-Telefon geöffnet"
+                audit(AuditAction.DIALER, AuditOutcome.SUCCESS)
+            }
+            .onFailure {
+                notice = "Auf diesem Gerät ist keine Telefon-App verfügbar"
+                audit(AuditAction.DIALER, AuditOutcome.FAILED)
+            }
+    }
+
+    fun openContacts() {
+        systemActions.openContacts()
+            .onSuccess { notice = "Android-Kontakte geöffnet" }
+            .onFailure { notice = "Auf diesem Gerät ist keine Kontakte-App verfügbar" }
+    }
+
+    fun openWhatsApp() {
+        val app = apps.firstOrNull { it.packageName in WHATSAPP_PACKAGES }
+        if (app != null) {
+            launch(app)
+            return
+        }
+        systemActions.openStoreListing(WHATSAPP_PRIMARY_PACKAGE)
+            .onSuccess { notice = "WhatsApp ist nicht installiert – Store-Seite geöffnet" }
+            .onFailure { notice = "WhatsApp konnte nicht geöffnet werden" }
+    }
+
+    fun phoneBadgeCount(): Int = communicationBadgeCount(systemActions.defaultDialerPackage())
+
+    fun messageBadgeCount(): Int = communicationBadgeCount(systemActions.defaultSmsPackage())
+
+    fun whatsAppBadgeCount(): Int = WHATSAPP_PACKAGES.sumOf { packageName ->
+        communicationBadgeCount(packageName)
     }
 
     fun closePhone() {
@@ -1549,6 +1584,11 @@ class LauncherController(context: Context) {
         }
     }
 
+    private fun communicationBadgeCount(packageName: String?): Int {
+        if (!notificationAccessGranted || packageName.isNullOrBlank()) return 0
+        return (notificationCounts[packageName] ?: 0).coerceAtLeast(0)
+    }
+
     fun consumeNotice() {
         notice = null
     }
@@ -1845,6 +1885,8 @@ class LauncherController(context: Context) {
         const val MAX_PINNED_APPS = 5
         const val DOCK_SIZE = 5
         const val MAX_BACKUP_ENVELOPE_BYTES = 8 * 1024 * 1024
+        const val WHATSAPP_PRIMARY_PACKAGE = "com.whatsapp"
+        val WHATSAPP_PACKAGES = setOf("com.whatsapp", "com.whatsapp.w4b")
     }
 
     private data class FileWorkspaceSnapshot(
