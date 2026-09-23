@@ -73,6 +73,7 @@ class MainActivity : ComponentActivity() {
     private var pendingInkExportToken: String? = null
     private var personalizationVisible by mutableStateOf(false)
     private var widgetStacksVisible by mutableStateOf(false)
+    private var homeAddRequest by mutableStateOf(0L)
 
     private val homeRoleRequest = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -303,6 +304,7 @@ class MainActivity : ComponentActivity() {
                             home = launcherViewModel.homeWorkspace,
                             settings = settings,
                             scopedSettings = launcherViewModel.scopedSettings,
+                            addRequest = homeAddRequest,
                             requestVoiceInput = ::requestVoiceInput,
                             requestDocument = ::requestDocument,
                             requestContact = ::requestContact,
@@ -334,6 +336,7 @@ class MainActivity : ComponentActivity() {
                         !universalSearch.visible
                     ) {
                         KalHomeQuickMenu(
+                            onAdd = { homeAddRequest += 1 },
                             onSearch = {
                                 personalizationVisible = false
                                 launcherViewModel.openUniversalSearch()
@@ -586,7 +589,7 @@ class MainActivity : ComponentActivity() {
         if (pages.isEmpty()) return
         val currentIndex = pages.indexOfFirst { it.id == home.document.activePageId }
             .takeIf { it >= 0 }
-            ?: pages.indexOfFirst(home::isPrimaryHomePage).coerceAtLeast(0)
+            ?: pages.indexOfFirst { home.isPrimaryHomePage(it) }.coerceAtLeast(0)
         val nextIndex = LauncherPresentationPlanner.adjacentPageIndex(
             settings = launcherViewModel.settings.document.pages,
             currentIndex = currentIndex,
