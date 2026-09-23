@@ -360,9 +360,9 @@ class MainActivity : ComponentActivity() {
                         )
                     }
 
-                    // The portable document controls presentation only. Runtime enable/disable remains authoritative
-                    // in AssistantSessionController, so a disabled Assistant still exposes its explicit setup entry.
-                    if (unifiedHomeVisible) {
+                    // Keep normal Home visually quiet. A disabled Assistant has no permanent desktop chrome; it can
+                    // be enabled again from Settings or the KAL menu.
+                    if (unifiedHomeVisible && launcherViewModel.assistant.settings.enabled) {
                         val assistantAlignment = when (assistantPresentation.anchor) {
                             AssistantAnchor.LEFT -> Alignment.BottomStart
                             AssistantAnchor.CENTER -> Alignment.BottomCenter
@@ -582,8 +582,11 @@ class MainActivity : ComponentActivity() {
 
     private fun moveGesturePage(direction: Int) {
         val home = launcherViewModel.homeWorkspace
-        val pages = home.document.pages
+        val pages = home.personalPages()
+        if (pages.isEmpty()) return
         val currentIndex = pages.indexOfFirst { it.id == home.document.activePageId }
+            .takeIf { it >= 0 }
+            ?: pages.indexOfFirst(home::isPrimaryHomePage).coerceAtLeast(0)
         val nextIndex = LauncherPresentationPlanner.adjacentPageIndex(
             settings = launcherViewModel.settings.document.pages,
             currentIndex = currentIndex,
@@ -591,7 +594,7 @@ class MainActivity : ComponentActivity() {
             direction = direction,
         )
         if (nextIndex == currentIndex || nextIndex !in pages.indices) {
-            controller.postNotice("Keine weitere Home-Seite in dieser Richtung")
+            controller.postNotice("Keine weitere persönliche Seite in dieser Richtung")
             return
         }
         controller.switchHomePage(HomePage.WORKSPACE)
