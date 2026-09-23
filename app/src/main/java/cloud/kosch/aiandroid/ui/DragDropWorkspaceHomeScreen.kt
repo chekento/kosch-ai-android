@@ -193,7 +193,7 @@ private fun WorkspaceArrangeDialog(
                     Column(modifier = Modifier.weight(1f)) {
                         Text("Home Studio", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold)
                         Text(
-                            "Apps · Widgets · Seiten · Raster · Drag & Drop · 30× Undo/Redo",
+                            "Apps · Widgets · freie Seiten · Raster · Drag & Drop · Undo/Redo",
                             color = MutedMist,
                             style = MaterialTheme.typography.labelMedium,
                         )
@@ -292,7 +292,7 @@ private fun WorkspaceArrangeDialog(
                 }
 
                 Text(
-                    "Home ist geschützt. Eigene Seiten kannst du anlegen, umbenennen, duplizieren, sortieren und löschen. KAL-Funktionsseiten bleiben dahinter erhalten.",
+                    "Home ist dein geschützter Hauptdesktop. Eigene freie Seiten kannst du links und rechts davon anlegen, sortieren, umbenennen, duplizieren und löschen.",
                     color = MutedMist,
                     style = MaterialTheme.typography.bodySmall,
                 )
@@ -359,9 +359,14 @@ private fun HomeStudioPageActions(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AssistChip(
-            onClick = { home.createPage() },
-            label = { Text("Neue Seite") },
-            leadingIcon = { Icon(Icons.Rounded.Add, contentDescription = null) },
+            onClick = { home.createPage(direction = -1) },
+            label = { Text("Seite links") },
+            leadingIcon = { Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = null) },
+        )
+        AssistChip(
+            onClick = { home.createPage(direction = 1) },
+            label = { Text("Seite rechts") },
+            leadingIcon = { Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null) },
         )
         AssistChip(
             onClick = home::duplicateActivePage,
