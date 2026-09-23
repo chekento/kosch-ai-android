@@ -8,6 +8,9 @@ import android.os.Build
 import android.os.UserHandle
 import android.provider.AlarmClock
 import android.provider.CalendarContract
+import android.provider.ContactsContract
+import android.provider.Telephony
+import android.telecom.TelecomManager
 import android.provider.MediaStore
 import android.provider.Settings
 import cloud.kosch.aiandroid.model.FileInsight
@@ -29,6 +32,20 @@ class SystemActionGateway(context: Context) {
             Uri.parse("smsto:${number.orEmpty()}"),
         ),
     )
+
+    /** Opens Android's normal address-book surface; KAL does not mirror or import the contact database. */
+    fun openContacts(): Result<Unit> = start(
+        Intent(Intent.ACTION_VIEW, ContactsContract.Contacts.CONTENT_URI),
+    )
+
+    /** Package names are used only to map opt-in notification counts to the visible system shortcuts. */
+    fun defaultDialerPackage(): String? = runCatching {
+        appContext.getSystemService(TelecomManager::class.java)?.defaultDialerPackage
+    }.getOrNull()?.takeIf(String::isNotBlank)
+
+    fun defaultSmsPackage(): String? = runCatching {
+        Telephony.Sms.getDefaultSmsPackage(appContext)
+    }.getOrNull()?.takeIf(String::isNotBlank)
 
     fun openCalendar(): Result<Unit> {
         val calendarUri = CalendarContract.CONTENT_URI.buildUpon().appendPath("time")
